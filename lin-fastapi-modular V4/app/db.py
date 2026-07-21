@@ -224,19 +224,23 @@ def load_context(source):
         print(f"[db] 读取 context {source} 失败: {e}")
         return None
 
+
 def save_context(source, payload):
     """写入/更新某个来源的最新快照（同一个source只留一条,用upsert）。"""
     if not _client:
         return
     try:
+        from datetime import datetime, timezone
         _client.table("context_state").upsert({
             "source": source,
             "payload": payload,
-            "updated_at": "now()",
+            # 之前这里写的是字符串 "now()"（带括号），Postgres会解析失败导致upsert静默失败，
+            # 天气/Mac状态永远存不进数据库、自己却看不出来。改成Python自己算好时间再传过去。
+            "updated_at": datetime.now(timezone.utc).isoformat(),
         }).execute()
     except Exception as e:
         print(f"[db] 写入 context {source} 失败: {e}")
-
+        
 # ---------- Photos（图片资料卡，图片本体在 Supabase Storage） ----------
 def insert_photo(filename, url, caption=""):
     if not _client:

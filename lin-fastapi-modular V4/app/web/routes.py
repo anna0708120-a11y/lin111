@@ -39,13 +39,15 @@ class AvatarPayload(BaseModel):
     who: Optional[str] = "lin"  # "lin" 或 "anna"
 
 class MacStatus(BaseModel):
-    """mac_daemon.py（第4步）会定期打这个进来。字段都设成可选，
+    """mac_daemon.py 会定期打这个进来。字段都设成可选，
     以后daemon想加别的信息（比如前台app名字）不用改这里的接口。"""
+    cpu: Optional[float] = None
+    ram: Optional[float] = None
     battery: Optional[int] = None
     charging: Optional[bool] = None
     locked: Optional[bool] = None
     asleep: Optional[bool] = None
-
+    
 @router.get("/health")
 def health():
     """给 Render / 之后的监控用的健康检查接口，顺便回报 Supabase 有没有连上。"""

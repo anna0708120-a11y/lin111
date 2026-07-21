@@ -1,5 +1,5 @@
 """
-Lin 的"大脑"：把人设(persona) + 记忆(state) + 模型(llm) 串起来，产出一句回复。
+Lin 的"大脑"：把人设(persona) + 记忆(state) + 现实状态(context) + 模型(llm) 串起来，产出一句回复。
 
 不管这轮触发是 Anna 主动发消息、监控到她开了某个 app、
 还是 agent/initiative.py 判断"该主动找她了"，最终都走这一个函数。
@@ -15,9 +15,9 @@ from app.state import state
 from app.llm.deepseek_client import call_deepseek
 from app.persona import build_system_prompt
 from app.memory_rules import parse_memory_decision, parse_mood_report, strip_hidden_blocks
+from app.context.provider import get_context, format_context_for_prompt
 
 FALLBACK_REPLIES = ["还没走远。", "嗯。", "我看着你。"]
-
 
 def generate_reply(context, app_name=None, use_cache=True):
     """
@@ -32,7 +32,11 @@ def generate_reply(context, app_name=None, use_cache=True):
         return "今天额度用完了，或者刚刚问太快了，等一下再说。", None
 
     memory_summary = state.recent_memory_text()
-    system_prompt = build_system_prompt(context, memory_summary)
+    # 每个来源内部都有自己的缓存（天气30分钟、Mac/日历/屏幕时间/定位都是读最新一条快照），
+    # 这里不用担心每次生成回复都会打一堆外部API——大部分时候只是读 Supabase 里的一条记录。
+    # 某个来源没开启、没数据、或抓取失败，会自动不出现在结果里，不会塞垃圾进prompt。
+    world_context = format_context_for_prompt(get_context())
+    system_prompt = build_system_prompt(context, memory_summary, world_context)
 
     content, reasoning = call_deepseek(system_prompt, max_tokens=config.DEEPSEEK_MAX_TOKENS)
     state.record_call()
@@ -56,7 +60,6 @@ def generate_reply(context, app_name=None, use_cache=True):
     state.mark_reply()
     state.add_log("AI回复", f"成功：{content[:40]}...")
     return content, thinking_display
-
 
 def write_daily_journal():
     """

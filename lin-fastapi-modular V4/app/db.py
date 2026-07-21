@@ -206,3 +206,79 @@ def insert_note(content):
         _client.table("chen_notes").insert({"content": content}).execute()
     except Exception as e:
         print(f"[db] 写入碎碎念失败: {e}")
+# ---------- Context State（Mac/天气/日历/屏幕时间/定位 快照） ----------
+def load_context(source):
+    """读某个来源最新的一条快照。找不到回传 None。"""
+    if not _client:
+        return None
+    try:
+        res = (
+            _client.table("context_state")
+            .select("payload, updated_at")
+            .eq("source", source)
+            .limit(1)
+            .execute()
+        )
+        return res.data[0] if res.data else None
+    except Exception as e:
+        print(f"[db] 读取 context {source} 失败: {e}")
+        return None
+
+def save_context(source, payload):
+    """写入/更新某个来源的最新快照（同一个source只留一条,用upsert）。"""
+    if not _client:
+        return
+    try:
+        _client.table("context_state").upsert({
+            "source": source,
+            "payload": payload,
+            "updated_at": "now()",
+        }).execute()
+    except Exception as e:
+        print(f"[db] 写入 context {source} 失败: {e}")
+
+# ---------- Photos（图片资料卡，图片本体在 Supabase Storage） ----------
+def insert_photo(filename, url, caption=""):
+    if not _client:
+        return None
+    try:
+        res = (
+            _client.table("photos")
+            .insert({"filename": filename, "url": url, "caption": caption})
+            .execute()
+        )
+        return res.data[0] if res.data else None
+    except Exception as e:
+        print(f"[db] 写入图片记录失败: {e}")
+        return None
+
+def load_recent_photos(limit=12):
+    if not _client:
+        return []
+    try:
+        res = (
+            _client.table("photos")
+            .select("id, filename, url, caption, created_at")
+            .order("created_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        return res.data or []
+    except Exception as e:
+        print(f"[db] 读取图片列表失败: {e}")
+        return []
+
+def upload_photo_file(local_path, storage_filename):
+    """把本地文件上传到 Supabase Storage，回传公开访问网址；失败回 None。"""
+    if not _client:
+        return None
+    try:
+        from app import config
+        with open(local_path, "rb") as f:
+            _client.storage.from_(config.PHOTO_BUCKET).upload(
+                storage_filename, f, {"content-type": "image/jpeg"}
+            )
+        return _client.storage.from_(config.PHOTO_BUCKET).get_public_url(storage_filename)
+    except Exception as e:
+        print(f"[db] 上传图片文件失败: {e}")
+        return None

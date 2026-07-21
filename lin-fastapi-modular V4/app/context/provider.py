@@ -60,7 +60,12 @@ def format_context_for_prompt(context_dict):
         if m.get("charging"):
             status_bits.append("充电中")
         status_text = "、".join(status_bits) if status_bits else "使用中"
-        lines.append(f"Anna的Mac状态：{status_text}，电量{m.get('battery')}%")
+        detail = f"Anna的Mac状态：{status_text}，电量{m.get('battery')}%"
+        if m.get("cpu") is not None:
+            detail += f"，CPU使用率{m.get('cpu')}%"
+        if m.get("ram") is not None:
+            detail += f"，内存使用率{m.get('ram')}%"
+        lines.append(detail)
     if "calendar" in context_dict:
         events = context_dict["calendar"]
         if events:

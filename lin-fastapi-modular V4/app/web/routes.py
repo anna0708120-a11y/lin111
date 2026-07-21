@@ -6,56 +6,58 @@
 """
 from typing import Optional
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.responses import Response
 from pydantic import BaseModel
 
 from app import db
 from app.agent.brain import generate_reply
+from app.context.auth import verify_context_token
+from app.context import mac as mac_context
 from app.notify.bark import send_to_bark
 from app.state import state
 from app.web.pwa import MANIFEST_JSON, SERVICE_WORKER_JS
 
 router = APIRouter()
 
-
 class Activity(BaseModel):
     activity: str
     app_name: Optional[str] = None
-
 
 class MemoryItem(BaseModel):
     category: str
     content: str
     tag: Optional[str] = None
 
-
 class ProactiveSettings(BaseModel):
     enabled: Optional[bool] = None
     min_minutes: Optional[int] = None
     max_minutes: Optional[int] = None
 
-
 class AvatarPayload(BaseModel):
     data: str
     who: Optional[str] = "lin"  # "lin" 或 "anna"
 
+class MacStatus(BaseModel):
+    """mac_daemon.py（第4步）会定期打这个进来。字段都设成可选，
+    以后daemon想加别的信息（比如前台app名字）不用改这里的接口。"""
+    battery: Optional[int] = None
+    charging: Optional[bool] = None
+    locked: Optional[bool] = None
+    asleep: Optional[bool] = None
 
 @router.get("/health")
 def health():
     """给 Render / 之后的监控用的健康检查接口，顺便回报 Supabase 有没有连上。"""
     return {"status": "ok", "supabase_connected": db.is_connected()}
 
-
 @router.get("/manifest.json")
 def manifest():
     return Response(content=MANIFEST_JSON, media_type="application/manifest+json")
 
-
 @router.get("/sw.js")
 def service_worker():
     return Response(content=SERVICE_WORKER_JS, media_type="application/javascript")
-
 
 @router.post("/watch")
 def observe_anna(activity: Activity):
@@ -74,7 +76,6 @@ def observe_anna(activity: Activity):
     state.add_log("監控觸發", f"{activity.app_name or '聊天'}: {activity.activity[:30]}")
     return {"status": "Success", "message": reply, "thinking": thinking}
 
-
 @router.get("/logs")
 def get_logs():
     return {
@@ -83,12 +84,10 @@ def get_logs():
         "quota": state.daily_count.get("count", 0),
     }
 
-
 @router.get("/memory")
 def list_memory():
     """给记忆库分页面用：回传目前所有记忆（来自 Supabase，不是浏览器本地存的）。"""
     return {"memories": state.memory_bank}
-
 
 @router.post("/memory")
 def add_memory(item: MemoryItem):
@@ -97,24 +96,20 @@ def add_memory(item: MemoryItem):
     state.add_log("記憶新增", f"[{item.category}] {item.content[:30]}")
     return {"status": "Success", "id": memory_id}
 
-
 @router.delete("/memory/{memory_id}")
 def remove_memory(memory_id: int):
     state.delete_memory(memory_id)
     return {"status": "Success"}
-
 
 @router.post("/note")
 def add_note(content: dict):
     state.add_note(content.get("text", ""))
     return {"status": "Success"}
 
-
 @router.get("/settings")
 def get_settings():
     """给之后的设置面板 / Flutter app 用：查看目前的主动消息设置。"""
     return {"push": state.proactive}
-
 
 @router.post("/settings")
 def update_settings(payload: ProactiveSettings):
@@ -126,25 +121,31 @@ def update_settings(payload: ProactiveSettings):
     )
     return {"push": state.proactive}
 
-
 @router.get("/mood")
 def get_mood():
     """给状态面板用：Lin目前的状态自评。"""
     return {"mood": state.mood}
 
-
 @router.get("/avatar")
 def get_avatar(who: str = "lin"):
     return {"avatar": state.anna_avatar if who == "anna" else state.lin_avatar}
-
 
 @router.post("/avatar")
 def set_avatar(payload: AvatarPayload):
     state.set_avatar(payload.who, payload.data)
     return {"status": "Success"}
 
-
 @router.delete("/avatar")
 def delete_avatar(who: str = "lin"):
     state.clear_avatar(who)
+    return {"status": "Success"}
+
+@router.post("/context/mac", dependencies=[Depends(verify_context_token)])
+def update_mac_status(payload: MacStatus):
+    """
+    mac_daemon.py（第4步）定期上传Mac状态，存进 context_state 表的 source='mac'。
+    需要 header: Authorization: Bearer <CONTEXT_API_TOKEN>，没带对会直接403/401
+    （鉴权逻辑集中在 app/context/auth.py，见 verify_context_token）。
+    """
+    mac_context.save_mac_status(payload.dict(exclude_none=True))
     return {"status": "Success"}

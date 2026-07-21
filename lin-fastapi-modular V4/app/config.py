@@ -57,3 +57,28 @@ APP_COOLDOWN_MINUTES = int(os.getenv("APP_COOLDOWN_MINUTES", 20))
 # SUPABASE_KEY 请填 service_role key（在 Supabase 项目 API 设置里），不是 anon key。
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
+
+# ---- Context Provider 总开关（每个功能都能单独关，改.env就好，不用删代码） ----
+ENABLE_MAC = os.getenv("ENABLE_MAC", "true").lower() == "true"
+ENABLE_WEATHER = os.getenv("ENABLE_WEATHER", "true").lower() == "true"
+ENABLE_CALENDAR = os.getenv("ENABLE_CALENDAR", "true").lower() == "true"
+ENABLE_SCREENTIME = os.getenv("ENABLE_SCREENTIME", "true").lower() == "true"
+ENABLE_LOCATION = os.getenv("ENABLE_LOCATION", "true").lower() == "true"
+ENABLE_PHOTO = os.getenv("ENABLE_PHOTO", "true").lower() == "true"
+
+# ---- Context API 统一鉴权 Token ----
+# Mac / iPhone快捷指令 / 以后第二台电脑，全部共用这一个token
+# 用 Bearer Token 方式：请求header加 Authorization: Bearer 这个值
+CONTEXT_API_TOKEN = os.getenv("CONTEXT_API_TOKEN", "")
+
+# ---- 天气：定位坐标（用 WEATHER_LAT / WEATHER_LON 环境变量设置） ----
+WEATHER_LAT = os.getenv("WEATHER_LAT", "25.0330")   # 默认台北
+WEATHER_LON = os.getenv("WEATHER_LON", "121.5654")
+WEATHER_CACHE_MINUTES = int(os.getenv("WEATHER_CACHE_MINUTES", 30))
+
+# ---- Apple Calendar 公开订阅链接（webcal:// 要换成 https://） ----
+ICAL_URL = os.getenv("ICAL_URL", "")
+CALENDAR_CACHE_MINUTES = int(os.getenv("CALENDAR_CACHE_MINUTES", 15))
+
+# ---- Supabase Storage 图片桶名字 ----
+PHOTO_BUCKET = os.getenv("PHOTO_BUCKET", "photos")

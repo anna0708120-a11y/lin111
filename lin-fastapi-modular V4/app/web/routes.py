@@ -70,6 +70,8 @@ def observe_anna(activity: Activity):
         context = f"Anna刚打开了{activity.app_name}"
     else:
         context = f"Anna说：{activity.activity}"
+        # 只有真的是聊天界面发的消息，才记进对话历史（app监控触发的不算Anna在跟Lin说话）
+        state.add_conversation_turn("anna", activity.activity)
 
     reply, thinking = generate_reply(context, app_name=activity.app_name, use_cache=False)
     send_to_bark(reply)

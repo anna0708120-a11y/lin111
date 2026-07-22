@@ -521,8 +521,8 @@ function stab(tab){
   document.querySelectorAll('.pg').forEach(e=>{e.style.display='none';e.classList.remove('active');});
   const pg=document.getElementById('pg-'+tab);
   if(tab==='chat'){pg.style.display='flex';pg.classList.add('active');setTimeout(()=>{const c=document.getElementById('cm');c.scrollTop=c.scrollHeight;},50);}
-  else{pg.style.display='block';pg.classList.add('active');if(tab==='memory')rmem();if(tab==='monitor')loadMood();}
-if(t==='mine')loadPeriod();}
+  else{pg.style.display='block';pg.classList.add('active');if(tab==='memory')rmem();if(tab==='monitor')loadMood();if(tab==='mine')loadPeriod();}
+}
 // 页面加载时如果是Mine tab,立即展开
 if(document.getElementById('pg-mine')?.classList.contains('active'))loadPeriod();
 

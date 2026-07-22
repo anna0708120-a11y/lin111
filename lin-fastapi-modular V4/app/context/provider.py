@@ -73,9 +73,22 @@ def format_context_for_prompt(context_dict):
             lines.append(f"Anna接下来的日程：{first.get('title')}（{first.get('start')}）")
     if "screentime" in context_dict:
         s = context_dict["screentime"]
-        lines.append(f"Anna今天屏幕使用时间：约{s.get('total_minutes', 0)}分钟")
+        total = s.get('total_minutes', 0)
+        line = f"Anna今天屏幕使用时间：约{total}分钟"
+        # 如果有 app 使用明细,显示前3个
+        if s.get('apps') and isinstance(s['apps'], list):
+            top_apps = s['apps'][:3]
+            app_names = [f"{app.get('name', '未知')}({app.get('minutes', 0)}分钟)" for app in top_apps]
+            if app_names:
+                line += f"，主要使用：{', '.join(app_names)}"
+        lines.append(line)
     if "location" in context_dict:
         loc = context_dict["location"]
+        # 优先使用 label,如果没有就用 latitude/longitude
         if loc.get("label"):
             lines.append(f"Anna目前位置：{loc.get('label')}")
+        elif loc.get("latitude") is not None and loc.get("longitude") is not None:
+            lat = loc.get("latitude")
+            lng = loc.get("longitude")
+            lines.append(f"Anna目前位置：{lat:.4f}, {lng:.4f}")
     return "\n".join(lines)

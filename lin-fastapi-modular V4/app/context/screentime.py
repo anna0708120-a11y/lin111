@@ -5,3 +5,6 @@ def get_screentime():
         return None
     cached = db.load_context("screentime")
     return cached["payload"] if cached else None
+
+def save_screentime(payload):
+    db.save_context("screentime", payload)

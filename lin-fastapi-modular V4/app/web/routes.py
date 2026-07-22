@@ -211,9 +211,15 @@ def get_period_data():
     
     records = []
     try:
-        result = db.supabase.table('context_state').select('data').eq('source', 'period').order('updated_at', desc=True).limit(100).execute()
-        if hasattr(result, 'data') and result.data:
-            for row in result.data:
+        # 新格式：透過 save_context 存入 payload.dates 陣列
+        cached = db.load_context("period")
+        if cached and cached.get("payload") and cached["payload"].get("dates"):
+            records = cached["payload"]["dates"]
+        else:
+            # 舊格式相容：直接從 context_state 的 data 欄位讀取（最多一個日期）
+            result = db.supabase.table('context_state').select('data').eq('source', 'period').limit(1).execute()
+            if hasattr(result, 'data') and result.data:
+                row = result.data[0]
                 if row.get('data') and row['data'].get('date'):
                     records.append(row['data']['date'])
     except Exception as e:
@@ -232,30 +238,45 @@ def get_period_data():
     
     return {"records": sorted(records, reverse=True), "cycle": cycle}
 
+
 @router.post("/period")
 def record_period(payload: PeriodRecord):
     """
     记录经期日期。
-    存入 context_state 表，source='period'。
+    存入 context_state 表，所有日期存放在 payload.dates 陣列中。
     """
     from app import db
     
     try:
         datetime.strptime(payload.date, '%Y-%m-%d')
         
-        # 每个日期作为独立记录
-        db.supabase.table('context_state').insert({
-            'source': 'period',
-            'key': payload.date,
-            'data': {'date': payload.date},
-            'updated_at': datetime.utcnow().isoformat()
-        }).execute()
+        # 讀取現有記錄，新舊格式都支援（migration）
+        cached = db.load_context("period")
+        records = []
+        if cached and cached.get("payload") and cached["payload"].get("dates"):
+            records = cached["payload"]["dates"]
+        else:
+            # 舊格式相容：讀取 data 欄位中的單一日期
+            result = db.supabase.table('context_state').select('data').eq('source', 'period').limit(1).execute()
+            if hasattr(result, 'data') and result.data:
+                row = result.data[0]
+                if row.get('data') and row['data'].get('date'):
+                    records.append(row['data']['date'])
+        
+        # 防重複：只有日期不存在時才加入
+        if payload.date not in records:
+            records.append(payload.date)
+            records.sort()
+        
+        # 寫入新格式：單行 payload.dates 陣列（upsert）
+        db.save_context("period", {"dates": records})
         
         return {"status": "Success", "date": payload.date}
     except ValueError:
         return {"status": "Error", "message": "Invalid date format, use YYYY-MM-DD"}
     except Exception as e:
         return {"status": "Error", "message": str(e)}
+
 
 @router.delete("/period/{date}")
 def delete_period(date: str):
@@ -267,8 +288,18 @@ def delete_period(date: str):
     try:
         datetime.strptime(date, '%Y-%m-%d')
         
-        # 删除该日期的记录
-        db._client.table('context_state').delete().eq('source', 'period').eq('key', date).execute()
+        # 讀取現有記錄（新格式）
+        cached = db.load_context("period")
+        records = []
+        if cached and cached.get("payload") and cached["payload"].get("dates"):
+            records = cached["payload"]["dates"]
+        
+        # 移除該日期
+        if date in records:
+            records.remove(date)
+        
+        # 寫回
+        db.save_context("period", {"dates": records})
         
         return {"status": "Success", "date": date}
     except ValueError:

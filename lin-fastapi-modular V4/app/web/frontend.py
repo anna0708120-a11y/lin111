@@ -133,7 +133,7 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 
 
 /* 经期记录样式 - 参考图2的粉红渐变配色 */
-.period-card { background: linear-gradient(135deg, var(--blush) 0%, #F5E8E4 100%); }
+.period-card { background: linear-gradient(180deg, #E8C4BC 0%, #F5E8E4 100%); }
 .period-calendar { 
   display: grid; 
   grid-template-columns: repeat(7, 1fr); 
@@ -148,11 +148,15 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
   display: flex; 
   align-items: center; 
   justify-content: center; 
-  border-radius: 8px; 
-  font-size: 13px; 
+  border-radius: 12px; 
+  font-size: 16px; 
   color: var(--dark);
   cursor: pointer;
-  transition: background .2s;
+  transition: all .2s;
+}
+.calendar-day.selected { 
+  border: 2px solid #D4A5A5; 
+  background: transparent;
 }
 .calendar-day:hover { background: var(--blush); }
 .calendar-day.recorded { background: #E89A9A; color: #FFF; }
@@ -203,12 +207,18 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 .period-btn:hover { background: var(--rose-deep); }
 .period-prediction { 
   margin-top: 16px; 
-  padding: 12px; 
+  padding: 16px; 
   background: var(--white); 
   border-radius: 12px;
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.8;
   color: var(--dark);
+}
+.period-prediction .big-text {
+  font-size: 28px;
+  font-weight: 600;
+  color: #D4718B;
+  margin: 12px 0;
 }
 /* 移动端适配 - 针对小屏幕优化 */
 @media (max-width: 768px) {
@@ -761,11 +771,12 @@ function updatePrediction() {
   const ovulation = new Date(next);
   ovulation.setDate(ovulation.getDate() - 14);
   
+  const nextStr = next.toLocaleDateString('zh-CN', {month: 'long', day: 'numeric'});
   pred.innerHTML = `
-    <p><strong>上次记录:</strong> ${last.toLocaleDateString('zh-CN')}</p>
-    <p><strong>预测下次:</strong> ${next.toLocaleDateString('zh-CN')}</p>
-    <p><strong>排卵日:</strong> ${ovulation.toLocaleDateString('zh-CN')} (前后2天为易孕期)</p>
-    <p><strong>周期:</strong> ${cycle} 天</p>
+    <p style="font-size:14px;color:var(--muted);margin-bottom:8px;">周期预测</p>
+    <p class="big-text">${nextStr}</p>
+    <p style="font-size:13px;color:var(--muted);">预测下次开始日期</p>
+    <p style="margin-top:12px;"><strong>上次:</strong> ${last.toLocaleDateString('zh-CN')} | <strong>周期:</strong> ${cycle}天</p>
   `;
 }
 
@@ -790,8 +801,15 @@ async function recordPeriod() {
   }
 }
 
+let selectedDate = null;
+
 function quickRecord(date) {
+  selectedDate = date;
   document.getElementById('period-date').value = date;
+  // 移除所有选中状态
+  document.querySelectorAll('.calendar-day').forEach(d => d.classList.remove('selected'));
+  // 添加选中状态到当前点击的日期
+  event.target.classList.add('selected');
 }
 
 </script>

@@ -256,3 +256,23 @@ def record_period(payload: PeriodRecord):
         return {"status": "Error", "message": "Invalid date format, use YYYY-MM-DD"}
     except Exception as e:
         return {"status": "Error", "message": str(e)}
+
+@router.delete("/period/{date}")
+def delete_period(date: str):
+    """
+    删除指定日期的经期记录。
+    """
+    from app import db
+    
+    try:
+        datetime.strptime(date, '%Y-%m-%d')
+        
+        # 删除该日期的记录
+        db._client.table('context_state').delete().eq('source', 'period').eq('key', date).execute()
+        
+        return {"status": "Success", "date": date}
+    except ValueError:
+        return {"status": "Error", "message": "Invalid date format"}
+    except Exception as e:
+        return {"status": "Error", "message": str(e)}
+

@@ -63,7 +63,7 @@ def _run_nudge_check():
 
     context = f"{_time_of_day_hint()}。{REASON_CATALOG}"
 
-    reply, thinking = generate_reply(context, use_cache=False, record_turn=False)
+    reply, thinking = generate_reply(context, use_cache=False)
     
     # Lin 可以选择不发送：如果回复是「不发」，就跳过推送
     if reply.strip() == "不发":

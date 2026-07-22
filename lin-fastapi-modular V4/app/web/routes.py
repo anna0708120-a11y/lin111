@@ -207,7 +207,7 @@ def get_period_data():
     获取经期记录数据和周期预测。
     返回: { records: [日期数组], cycle: 平均周期天数 }
     """
-    from app.storage import db
+    from app import db
     
     records = []
     try:
@@ -238,17 +238,18 @@ def record_period(payload: PeriodRecord):
     记录经期日期。
     存入 context_state 表，source='period'。
     """
-    from app.storage import db
+    from app import db
     
     try:
         datetime.strptime(payload.date, '%Y-%m-%d')
         
-        db.supabase.table('context_state').upsert({
+        # 每个日期作为独立记录
+        db.supabase.table('context_state').insert({
             'source': 'period',
             'key': payload.date,
             'data': {'date': payload.date},
             'updated_at': datetime.utcnow().isoformat()
-        }, on_conflict='source,key').execute()
+        }).execute()
         
         return {"status": "Success", "date": payload.date}
     except ValueError:

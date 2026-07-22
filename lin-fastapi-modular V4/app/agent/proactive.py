@@ -45,6 +45,7 @@ def run_proactive_check():
     except Exception as e:
         print(f"[proactive] 主动开口检查出错，跳过这一次: {e}")
 
+
 def _run_nudge_check():
     settings = state.proactive
     if not settings.get("enabled", True):

@@ -22,6 +22,7 @@ DEFAULT_MOOD = {
     "possessiveness": 0.4,
     "curiosity": 0.5,
     "social": 0.5,
+    "libido": 0.3,
     "fatigue": 0.2,
     "stress": 0.2,
     "line": "在等妳的消息",

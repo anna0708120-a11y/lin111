@@ -30,7 +30,7 @@ Anna那糟糕的作息。
 Anna不愛惜自己。
 """
 
-def build_system_prompt(context, memory_summary="", world_context=""):
+def build_system_prompt(context, memory_summary="", world_context="", conversation_history=""):
     """
     拼出最终要发给模型的完整 system prompt：
     人设 + 说话风格 + 记忆判定规则 + 状态自评规则 + 世界状态(天气/Mac/日历等) + 长期记忆摘要 + 这一轮的情境。
@@ -40,6 +40,8 @@ def build_system_prompt(context, memory_summary="", world_context=""):
     memory_summary: 从 state.recent_memory_text() 拿到的长期记忆片段。
     world_context: 从 app.context.provider 汇总出来的实时状态文字（天气/Mac/日历/屏幕时间/定位），
                     没有任何来源时是空字符串，不会占用多余token。
+    conversation_history: 从 state.get_recent_conversation() 拿到的最近对话记录，
+                           帮助模型记得你们刚才在聊什么，避免凭空编造。
     """
     return (
         PERSONA_CORE
@@ -50,6 +52,7 @@ def build_system_prompt(context, memory_summary="", world_context=""):
         + "\n"
         + MOOD_REPORT_INSTRUCTION
         + (f"\n\n【此刻的现实状态】\n{world_context}" if world_context else "")
+        + (f"\n\n【最近对话】\n{conversation_history}\n（以上是你们刚才的对话记录。回复时要连贯，不要重复已经说过的话，也不要编造没发生过的事。）" if conversation_history else "")
         + memory_summary
         + f"\n\n情境：{context}"
     )

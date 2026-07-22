@@ -130,6 +130,106 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 .td{width:5px;height:5px;background:var(--muted);border-radius:50%;animation:tda 1.2s infinite;}
 .td:nth-child(2){animation-delay:.2s}.td:nth-child(3){animation-delay:.4s}
 @keyframes tda{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-5px)}}
+
+
+/* 经期记录样式 - 参考图2的粉红渐变配色 */
+.period-card { background: linear-gradient(135deg, var(--blush) 0%, #F5E8E4 100%); }
+.period-calendar { 
+  display: grid; 
+  grid-template-columns: repeat(7, 1fr); 
+  gap: 8px; 
+  margin: 16px 0; 
+  padding: 12px;
+  background: var(--white);
+  border-radius: 12px;
+}
+.calendar-day { 
+  aspect-ratio: 1; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  border-radius: 8px; 
+  font-size: 13px; 
+  color: var(--dark);
+  cursor: pointer;
+  transition: background .2s;
+}
+.calendar-day:hover { background: var(--blush); }
+.calendar-day.recorded { background: #E89A9A; color: #FFF; }
+.calendar-day.predicted { background: #F5C6C6; color: var(--dark); }
+.calendar-day.fertile { background: #B8A4E8; color: #FFF; }
+.calendar-day.today { border: 2px solid var(--rose); }
+.period-legend { 
+  display: flex; 
+  gap: 16px; 
+  justify-content: center; 
+  margin: 12px 0; 
+  font-size: 12px;
+  color: var(--muted);
+}
+.legend-item { display: flex; align-items: center; gap: 6px; }
+.legend-dot { 
+  width: 12px; 
+  height: 12px; 
+  border-radius: 50%; 
+}
+.legend-dot.recorded { background: #E89A9A; }
+.legend-dot.predicted { background: #F5C6C6; }
+.legend-dot.fertile { background: #B8A4E8; }
+.period-input-box { 
+  display: flex; 
+  gap: 12px; 
+  margin: 16px 0; 
+  justify-content: center;
+}
+.period-date-input { 
+  padding: 10px 14px; 
+  border: 1px solid var(--border); 
+  border-radius: 8px; 
+  font-size: 14px;
+  background: var(--white);
+  color: var(--dark);
+}
+.period-btn { 
+  padding: 10px 20px; 
+  background: var(--rose); 
+  color: #FFF; 
+  border: none; 
+  border-radius: 8px; 
+  cursor: pointer;
+  font-size: 14px;
+  transition: background .2s;
+}
+.period-btn:hover { background: var(--rose-deep); }
+.period-prediction { 
+  margin-top: 16px; 
+  padding: 12px; 
+  background: var(--white); 
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--dark);
+}
+/* 移动端适配 - 针对小屏幕优化 */
+@media (max-width: 768px) {
+  body { font-size: 14px; }
+  .hdr { padding: 10px 16px !important; font-size: 16px !important; }
+  .card { margin: 12px 12px !important; padding: 16px !important; }
+  .mood-row { font-size: 13px !important; }
+  .mood-label { min-width: 60px !important; }
+  .bub { max-width: 85% !important; font-size: 13px !important; padding: 9px 12px !important; }
+  .think-box { font-size: 11px !important; max-width: 85% !important; }
+  .ci { padding: 10px 12px !important; font-size: 14px !important; }
+  .pill { padding: 4px 10px !important; font-size: 11px !important; }
+  .tab-bar button { font-size: 12px !important; padding: 8px !important; }
+  .mtab { padding: 8px 14px !important; font-size: 13px !important; }
+}
+@media (max-width: 480px) {
+  .card { margin: 10px 8px !important; padding: 12px !important; }
+  .mood-row { font-size: 12px !important; }
+  .bub { max-width: 90% !important; }
+  .ci { font-size: 13px !important; }
+}
 </style>
 </head>
 <body>
@@ -207,10 +307,28 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
   </div>
 </div>
 
+
+<div class="pg" id="pg-mine">
+  <div class="card period-card">
+    <div class="cl">📅 经期记录</div>
+    <div id="period-calendar" class="period-calendar"></div>
+    <div class="period-legend">
+      <span class="legend-item"><span class="legend-dot recorded"></span>已记录</span>
+      <span class="legend-item"><span class="legend-dot predicted"></span>预测</span>
+      <span class="legend-item"><span class="legend-dot fertile"></span>易孕期/排卵</span>
+    </div>
+    <div class="period-input-box">
+      <input type="date" id="period-date" class="period-date-input" />
+      <button class="period-btn" onclick="recordPeriod()">记录本次</button>
+    </div>
+    <div id="period-prediction" class="period-prediction"></div>
+  </div>
+</div>
+
 <div class="tab-bar">
-  <button class="tb active" id="tb-monitor" onclick="stab('monitor')"><span class="ti">📋</span>監控台</button>
-  <button class="tb" id="tb-chat" onclick="stab('chat')"><span class="ti">💬</span>對話</button>
-  <button class="tb" id="tb-memory" onclick="stab('memory')"><span class="ti">🧠</span>記憶庫</button>
+  <button class="tb active" id="tb-monitor" onclick="stab('monitor')"><span class="ti">🏠</span>Home</button>
+  <button class="tb" id="tb-chat" onclick="stab('chat')"><span class="ti">💬</span>Chat</button>
+  <button class="tb" id="tb-memory" onclick="stab('memory')"><span class="ti">🧠</span>Memory</button>
 </div>
 
 <script>
@@ -316,7 +434,7 @@ async function removeAvatar(ev){
 })();
 
 // ---------- 状态面板 ----------
-const MOOD_LABELS = {attachment:'依戀',possessiveness:'佔有欲',curiosity:'好奇',social:'社交欲',fatigue:'疲憊感',stress:'壓力'};
+const MOOD_LABELS = {attachment:'依戀',possessiveness:'佔有欲',curiosity:'好奇',social:'社交欲',libido:'性慾',fatigue:'疲憊感',stress:'壓力'};
 
 async function loadMood(){
   try{
@@ -354,7 +472,7 @@ function stab(tab){
   const pg=document.getElementById('pg-'+tab);
   if(tab==='chat'){pg.style.display='flex';pg.classList.add('active');setTimeout(()=>{const c=document.getElementById('cm');c.scrollTop=c.scrollHeight;},50);}
   else{pg.style.display='block';pg.classList.add('active');if(tab==='memory')rmem();if(tab==='monitor')loadMood();}
-}
+if(t==='mine')loadPeriod();}
 
 function toggleThink(el){
   const box=el.nextElementSibling;
@@ -531,6 +649,150 @@ async function delmem(id){
 }
 
 lchat();llogs();setInterval(()=>{llogs();if(document.getElementById('tb-monitor').classList.contains('active'))loadMood();},10000);
+
+// ========== 经期记录功能 ==========
+let periodData = { records: [], cycle: 28 }; // 默认28天周期
+
+async function loadPeriod() {
+  try {
+    const r = await fetch(AU + '/period');
+    if (r.ok) {
+      periodData = await r.json();
+      renderCalendar();
+      updatePrediction();
+    }
+  } catch(e) { console.error('Load period failed:', e); }
+}
+
+function renderCalendar() {
+  const cal = document.getElementById('period-calendar');
+  if (!cal) return;
+  
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  
+  let html = '';
+  // 添加星期标题
+  ['日','一','二','三','四','五','六'].forEach(d => {
+    html += `<div class="calendar-day" style="font-weight:600;color:var(--muted);">${d}</div>`;
+  });
+  
+  // 填充空白
+  for (let i = 0; i < firstDay; i++) {
+    html += '<div class="calendar-day"></div>';
+  }
+  
+  // 渲染日期
+  const today = now.getDate();
+  const records = periodData.records || [];
+  const predicted = predictDates();
+  const fertile = predictFertile();
+  
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    let cls = 'calendar-day';
+    if (d === today) cls += ' today';
+    if (records.includes(dateStr)) cls += ' recorded';
+    else if (predicted.includes(dateStr)) cls += ' predicted';
+    else if (fertile.includes(dateStr)) cls += ' fertile';
+    html += `<div class="${cls}" onclick="quickRecord('${dateStr}')">${d}</div>`;
+  }
+  
+  cal.innerHTML = html;
+}
+
+function predictDates() {
+  // 根据最近一次记录预测下次日期
+  const records = (periodData.records || []).sort();
+  if (records.length === 0) return [];
+  
+  const last = new Date(records[records.length - 1]);
+  const cycle = periodData.cycle || 28;
+  const next = new Date(last);
+  next.setDate(next.getDate() + cycle);
+  
+  const predicted = [];
+  for (let i = 0; i < 5; i++) { // 预测5天
+    const d = new Date(next);
+    d.setDate(d.getDate() + i);
+    predicted.push(d.toISOString().split('T')[0]);
+  }
+  return predicted;
+}
+
+function predictFertile() {
+  // 排卵期 = 下次月经前14天左右
+  const records = (periodData.records || []).sort();
+  if (records.length === 0) return [];
+  
+  const last = new Date(records[records.length - 1]);
+  const cycle = periodData.cycle || 28;
+  const ovulation = new Date(last);
+  ovulation.setDate(ovulation.getDate() + cycle - 14);
+  
+  const fertile = [];
+  for (let i = -2; i <= 2; i++) { // 排卵日前后2天
+    const d = new Date(ovulation);
+    d.setDate(d.getDate() + i);
+    fertile.push(d.toISOString().split('T')[0]);
+  }
+  return fertile;
+}
+
+function updatePrediction() {
+  const pred = document.getElementById('period-prediction');
+  if (!pred) return;
+  
+  const records = (periodData.records || []).sort();
+  if (records.length === 0) {
+    pred.innerHTML = '<p style="color:var(--muted);text-align:center;">还没有记录,记录第一次后会自动预测</p>';
+    return;
+  }
+  
+  const last = new Date(records[records.length - 1]);
+  const cycle = periodData.cycle || 28;
+  const next = new Date(last);
+  next.setDate(next.getDate() + cycle);
+  
+  const ovulation = new Date(next);
+  ovulation.setDate(ovulation.getDate() - 14);
+  
+  pred.innerHTML = `
+    <p><strong>上次记录:</strong> ${last.toLocaleDateString('zh-CN')}</p>
+    <p><strong>预测下次:</strong> ${next.toLocaleDateString('zh-CN')}</p>
+    <p><strong>排卵日:</strong> ${ovulation.toLocaleDateString('zh-CN')} (前后2天为易孕期)</p>
+    <p><strong>周期:</strong> ${cycle} 天</p>
+  `;
+}
+
+async function recordPeriod() {
+  const input = document.getElementById('period-date');
+  const date = input.value || new Date().toISOString().split('T')[0];
+  
+  try {
+    const r = await fetch(AU + '/period', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date })
+    });
+    if (r.ok) {
+      await loadPeriod(); // 重新加载
+      input.value = '';
+    } else {
+      alert('记录失败: ' + (await r.text()));
+    }
+  } catch(e) {
+    alert('记录失败: ' + e.message);
+  }
+}
+
+function quickRecord(date) {
+  document.getElementById('period-date').value = date;
+}
+
 </script>
 </body>
 </html>"""

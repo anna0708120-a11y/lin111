@@ -45,7 +45,6 @@ def run_proactive_check():
     except Exception as e:
         print(f"[proactive] 主动开口检查出错，跳过这一次: {e}")
 
-
 def _run_nudge_check():
     settings = state.proactive
     if not settings.get("enabled", True):
@@ -63,13 +62,21 @@ def _run_nudge_check():
 
     context = f"{_time_of_day_hint()}。{REASON_CATALOG}"
 
-    reply, thinking = generate_reply(context, use_cache=False)
+    reply, thinking = generate_reply(context, use_cache=False, record_turn=False)
+    
+    # Lin 可以选择不发送：如果回复是「不发」，就跳过推送
+    if reply.strip() == "不发":
+        state.add_log("主動推送", "Lin 判断现在不适合打扰，选择不发送")
+        state.mark_conversation_anchor()  # 仍然记录这次判断，避免频繁重试
+        return
+    
+    # 主动消息发送成功后，才记进对话历史
+    state.add_conversation_turn("lin", reply, thinking=thinking)
     send_to_bark(reply)
     state.add_log("主動推送", reply)
 
     # 主动开口本身也是一次"锚点"，避免几分钟后又立刻再触发一次
     state.mark_conversation_anchor()
-
 
 def run_memory_review():
     """

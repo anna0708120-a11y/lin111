@@ -34,9 +34,7 @@ class ProactiveSettings(BaseModel):
     min_minutes: Optional[int] = None
     max_minutes: Optional[int] = None
 
-class AvatarPayload(BaseModel):
-    data: str
-    who: Optional[str] = "lin"  # "lin" 或 "anna"
+class AvatarPayload(BaseModel): Optional[str] = "lin"  # "lin" 或 "anna"
 
 class MacStatus(BaseModel):
     """mac_daemon.py 会定期打这个进来。字段都设成可选，

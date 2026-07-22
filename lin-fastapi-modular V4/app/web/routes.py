@@ -48,6 +48,19 @@ class MacStatus(BaseModel):
     locked: Optional[bool] = None
     asleep: Optional[bool] = None
 
+
+class ScreenTimePayload(BaseModel):
+    """iPhone 快捷指令定期上传屏幕使用时间。字段都设成可选。"""
+    total_minutes: Optional[int] = None
+    date: Optional[str] = None  # YYYY-MM-DD
+
+class LocationPayload(BaseModel):
+    """iPhone 快捷指令上传定位。字段都设成可选。"""
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    label: Optional[str] = None  # 地点名称（如果有的话）
+    accuracy: Optional[float] = None
+
 @router.get("/health")
 def health():
     """给 Render / 之后的监控用的健康检查接口，顺便回报 Supabase 有没有连上。"""
@@ -156,4 +169,25 @@ def update_mac_status(payload: MacStatus):
     （鉴权逻辑集中在 app/context/auth.py，见 verify_context_token）。
     """
     mac_context.save_mac_status(payload.dict(exclude_none=True))
+    return {"status": "Success"}
+
+
+@router.post("/context/screentime", dependencies=[Depends(verify_context_token)])
+def update_screentime(payload: ScreenTimePayload):
+    """
+    iPhone 快捷指令定期上传屏幕使用时间，存进 context_state 表的 source='screentime'。
+    需要 header: Authorization: Bearer <CONTEXT_API_TOKEN>。
+    """
+    from app.context import screentime as screentime_context
+    screentime_context.save_screentime(payload.dict(exclude_none=True))
+    return {"status": "Success"}
+
+@router.post("/context/location", dependencies=[Depends(verify_context_token)])
+def update_location(payload: LocationPayload):
+    """
+    iPhone 快捷指令上传定位，存进 context_state 表的 source='location'。
+    需要 header: Authorization: Bearer <CONTEXT_API_TOKEN>。
+    """
+    from app.context import location as location_context
+    location_context.save_location(payload.dict(exclude_none=True))
     return {"status": "Success"}

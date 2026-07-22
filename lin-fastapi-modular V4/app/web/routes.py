@@ -34,7 +34,9 @@ class ProactiveSettings(BaseModel):
     min_minutes: Optional[int] = None
     max_minutes: Optional[int] = None
 
-class AvatarPayload(BaseModel): Optional[str] = "lin"  # "lin" 或 "anna"
+class AvatarPayload(BaseModel):
+    who: Optional[str] = "lin"  # "lin" 或 "anna"
+    data: Optional[str] = None  # base64 图片数据
 
 class MacStatus(BaseModel):
     """mac_daemon.py 会定期打这个进来。字段都设成可选，
@@ -45,7 +47,7 @@ class MacStatus(BaseModel):
     charging: Optional[bool] = None
     locked: Optional[bool] = None
     asleep: Optional[bool] = None
-    
+
 @router.get("/health")
 def health():
     """给 Render / 之后的监控用的健康检查接口，顺便回报 Supabase 有没有连上。"""
@@ -73,6 +75,10 @@ def observe_anna(activity: Activity):
 
     reply, thinking = generate_reply(context, app_name=activity.app_name, use_cache=False)
     send_to_bark(reply)
+
+    # 只有真的生成了回复内容，才记进对话历史（避免额度用完/信号不好时把错误提示当成Lin说的话存进去）
+    if reply and reply not in ("信号不好。", "今天额度用完了，或者刚刚问太快了，等一下再说。"):
+        state.add_conversation_turn("lin", reply, thinking=thinking)
 
     state.mark_conversation_anchor()
     state.add_log("監控觸發", f"{activity.app_name or '聊天'}: {activity.activity[:30]}")

@@ -5,3 +5,6 @@ def get_latest_location():
         return None
     cached = db.load_context("location")
     return cached["payload"] if cached else None
+
+def save_location(payload):
+    db.save_context("location", payload)

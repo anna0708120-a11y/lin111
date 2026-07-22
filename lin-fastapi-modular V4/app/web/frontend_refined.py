@@ -4,7 +4,6 @@
 只是单纯挪到自己的文件里，让 main.py 不用再塞几百行 HTML/CSS/JS。
 """
 
-
 HTML_CONTENT = """<!DOCTYPE html>
 <html lang="zh-TW">
 <head>

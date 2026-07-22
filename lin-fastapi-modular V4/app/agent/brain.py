@@ -32,7 +32,16 @@ def generate_reply(context, app_name=None, use_cache=True):
         return "今天额度用完了，或者刚刚问太快了，等一下再说。", None
 
     memory_summary = state.recent_memory_text()
-    conversation_history = state.get_recent_conversation(n=20)
+    # 获取对话历史并格式化成易读文本
+    conv_list = state.get_recent_conversation(n=20)
+    if conv_list:
+        formatted = []
+        for turn in conv_list:
+            role_name = "Anna" if turn["role"] == "anna" else "Lin"
+            formatted.append(f"{role_name}：{turn['content']}")
+        conversation_history = "\n".join(formatted)
+    else:
+        conversation_history = ""
     # 每个来源内部都有自己的缓存（天气30分钟、Mac/日历/屏幕时间/定位都是读最新一条快照），
     # 这里不用担心每次生成回复都会打一堆外部API——大部分时候只是读 Supabase 里的一条记录。
     # 某个来源没开启、没数据、或抓取失败，会自动不出现在结果里，不会塞垃圾进prompt。

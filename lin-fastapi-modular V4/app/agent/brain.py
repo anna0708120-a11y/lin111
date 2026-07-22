@@ -68,7 +68,20 @@ def write_daily_journal():
     """
     if state.has_written_journal_today():
         return
-    context = "写一篇今天的日记。回顾一下今天你们之间发生的事、你的感受，写成你自己的反思，不是转述系统日志。"
+    today_conversation = state.get_today_conversation_text()
+    if today_conversation:
+        context = (
+            "写一篇今天的日记。回顾一下今天你们之间发生的事、你的感受，写成你自己的反思，不是转述系统日志。\n"
+            "以下是今天你们之间真实发生的对话记录，只能基于这些真实内容来写，"
+            "不要编造没有发生过的事情、没说过的话、没做过的事：\n"
+            f"{today_conversation}"
+        )
+    else:
+        context = (
+            "今天你们之间没有发生任何对话或互动。写一篇简短的日记，"
+            "可以写你自己的心情、想法、或者对Anna的想念，"
+            "但不要编造今天发生了什么具体的事情——因为今天真的什么都没发生。"
+        )
     system_prompt = build_system_prompt(context, state.recent_memory_text())
     content, _ = call_deepseek(system_prompt, max_tokens=config.DEEPSEEK_MAX_TOKENS, thinking=False)
     state.record_call()

@@ -191,3 +191,67 @@ def update_location(payload: LocationPayload):
     from app.context import location as location_context
     location_context.save_location(payload.dict(exclude_none=True))
     return {"status": "Success"}
+
+
+# ========== 经期记录 API ==========
+from pydantic import BaseModel
+from datetime import datetime, timedelta
+from typing import List
+
+class PeriodRecord(BaseModel):
+    date: str  # YYYY-MM-DD
+
+@router.get("/period")
+def get_period_data():
+    """
+    获取经期记录数据和周期预测。
+    返回: { records: [日期数组], cycle: 平均周期天数 }
+    """
+    from app.storage import db
+    
+    records = []
+    try:
+        result = db.supabase.table('context_state').select('data').eq('source', 'period').order('updated_at', desc=True).limit(100).execute()
+        if hasattr(result, 'data') and result.data:
+            for row in result.data:
+                if row.get('data') and row['data'].get('date'):
+                    records.append(row['data']['date'])
+    except Exception as e:
+        print(f"Load period records failed: {e}")
+    
+    cycle = 28
+    if len(records) >= 2:
+        sorted_records = sorted(records)
+        diffs = []
+        for i in range(1, len(sorted_records)):
+            d1 = datetime.strptime(sorted_records[i-1], '%Y-%m-%d')
+            d2 = datetime.strptime(sorted_records[i], '%Y-%m-%d')
+            diffs.append((d2 - d1).days)
+        if diffs:
+            cycle = int(sum(diffs) / len(diffs))
+    
+    return {"records": sorted(records, reverse=True), "cycle": cycle}
+
+@router.post("/period")
+def record_period(payload: PeriodRecord):
+    """
+    记录经期日期。
+    存入 context_state 表，source='period'。
+    """
+    from app.storage import db
+    
+    try:
+        datetime.strptime(payload.date, '%Y-%m-%d')
+        
+        db.supabase.table('context_state').upsert({
+            'source': 'period',
+            'key': payload.date,
+            'data': {'date': payload.date},
+            'updated_at': datetime.utcnow().isoformat()
+        }, on_conflict='source,key').execute()
+        
+        return {"status": "Success", "date": payload.date}
+    except ValueError:
+        return {"status": "Error", "message": "Invalid date format, use YYYY-MM-DD"}
+    except Exception as e:
+        return {"status": "Error", "message": str(e)}

@@ -110,7 +110,10 @@ def call_deepseek_stream(system_prompt, temperature=0.95, max_tokens=None, top_p
                 # 處理 reasoning_content
                 if "reasoning_content" in delta:
                     chunk = delta["reasoning_content"]
-                    reasoning_buffer.append(chunk)
+                    if chunk is not None:
+                        reasoning_buffer.append(chunk)
+                    else:
+                        chunk = ""
                     
                     # 檢查是否包含隱藏標籤
                     full_reasoning = "".join(reasoning_buffer)
@@ -122,7 +125,7 @@ def call_deepseek_stream(system_prompt, temperature=0.95, max_tokens=None, top_p
                 
                 # 處理 content
                 elif "content" in delta:
-                    yield ("content", delta["content"])
+                    yield ("content", delta["content"] or "")
                 
                 # 結束標記
                 if data["choices"][0].get("finish_reason"):

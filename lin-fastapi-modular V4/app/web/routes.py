@@ -94,7 +94,6 @@ def observe_anna(activity: Activity):
         state.add_conversation_turn("lin", reply, thinking=thinking)
 
     state.mark_conversation_anchor()
-    state.add_log("監控觸發", f"{activity.app_name or '聊天'}: {activity.activity[:30]}")
     return {"status": "Success", "message": reply, "thinking": thinking}
 
 @router.get("/logs")

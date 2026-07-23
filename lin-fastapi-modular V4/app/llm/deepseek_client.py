@@ -1,3 +1,6 @@
+import json
+import re
+import requests
 """
 封装对 DeepSeek API 的调用。
 

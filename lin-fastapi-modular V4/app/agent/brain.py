@@ -98,3 +98,25 @@ def write_daily_journal():
     if content:
         state.add_note(content)
     state.mark_journal_written()
+
+
+def generate_reply_stream(context, app_name=None, use_cache=True):
+    """
+    流式生成回覆，yield SSE 格式的事件。
+    Yields: "event: reasoning\ndata: {json}\n\n"
+    """
+    from app.llm.deepseek_client import call_deepseek_stream
+    
+    # 構建 system_prompt（與原版邏輯一致）
+    system_prompt = _build_system_prompt(context, app_name, use_cache)
+    
+    # 調用 streaming API
+    for event_type, data in call_deepseek_stream(system_prompt):
+        if event_type == "reasoning":
+            yield f"event: reasoning\ndata: {json.dumps({'content': data})}\n\n"
+        elif event_type == "content":
+            yield f"event: content\ndata: {json.dumps({'delta': data})}\n\n"
+        elif event_type == "done":
+            yield f"event: done\ndata: {json.dumps({'usage': data})}\n\n"
+        elif event_type == "error":
+            yield f"event: error\ndata: {json.dumps({'message': data})}\n\n"

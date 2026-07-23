@@ -106,25 +106,23 @@ def generate_reply_stream(context, app_name=None, use_cache=True):
     """
     流式生成回覆，yield SSE 格式的事件。
     """
+    import json
     from app.llm.deepseek_client import call_deepseek_stream
     from app.memory_rules import parse_memory_decision, parse_mood_report, strip_hidden_blocks
     
-    # Rate limit 檢查
     if not state.check_rate_limit():
         err_msg = "今天额度用完了，或者刚刚问太快了，等一下再说。"
-        yield f"event: error\ndata: {json.dumps({'message': err_msg})}\n\n"
-        yield "event: done\ndata: {}\n\n"
-        return
+        yield "event: error\n"
+        yieln.dumps({"message": err_msg})
+        yield "\n\n"
+        yield "event: don    return
     
-    # Cache 檢查
     if use_cache and state.last_context_cache == context and state.last_reply_at:
         if datetime.now() - state.last_reply_at < timedelta(minutes=2):
             fallback = random.choice(FALLBACK_REPLIES)
-            yield f"event: content\nson.dumps({'delta': fallback})}\n\n"
-            yield "event: done\ndata: {}\n\n"
-            return
+            yie          yield json.dumps({"delta": fallback})
+            yield "\n\nevent: don    return
     
-    # 構建 system_prompt
     memory_summary = state.recent_memory_text()
     conv_list = state.get_recent_conversation(n=20)
     if conv_list:
@@ -149,11 +147,13 @@ def generate_reply_stream(context, app_name=None, use_cache=True):
         for event_type, data in call_deepseek_stream(system_prompt, max_tokens=config.DEEPSEEK_MAX_TOKENS):
             if event_type == "reasoning":
                 full_reasoning += data
-                yield f"event: reasoning\.dumps({'content': data})}\n\n"
+                yield "event: yield json.dumps({"content": data})
+                yield "\n\n"
                 
             elif event_type == "content":
                 full_content += data
-                yield f"event: content\ndata: {json.dumps({'delta': data})}\n\n"
+                yield "event:ield json.dumps({"delta": data})
+                yield "\n\n"
                 
             elif event_type == "done":
                 if full_reasoning:
@@ -170,20 +170,26 @@ def generate_reply_stream(context, app_name=None, use_cache=True):
                 state.add_log("AI回复", f"成功：{full_content[:40]}...")
                 
                 if full_content and full_content not in ("信号不好。", "今天额度用完了，或者刚刚问太快了，等一下再说。"):
-               
+                    thinking_display = strip_hidden_blocks(full_reasoning) if full_reasoning else None
+                    state.add_conversation_turn("lin", full_content, thinking=thinking_display)
+                    
                     from app.notify.bark import send_to_bark
                     send_to_bark(full_content)
                 
                 state.mark_conversation_anchor()
-                yield f"event: done\son.dumps(data)}\n\n"
+                yield "eveield json.dumps(data)
+                yield "\n\n"
                 
             elif event_type == "error":
-                yield f"event: error\ndata: {json.dumps({'message': data})}\n\n"
-                yield "event: don {}\n\n"
-                
+                yield "eveyield json.dumps({"message": data})
+                yield "\n\nevent: don          
     except Exception as e:
         print(f"[brain] Stream error: {e}")
-        yield f"event: error\nson.dumps({'message': '信号不好。'})}\n\n"
-        yield "event: done{}\n\n"     thinking_display = strip_hidden_blocks(full_reasoning) if full_reasoning else None
-                    state.add_conversation_turn("lin", full_content, thinking=thinking_display)
-                    
+        yield "event: erson.dumps({"message": "信号不好。"})
+        yield "\n\nevent: done\ndata: {}\n\n"
+
+
+
+
+
+

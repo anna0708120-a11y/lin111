@@ -75,15 +75,18 @@ def manifest():
 def service_worker():
     return Response(content=SERVICE_WORKER_JS, media_type="application/javascript")
 
+
+from fastapi.responses import StreamingResponse
+
 @router.post("/watch")
 def observe_anna(activity: Activity):
+    # 冷卻檢查邏輯保持不變
     if activity.app_name and activity.app_name != "聊天界面":
         if not state.check_app_cooldown(activity.app_name):
             return {"status": "Cooldown", "message": ""}
         state.update_app_cooldown(activity.app_name)
         context = f"Anna刚打开了{activity.app_name}"
     else:
-        # 处理图片消息
         if activity.image:
             context = f"Anna发了一张图片"
             if activity.activity and activity.activity != '[图片]':
@@ -92,10 +95,19 @@ def observe_anna(activity: Activity):
         else:
             context = f"Anna说：{activity.activity}"
             state.add_conversation_turn("anna", activity.activity)
+    
+    # 🔥 改為 Streaming Response
+    return StreamingResponse(
+        generate_reply_stream(context, app_name=activity.app_name, use_cache=False),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",  # 禁用 Nginx buffering
+        }
+    )
 
-    reply, thinking = generate_reply(context, app_name=activity.app_name, use_cache=False)
-    send_to_bark(reply)
 
+    
     # 只有真的生成了回复内容，才记进对话历史（避免额度用完/信号不好时把错误提示当成Lin说的话存进去）
     if reply and reply not in ("信号不好。", "今天额度用完了，或者刚刚问太快了，等一下再说。"):
         state.add_conversation_turn("lin", reply, thinking=thinking)

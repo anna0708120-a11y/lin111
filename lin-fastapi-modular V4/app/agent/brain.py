@@ -100,23 +100,90 @@ def write_daily_journal():
     state.mark_journal_written()
 
 
+import json
+
 def generate_reply_stream(context, app_name=None, use_cache=True):
     """
     流式生成回覆，yield SSE 格式的事件。
-    Yields: "event: reasoning\ndata: {json}\n\n"
     """
     from app.llm.deepseek_client import call_deepseek_stream
+    from app.memory_rules import parse_memory_decision, parse_mood_report, strip_hidden_blocks
     
-    # 構建 system_prompt（與原版邏輯一致）
-    system_prompt = _build_system_prompt(context, app_name, use_cache)
+    # Rate limit 檢查
+    if not state.check_rate_limit():
+        err_msg = "今天额度用完了，或者刚刚问太快了，等一下再说。"
+        yield f"event: error\ndata: {json.dumps({'message': err_msg})}\n\n"
+        yield "event: done\ndata: {}\n\n"
+        return
     
-    # 調用 streaming API
-    for event_type, data in call_deepseek_stream(system_prompt):
-        if event_type == "reasoning":
-            yield f"event: reasoning\ndata: {json.dumps({'content': data})}\n\n"
-        elif event_type == "content":
-            yield f"event: content\ndata: {json.dumps({'delta': data})}\n\n"
-        elif event_type == "done":
-            yield f"event: done\ndata: {json.dumps({'usage': data})}\n\n"
-        elif event_type == "error":
-            yield f"event: error\ndata: {json.dumps({'message': data})}\n\n"
+    # Cache 檢查
+    if use_cache and state.last_context_cache == context and state.last_reply_at:
+        if datetime.now() - state.last_reply_at < timedelta(minutes=2):
+            fallback = random.choice(FALLBACK_REPLIES)
+            yield f"event: content\nson.dumps({'delta': fallback})}\n\n"
+            yield "event: done\ndata: {}\n\n"
+            return
+    
+    # 構建 system_prompt
+    memory_summary = state.recent_memory_text()
+    conv_list = state.get_recent_conversation(n=20)
+    if conv_list:
+        formatted = []
+        for turn in conv_list:
+            role_name = "Anna" if turn["role"] == "anna" else "Lin"
+            formatted.append(f"{role_name}：{turn['content']}")
+        conversation_history = "\n".join(formatted)
+    else:
+        conversation_history = ""
+    
+    from app.context.provider import get_context, format_context_for_prompt
+    world_context = format_context_for_prompt(get_context())
+    system_prompt = build_system_prompt(context, memory_summary, world_context, conversation_history)
+    
+    state.record_call()
+    
+    full_reasoning = ""
+    full_content = ""
+    
+    try:
+        for event_type, data in call_deepseek_stream(system_prompt, max_tokens=config.DEEPSEEK_MAX_TOKENS):
+            if event_type == "reasoning":
+                full_reasoning += data
+                yield f"event: reasoning\.dumps({'content': data})}\n\n"
+                
+            elif event_type == "content":
+                full_content += data
+                yield f"event: content\ndata: {json.dumps({'delta': data})}\n\n"
+                
+            elif event_type == "done":
+                if full_reasoning:
+                    decision = parse_memory_decision(full_reasoning)
+                    if decision:
+                        state.remember_or_reinforce(decision)
+                    
+                    mood = parse_mood_report(full_reasoning)
+                    if mood:
+                        state.update_mood(mood)
+                
+                state.last_context_cache = context
+                state.mark_reply()
+                state.add_log("AI回复", f"成功：{full_content[:40]}...")
+                
+                if full_content and full_content not in ("信号不好。", "今天额度用完了，或者刚刚问太快了，等一下再说。"):
+               
+                    from app.notify.bark import send_to_bark
+                    send_to_bark(full_content)
+                
+                state.mark_conversation_anchor()
+                yield f"event: done\son.dumps(data)}\n\n"
+                
+            elif event_type == "error":
+                yield f"event: error\ndata: {json.dumps({'message': data})}\n\n"
+                yield "event: don {}\n\n"
+                
+    except Exception as e:
+        print(f"[brain] Stream error: {e}")
+        yield f"event: error\nson.dumps({'message': '信号不好。'})}\n\n"
+        yield "event: done{}\n\n"     thinking_display = strip_hidden_blocks(full_reasoning) if full_reasoning else None
+                    state.add_conversation_turn("lin", full_content, thinking=thinking_display)
+                    

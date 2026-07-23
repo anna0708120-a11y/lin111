@@ -1,4 +1,3 @@
-import json
 """
 Lin 的"大脑"：把人设(persona) + 记忆(state) + 现实状态(context) + 模型(llm) 串起来，产出一句回复。
 

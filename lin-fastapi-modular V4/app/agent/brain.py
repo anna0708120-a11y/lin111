@@ -99,7 +99,7 @@ def write_daily_journal():
         state.add_note(content)
     state.mark_journal_written()
 
-
+import json
 
 def generate_reply_stream(context, app_name=None, use_cache=True):
     """

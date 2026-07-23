@@ -603,7 +603,6 @@ function smsg(role,text,think){
 
 
 async function send(){
-async function send(){
   const inp=document.getElementById('ci');
   let txt=inp.value.trim();
   if(!txt)return;

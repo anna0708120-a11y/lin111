@@ -322,8 +322,14 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 <div class="pg" id="pg-chat">
   <div class="cms" id="cm"><div class="clabel">with Lin</div></div>
   <div class="ciw">
+    <button class="img-btn" onclick="document.getElementById('imgInput').click()" title="发送图片">📎</button>
+    <input type="file" id="imgInput" accept="image/*" style="display:none" onchange="previewImage(event)">
     <input type="text" class="ci" id="ci" placeholder="跟主人說話...">
     <button class="sb" onclick="send()">↑</button>
+  </div>
+  <div id="imgPreview" class="img-preview" style="display:none;">
+    <img id="previewImg" src="" alt="预览">
+    <button class="img-remove" onclick="removeImage()">×</button>
   </div>
 </div>
 

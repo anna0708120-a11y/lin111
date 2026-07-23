@@ -124,6 +124,12 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 .msave{background:var(--rose);color:white;border:none;border-radius:10px;padding:10px;font-size:13px;font-weight:600;cursor:pointer;}
 .cms{flex:1;overflow-y:auto;padding:16px 16px 8px;-webkit-overflow-scrolling:touch;}
 .ciw{padding:10px 16px;background:var(--white);border-top:1px solid var(--border);display:flex;gap:10px;align-items:center;}
+.img-btn{width:40px;height:40px;border:none;background:transparent;cursor:pointer;font-size:20px;flex-shrink:0;border-radius:8px;transition:background .2s;}
+.img-btn:hover{background:var(--blush);}
+.img-preview{padding:12px 16px;background:var(--bg);border-top:1px solid var(--border);display:flex;align-items:center;gap:12px;}
+.img-preview img{max-height:100px;max-width:150px;border-radius:8px;object-fit:cover;}
+.img-remove{width:28px;height:28px;border:none;background:var(--rose);color:#FFF;border-radius:50%;cursor:pointer;font-size:18px;font-weight:bold;line-height:1;}
+.img-remove:hover{opacity:0.8;}
 .ci{flex:1;border:1.5px solid var(--border);border-radius:22px;padding:9px 16px;font-size:14px;font-family:'DM Sans',sans-serif;background:var(--cream);outline:none;color:var(--dark);}
 .ci:focus{border-color:var(--rose);}
 .sb{width:38px;height:38px;background:var(--rose);border:none;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;color:white;flex-shrink:0;}
@@ -608,25 +614,48 @@ function smsg(role,text,think){
 }
 
 
+let pendingImgBase64 = null;
+let pendingImgName = '';
+
+function previewImage(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  pendingImgName = file.name;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    pendingImgBase64 = e.target.result;
+    document.getElementById('previewImg').src = pendingImgBase64;
+    document.getElementById('imgPreview').style.display = 'flex';
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeImage() {
+  pendingImgBase64 = null;
+  pendingImgName = '';
+  document.getElementById('imgInput').value = '';
+  document.getElementById('imgPreview').style.display = 'none';
+}
+
 async function send(){
   const inp=document.getElementById('ci');
-  const msg=inp.value.trim();if(!msg)return;
+  const msg=inp.value.trim();
+  if(!msg && !pendingImgBase64)return;
   inp.value='';
-  let h=smsg('anna',msg);
+  const payload={activity:msg||'[图片]',app_name:'聊天界面'};
+  if(pendingImgBase64){payload.image=pendingImgBase64;}
+  let h=smsg('anna',msg||'[图片]');
   renderMessages(h);
+  if(pendingImgBase64){removeImage();}
   const cm=document.getElementById('cm');
   cm.innerHTML+='<div class="msg lin" id="ldg"><div class="msg-row">'+avatarHtml('lin')+'<div class="typing"><div class="td"></div><div class="td"></div><div class="td"></div></div></div></div>';
   cm.scrollTop=cm.scrollHeight;
   try{
-    const r=await fetch(AU+'/watch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({activity:msg,app_name:'聊天界面'})});
+    const r=await fetch(AU+'/watch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     const d=await r.json();
     if(d.message){h=smsg('lin',d.message,d.thinking);}
-    renderMessages(h);
-    llogs();
-    loadMood();
-  }catch(e){
-    renderMessages(h);
-  }
+    renderMessages(h);llogs();loadMood();
+  }catch(e){renderMessages(h);}
 }
 
 document.getElementById('ci').addEventListener('keypress',e=>{if(e.key==='Enter')send();});

@@ -111,15 +111,18 @@ def generate_reply_stream(context, app_name=None, use_cache=True):
     if not state.check_rate_limit():
         err_msg = "今天额度用完了，或者刚刚问太快了，等一下再说。"
         yield "event: error\n"
-        yieln.dumps({"message": err_msg})
+        yield json.dumps({"message": err_msg})
         yield "\n\n"
-        yield "event: don    return
+    yield "event: done\ndata: {}\n\n"
+    return
     
     if use_cache and state.last_context_cache == context and state.last_reply_at:
         if datetime.now() - state.last_reply_at < timedelta(minutes=2):
             fallback = random.choice(FALLBACK_REPLIES)
             yie          yield json.dumps({"delta": fallback})
-            yield "\n\nevent: don    return
+            yield "\n\n"
+    yield "event: done\ndata: {}\n\n"
+    return
     
     memory_summary = state.recent_memory_text()
     conv_list = state.get_recent_conversation(n=20)
@@ -145,13 +148,11 @@ def generate_reply_stream(context, app_name=None, use_cache=True):
         for event_type, data in call_deepseek_stream(system_prompt, max_tokens=config.DEEPSEEK_MAX_TOKENS):
             if event_type == "reasoning":
                 full_reasoning += data
-                yield "event: yield json.dumps({"content": data})
-                yield "\n\n"
+                yield f"event: reasoning\ndata: {json.dumps({'content': data})}\n\n"
                 
             elif event_type == "content":
                 full_content += data
-                yield "event:ield json.dumps({"delta": data})
-                yield "\n\n"
+                yield f"event: text\ndata: {json.dumps({'delta': data})}\n\n"
                 
             elif event_type == "done":
                 if full_reasoning:
@@ -175,19 +176,14 @@ def generate_reply_stream(context, app_name=None, use_cache=True):
                     send_to_bark(full_content)
                 
                 state.mark_conversation_anchor()
-                yield "eveield json.dumps(data)
-                yield "\n\n"
+                yield f"event: done\ndata: {json.dumps(data)}\n\n"
                 
             elif event_type == "error":
-                yield "eveyield json.dumps({"message": data})
-                yield "\n\nevent: don          
+                yield f"event: error\ndata: {json.dumps({'message': data})}\n\n"
+            
     except Exception as e:
         print(f"[brain] Stream error: {e}")
         yield "event: erson.dumps({"message": "信号不好。"})
         yield "\n\nevent: done\ndata: {}\n\n"
-
-
-
-
 
 

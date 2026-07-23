@@ -6,6 +6,8 @@
 
 以后想换别的模型，只需要在这个文件里加新函数，改 agent/brain.py 里调用的那一行。
 """
+import json
+import re
 import requests
 
 from app import config

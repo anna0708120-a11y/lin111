@@ -80,7 +80,6 @@ from fastapi.responses import StreamingResponse
 
 @router.post("/watch")
 def observe_anna(activity: Activity):
-    # 冷卻檢查邏輯保持不變
     if activity.app_name and activity.app_name != "聊天界面":
         if not state.check_app_cooldown(activity.app_name):
             return {"status": "Cooldown", "message": ""}
@@ -96,17 +95,18 @@ def observe_anna(activity: Activity):
             context = f"Anna说：{activity.activity}"
             state.add_conversation_turn("anna", activity.activity)
     
-    # 🔥 改為 Streaming Response
+    from app.agent.brain import generate_reply_stream
+    
     return StreamingResponse(
         generate_reply_stream(context, app_name=activity.app_name, use_cache=False),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no",  # 禁用 Nginx buffering
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
         }
     )
-
-
+    
     
     # 只有真的生成了回复内容，才记进对话历史（避免额度用完/信号不好时把错误提示当成Lin说的话存进去）
     if reply and reply not in ("信号不好。", "今天额度用完了，或者刚刚问太快了，等一下再说。"):

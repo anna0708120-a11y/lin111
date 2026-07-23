@@ -23,6 +23,7 @@ router = APIRouter()
 class Activity(BaseModel):
     activity: str
     app_name: Optional[str] = None
+    image: Optional[str] = None  # base64 图片数据
 
 class MemoryItem(BaseModel):
     category: str
@@ -82,9 +83,15 @@ def observe_anna(activity: Activity):
         state.update_app_cooldown(activity.app_name)
         context = f"Anna刚打开了{activity.app_name}"
     else:
-        context = f"Anna说：{activity.activity}"
-        # 只有真的是聊天界面发的消息，才记进对话历史（app监控触发的不算Anna在跟Lin说话）
-        state.add_conversation_turn("anna", activity.activity)
+        # 处理图片消息
+        if activity.image:
+            context = f"Anna发了一张图片"
+            if activity.activity and activity.activity != '[图片]':
+                context += f"，并说: {activity.activity}"
+            state.add_conversation_turn("anna", context, image_data=activity.image)
+        else:
+            context = f"Anna说：{activity.activity}"
+            state.add_conversation_turn("anna", activity.activity)
 
     reply, thinking = generate_reply(context, app_name=activity.app_name, use_cache=False)
     send_to_bark(reply)

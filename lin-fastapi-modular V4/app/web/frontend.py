@@ -604,22 +604,127 @@ function smsg(role,text,think){
 
 async function send(){
   const inp=document.getElementById('ci');
-  const msg=inp.value.trim();if(!msg)return;
+  let txt=inp.value.trim();
+  if(!txt)return;
   inp.value='';
-  let h=smsg('anna',msg);
-  renderMessages(h);
-  const cm=document.getElementById('cm');
-  cm.innerHTML+='<div class="msg lin" id="ldg"><div class="msg-row">'+avatarHtml('lin')+'<div class="typing"><div class="td"></div><div class="td"></div><div class="td"></div></div></div></div>';
-  cm.scrollTop=cm.scrollHeight;
+  addMsg('anna',txt);
+  typing(true);
+  
   try{
-    const r=await fetch(AU+'/watch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({activity:msg,app_name:'聊天界面'})});
-    const d=await r.json();
-    if(d.message){h=smsg('lin',d.message,d.thinking);}
-    renderMessages(h);
-    llogs();
-    loadMood();
+    const response = await fetch(AU+'/watch', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({activity: txt})
+    });
+    
+    if(!response.ok) throw new Error('Network error');
+    
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    
+    let reasoningBuffer = '';
+    let contentBuffer = '';
+    let currentMsgDiv = null;
+    let thinkDiv = null;
+    
+    typing(false); // 停止 typing 動畫
+    
+    function processChunk({done, value}){
+      if(done){
+        // Stream 結束，保存到對話歷史
+        if(contentBuffer){
+          const chatData = JSON.parse(localStorage.getItem(CK)||'[]');
+          chatData.push({role:'lin', content:contentBuffer, thinking:reasoningBuffer, time:ts()});
+          localStorage.setItem(CK, JSON.stringify(chatData));
+        }
+        scrollDown();
+        return;
+      }
+      
+      const chunk = decoder.decode(value, {stream: true});
+      const lines = chunk.split('\n');
+      
+      for(let line of lines){
+        if(!line.trim() || line.startsWith(': ping')) continue;
+        
+        if(line.startsWith('event:')){
+          const eventType = line.slice(7).trim();
+          continue; // 跳過 event 行，等下一行的 data
+        }
+        
+        if(line.startsWith(       try{
+            const data = JSON.parse(line.slice(6));
+            
+            // 處理 reasoning 事件
+            if(data.content !== undefined && !currentMsgDiv){
+              reasoningBuffer += data.content;
+              
+              // 如果還沒創建思考區塊，創建它
+              if(!thinkDiv){
+                const msgDiv = document.createElement('div');
+                msgDiv.className = 'msg lin';
+                
+                thinkDiv = document.createElement('div');
+                thinkDiv.className = 'think-box';
+                thinkDiv.textContent = reasoningBuffer;
+                
+                const toggle = document.createElement('div');
+                toggle.className = 'think-toggle';
+                toggle.innerHTML = '💭 思考過程 <span class="mstar">★★★★★</span>';
+                toggle.onclick = () => {
+                  thinkDiv.style.display = thinkDiv.style.display==='none'?'block':'none';
+                };
+                
+                msgDiv.appendChild(toggle);
+                msgDiv.appendChild(thinkDiv);
+                document.getElementById('cm').appendChild(msgDiv);
+              } else {
+                thinkDiv.textContent = reasoningBuffer;
+              }
+              scrollDown();
+            }
+            
+            // 處理 content 事件
+            else if(data.delta !== undefined){
+              contentBuffer += data.delta;
+              
+              // 如果還沒創建回答氣泡，創建它
+              if(!currentMsgDiv){
+                const msgDiv = document.createElement('div');
+                msgDiv.className = 'msg lin';
+                
+                const rowDiv = document.createElement('div');
+                rowDiv.className = 'msg-row';
+                
+                const bubDiv = document.createElement('div');
+                bubDiv.className = 'bub';
+                bubDiv.textContent = contentBuffer;
+                
+                rowDiv.appendChild(bubDiv);
+                msgDiv.appendChild(rowDiv);
+                document.getElementById('cm').appendChild(msgDiv);
+                
+                currentMsgDiv = bubDiv;
+              } else {
+                currentMsgDiv.textContent = contentBuffer;
+              }
+              scrollDown();
+            }
+          }catch(e){
+            console.error('Parse SSE error:', e);
+          }
+        }
+      }
+      
+      // 繼續讀取下一個 chunk
+      reader.read().then(processChunk);
+    }
+    
+    reader.read().then(processChunk);
+    
   }catch(e){
-    renderMessages(h);
+    typing(false);
+    console.error('Send error:', e);
   }
 }
 

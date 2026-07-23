@@ -127,6 +127,12 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 .ci{flex:1;border:1.5px solid var(--border);border-radius:22px;padding:9px 16px;font-size:14px;font-family:'DM Sans',sans-serif;background:var(--cream);outline:none;color:var(--dark);}
 .ci:focus{border-color:var(--rose);}
 .sb{width:38px;height:38px;background:var(--rose);border:none;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;color:white;flex-shrink:0;}
+.img-preview-bar{display:flex;align-items:center;gap:8px;padding:8px 16px;background:var(--white);border-top:1px solid var(--border);}
+.img-preview-thumb{width:40px;height:40px;border-radius:8px;object-fit:cover;border:1px solid var(--border);}
+.img-preview-label{flex:1;font-size:12px;color:var(--muted);}
+.img-preview-btn{border:none;border-radius:14px;padding:5px 12px;font-size:12px;cursor:pointer;}
+.img-preview-cancel{background:var(--blush);color:var(--muted);}
+.img-preview-send{background:var(--rose);color:#fff;}
 .clabel{text-align:center;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:16px;}
 .msg{margin-bottom:14px;display:flex;flex-direction:column;}
 .msg.grouped{margin-bottom:3px;}
@@ -321,6 +327,12 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 
 <div class="pg" id="pg-chat">
   <div class="cms" id="cm"><div class="clabel">with Lin</div></div>
+  <div class="img-preview-bar" id="imgPreviewBar" style="display:none">
+    <img id="imgPreviewThumb" class="img-preview-thumb">
+    <span class="img-preview-label">已選擇圖片</span>
+    <button class="img-preview-btn img-preview-cancel" onclick="cancelImagePreview()">取消</button>
+    <button class="img-preview-btn img-preview-send" onclick="confirmImageSend()">送出</button>
+  </div>
   <div class="ciw">
     <input type="file" id="chatImageUpload" accept="image/*" style="display:none">
     <button class="sb" onclick="document.getElementById('chatImageUpload').click()" style="background:var(--blush);color:var(--rose-deep);">📎</button>
@@ -411,6 +423,7 @@ applyTheme(document.documentElement.getAttribute('data-theme')||'light');
 let linAvatarUrl = null;
 let annaAvatarUrl = null;
 let pendingAvatarWho = 'lin';
+let pendingImageDataUrl = null;
 
 function pickAvatar(who){ pendingAvatarWho = who || 'lin'; document.getElementById('avatarFile').click(); }
 
@@ -728,6 +741,7 @@ async function send(){
     let currentMsgDiv = null;
     let thinkDiv = null;
     let currentEvent = null;
+    let sseBuffer = '';
     
     typing(false);
     
@@ -743,7 +757,9 @@ async function send(){
       }
       
       const chunk = decoder.decode(value, {stream: true});
-      const lines = chunk.split('\\n');
+      sseBuffer += chunk;
+      const lines = sseBuffer.split('\\n');
+      sseBuffer = lines.pop();
       
       for(let line of lines){
         if(!line.trim() || line.startsWith(': ping')) continue;
@@ -770,7 +786,7 @@ async function send(){
                 
                 const toggle = document.createElement('div');
                 toggle.className = 'think-toggle';
-                toggle.innerHTML = '💭 思考過程 <span class="mstar">★★★★★</span>';
+                toggle.innerHTML = '💭 思考過程';
                 toggle.onclick = () => {
                   thinkDiv.style.display = thinkDiv.style.display==='none'?'block':'none';
                 };
@@ -793,6 +809,7 @@ async function send(){
                 
                 const rowDiv = document.createElement('div');
                 rowDiv.className = 'msg-row';
+                rowDiv.innerHTML = avatarHtml('lin');
                 
                 const bubDiv = document.createElement('div');
                 bubDiv.className = 'bub';

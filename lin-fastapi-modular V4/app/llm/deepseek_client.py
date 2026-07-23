@@ -104,7 +104,10 @@ def call_deepseek_stream(system_prompt, temperature=0.95, max_tokens=None, top_p
                 continue
             
             if line.startswith(b"data: "):
-                data = json.loads(line[6:])
+                payload_str = line[6:].strip()
+                if payload_str == b"[DONE]":
+                    break
+                data = json.loads(payload_str)
                 delta = data["choices"][0]["delta"]
                 
                 # 處理 reasoning_content

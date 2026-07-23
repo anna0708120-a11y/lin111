@@ -602,7 +602,40 @@ function smsg(role,text,think){
 }
 
 
+
+function addMsg(role, text, think) {
+  smsg(role, text, think);
+  lchat();
+}
+
+function typing(show) {
+  const cm = document.getElementById('cm');
+  let typingDiv = cm.querySelector('.typing');
+  if (show && !typingDiv) {
+    typingDiv = document.createElement('div');
+    typingDiv.className = 'typing';
+    typingDiv.innerHTML = '<span class="td"></span><span class="td"></span><span class="td"></span>';
+    cm.appendChild(typingDiv);
+    cm.scrollTop = cm.scrollHeight;
+  } else if (!show && typingDiv) {
+    typingDiv.remove();
+  }
+}
+
+function scrollDown() {
+  const cm = document.getElementById('cm');
+  if (cm) cm.scrollTop = cm.scrollHeight;
+}
+
+function ftime() {
+  const now = new Date();
+  const h = now.getHours().toString().padStart(2, '0');
+  const m = now.getMinutes().toString().padStart(2, '0');
+  return h + ':' + m;
+}
+
 async function send(){
+
   const inp=document.getElementById('ci');
   let txt=inp.value.trim();
   if(!txt)return;

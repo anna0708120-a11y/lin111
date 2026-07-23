@@ -322,6 +322,8 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 <div class="pg" id="pg-chat">
   <div class="cms" id="cm"><div class="clabel">with Lin</div></div>
   <div class="ciw">
+    <input type="file" id="chatImageUpload" accept="image/*" style="display:none">
+    <button class="sb" onclick="document.getElementById('chatImageUpload').click()" style="background:var(--blush);color:var(--rose-deep);">📎</button>
     <input type="text" class="ci" id="ci" placeholder="跟主人說話...">
     <button class="sb" onclick="send()">↑</button>
   </div>
@@ -595,7 +597,9 @@ function lchat(){
 
 function smsg(role,text,think){
   const h=JSON.parse(localStorage.getItem(CK)||'[]');
-  h.push({r:role,t:text,time:ts(),iso:new Date().toISOString(),think:think||null});
+  const entry = {r:role,t:text,time:ts(),iso:new Date().toISOString()};
+  if(think) entry.think = think;
+  h.push(entry);
   if(h.length>200)h.splice(0,h.length-200);
   localStorage.setItem(CK,JSON.stringify(h));
   return h;
@@ -633,6 +637,70 @@ function ftime() {
   const m = now.getMinutes().toString().padStart(2, '0');
   return h + ':' + m;
 }
+
+
+// 聊天圖片上傳處理
+document.getElementById('chatImageUpload').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  
+  try {
+    const dataUrl = await resizeImage(file, 800);
+    const base64 = dataUrl.split(',')[1];
+    
+    addMsg('anna', '[圖片]');
+    typing(true);
+    
+    const response = await fetch(AU + '/watch', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({activity: '看圖片', image: base64})
+    });
+    
+    if (!response.ok) throw new Error('Upload failed');
+    
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    
+    typing(false);
+    
+    function processChunk({done, value}) {
+      if (done) {
+        scrollDown();
+        return;
+      }
+      
+      const chunk = decoder.decode(value, {stream: true});
+      buffer += chunk;
+      
+      const lines = buffer.split('\\n');
+      buffer = lines.pop();
+      
+      for (let line of lines) {
+        if (!line.trim() || line.startsWith(': ping')) continue;
+        if (line.startsWith('data:')) {
+          try {
+            const data = JSON.parse(line.slice(6));
+            if (data.delta) {
+              // 流式輸出處理
+            }
+          } catch(e) {}
+        }
+      }
+      
+      reader.read().then(processChunk);
+    }
+    
+    reader.read().then(processChunk);
+    
+  } catch(e) {
+    typing(false);
+    addMsg('lin', '圖片上傳失敗');
+  }
+  
+  e.target.value = '';
+});
 
 async function send(){
 

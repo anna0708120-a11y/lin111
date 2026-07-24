@@ -659,11 +659,37 @@ document.getElementById('chatImageUpload').addEventListener('change', async (e) 
   
   try {
     const dataUrl = await resizeImage(file, 800);
-    const base64 = dataUrl.split(',')[1];
+    pendingImageDataUrl = dataUrl;
     
-    addMsg('anna', '[圖片]');
-    typing(true);
-    
+    // 顯示預覽
+    document.getElementById('imgPreviewThumb').src = dataUrl;
+    document.getElementById('imgPreviewBar').style.display = 'flex';
+  } catch(e) {
+    console.error('Image preview error:', e);
+  }
+});
+
+// 取消圖片預覽
+function cancelImagePreview() {
+  pendingImageDataUrl = null;
+  document.getElementById('imgPreviewBar').style.display = 'none';
+  document.getElementById('chatImageUpload').value = '';
+}
+
+// 確認送出圖片
+async function confirmImageSend() {
+  if (!pendingImageDataUrl) return;
+  
+  const base64 = pendingImageDataUrl.split(',')[1];
+  
+  // 隱藏預覽列
+  document.getElementById('imgPreviewBar').style.display = 'none';
+  document.getElementById('chatImageUpload').value = '';
+  
+  addMsg('anna', '[圖片]');
+  typing(true);
+  
+  try {
     const response = await fetch(AU + '/watch', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
@@ -674,31 +700,108 @@ document.getElementById('chatImageUpload').addEventListener('change', async (e) 
     
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
-    let buffer = '';
+    
+    let reasoningBuffer = '';
+    let contentBuffer = '';
+    let currentMsgDiv = null;
+    let thinkDiv = null;
+    let currentEvent = null;
+    let sseBuffer = '';
     
     typing(false);
     
     function processChunk({done, value}) {
       if (done) {
+        if (contentBuffer) {
+          const chatData = JSON.parse(localStorage.getItem(CK)||'[]');
+          chatData.push({role:'lin', content:contentBuffer, thinking:reasoningBuffer, time:ts()});
+          localStorage.setItem(CK, JSON.stringify(chatData));
+        }
         scrollDown();
+        pendingImageDataUrl = null;
         return;
       }
       
       const chunk = decoder.decode(value, {stream: true});
-      buffer += chunk;
-      
-      const lines = buffer.split('\\n');
-      buffer = lines.pop();
+      sseBuffer += chunk;
+      const lines = sseBuffer.split('\\n');
+      sseBuffer = lines.pop();
       
       for (let line of lines) {
         if (!line.trim() || line.startsWith(': ping')) continue;
+        
+        if (line.startsWith('event:')) {
+          currentEvent = line.slice(7).trim();
+          continue;
+        }
+        
         if (line.startsWith('data:')) {
           try {
             const data = JSON.parse(line.slice(6));
-            if (data.delta) {
-              // 流式輸出處理
+            
+            if (currentEvent === 'reasoning' && data.content !== undefined) {
+              reasoningBuffer += data.content;
+              
+              if (!thinkDiv) {
+                const msgDiv = document.createElement('div');
+                msgDiv.className = 'msg lin';
+                
+                thinkDiv = document.createElement('div');
+                thinkDiv.className = 'think-box';
+                thinkDiv.textContent = reasoningBuffer;
+                
+                const toggle = document.createElement('div');
+                toggle.className = 'think-toggle';
+                toggle.innerHTML = '💭 思考過程';
+                toggle.onclick = () => {
+                  thinkDiv.style.display = thinkDiv.style.display==='none'?'block':'none';
+                };
+                
+                msgDiv.appendChild(toggle);
+                msgDiv.appendChild(thinkDiv);
+                document.getElementById('cm').appendChild(msgDiv);
+              } else {
+                thinkDiv.textContent = reasoningBuffer;
+              }
+              scrollDown();
             }
-          } catch(e) {}
+            
+            else if (currentEvent === 'content' && data.delta !== undefined) {
+              contentBuffer += data.delta;
+              
+              if (!currentMsgDiv) {
+                const msgDiv = document.createElement('div');
+                msgDiv.className = 'msg lin';
+                
+                const rowDiv = document.createElement('div');
+                rowDiv.className = 'msg-row';
+                rowDiv.innerHTML = avatarHtml('lin');
+                
+                const bubDiv = document.createElement('div');
+                bubDiv.className = 'bub';
+                bubDiv.textContent = contentBuffer;
+                
+                rowDiv.appendChild(bubDiv);
+                msgDiv.appendChild(rowDiv);
+                document.getElementById('cm').appendChild(msgDiv);
+                
+                currentMsgDiv = bubDiv;
+              } else {
+                currentMsgDiv.textContent = contentBuffer;
+              }
+              scrollDown();
+            }
+            
+            else if (currentEvent === 'error') {
+              typing(false);
+              if (data.message) {
+                addMsg('lin', data.message);
+              }
+            }
+            
+          } catch(e) {
+            console.error('Parse SSE error:', e, line);
+          }
         }
       }
       
@@ -710,10 +813,11 @@ document.getElementById('chatImageUpload').addEventListener('change', async (e) 
   } catch(e) {
     typing(false);
     addMsg('lin', '圖片上傳失敗');
+    console.error('Image send error:', e);
+  } finally {
+    pendingImageDataUrl = null;
   }
-  
-  e.target.value = '';
-});
+}
 
 async function send(){
 

@@ -181,6 +181,39 @@ def insert_log(event_type, content):
         print(f"[db] 写入监控日志失败: {e}")
 
 
+# ---------- 对话历史（跨装置同步：手机 dock / 电脑 dock / 网页版 共用一份） ----------
+def load_conversations(limit=500):
+    """启动时读一份最近的聊天记录进内存，让三端打开时看到同一份对话。"""
+    if not _client:
+        return []
+    try:
+        res = (
+            _client.table("conversation_history")
+            .select("role, content, thinking, image_data, created_at")
+            .order("created_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        rows = res.data or []
+        rows.reverse()  # 转回时间正序（旧->新），跟内存 deque 的顺序一致
+        return rows
+    except Exception as e:
+        print(f"[db] 读取对话历史失败: {e}")
+        return []
+
+def insert_conversation_turn(role, content, thinking=None, image_data=None):
+    if not _client:
+        return
+    try:
+        _client.table("conversation_history").insert({
+            "role": role,
+            "content": content,
+            "thinking": thinking,
+            "image_data": image_data,
+        }).execute()
+    except Exception as e:
+        print(f"[db] 写入对话历史失败: {e}")
+
 # ---------- Lin 的碎碎念 ----------
 def load_notes(limit=50):
     if not _client:
@@ -286,3 +319,4 @@ def upload_photo_file(local_path, storage_filename):
     except Exception as e:
         print(f"[db] 上传图片文件失败: {e}")
         return None
+

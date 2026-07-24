@@ -7,9 +7,9 @@
 主动消息的"锚点"时间 (last_anchor_at)、主动消息设置 (proactive)、双方头像。
 如果没接 Supabase，db.py 会自动什么都不做，一样能用，只是恢复成"重启就忘记"。
 
-对话历史 (conversation_history) 特意留在纯内存，不接 Supabase：
-这是让 Lin 能看到"刚才聊了什么"的关键数据，但服务重启清空也没关系
-——真正重要的内容会被 Lin 自己判断后写进长期记忆 (memory_bank)。
+对话历史 (conversation_history) 现在也经过 app/db.py 存进 Supabase 的
+conversation_history 表，让手机 dock / 电脑 dock / 网页版三端能读到同一份聊天记录，
+不再各自锁在浏览器自己的 localStorage 里。保留条数由 config.CHAT_HISTORY_LIMIT 控制。
 """
 from collections import deque
 from datetime import datetime, timedelta
@@ -100,8 +100,21 @@ class AppState:
         self.mood = db.load_state_value("mood_state") or dict(DEFAULT_MOOD)
 
         # 对话历史：最近的聊天记录，用于给模型看上下文，不然模型每次都"失忆"
-        # 特意纯内存（见文件开头说明），最多保留50条，滚动窗口
-        self.conversation_history = deque(maxlen=50)
+        # 启动时从 Supabase 读一份进内存，让三端（手机/电脑/网页）打开时看到同一份记录；
+        # 之后新增的同时写回 Supabase。保留条数上限见 config.CHAT_HISTORY_LIMIT。
+        self.conversation_history = deque(
+            (
+                {
+                    "role": r.get("role", ""),
+                    "content": r.get("content", ""),
+                    "thinking": r.get("thinking"),
+                    "image_data": r.get("image_data"),
+                    "time": r.get("time") or r.get("created_at", ""),
+                }
+                for r in db.load_conversations(limit=config.CHAT_HISTORY_LIMIT)
+            ),
+            maxlen=config.CHAT_HISTORY_LIMIT,
+        )
 
     # ---------- 日志 ----------
     def add_log(self, event_type, content):
@@ -207,15 +220,18 @@ class AppState:
     def add_conversation_turn(self, role, content, thinking=None, image_data=None):
         """
         记录一轮对话：role 是 'anna' 或 'lin'，content 是说的话。
-        用 deque(maxlen=50) 自动保留最近50条，超过自动丢弃最旧的。
+        用 deque(maxlen=config.CHAT_HISTORY_LIMIT) 自动保留最近N条，超过自动丢弃最旧的。
+        同时写回 Supabase，让手机/电脑/网页三端下次打开能读到同一份记录。
         """
-        self.conversation_history.append({
+        turn = {
             "role": role,
             "content": content,
             "thinking": thinking,
             "image_data": image_data,
             "time": datetime.now().isoformat(),
-        })
+        }
+        self.conversation_history.append(turn)
+        db.insert_conversation_turn(role, content, thinking=thinking, image_data=image_data)
 
     def get_recent_conversation(self, n=20):
         """取最近 n 条对话，按时间正序返回，给 DeepSeek 当 messages 历史用。"""

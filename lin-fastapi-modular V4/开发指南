@@ -50,5 +50,42 @@ File Status:
 
 已修復:
 
-已知其他 bug:
-之前留在 main 上的那個 debug commit(7381221d)還沒清理
+本轮已完成：聊天记录跨装置同步（手机dock/电脑dock/网页版共用同一份记录）
+
+问题：三端各自读写浏览器 localStorage（key: lin_chat_v1），互不相通，
+所以手机上聊的、电脑上看不到；刷新页面也只能看到当前这台设备自己存的记录。
+
+改动（只影响这一件事，没碰 UI、没碰 SSE 相关逻辑）：
+- config.py：新增 `CHAT_HISTORY_LIMIT`（默认500，环境变量可调，不用改数据库结构）
+- db.py：新增 `load_conversations()` / `insert_conversation_turn()`，跟现有函数同一套
+  try/except+`_client`判断的写法，没接 Supabase 时安静跳过、不报错
+- state.py：`conversation_history` 从纯内存 deque(maxlen=50) 改成启动时从 Supabase
+  读一份进内存（deque(maxlen=CHAT_HISTORY_LIMIT)），`add_conversation_turn()` 新增消息
+  时同步写回 Supabase
+- routes.py：新增 `GET /conversation`，返回字段对齐前端 renderMessages 需要的
+  r/t/iso/time/think 格式
+- frontend.py：`lchat()` 改名 `syncChat()`，页面载入时先打 `/conversation` 拿共享记录
+  覆盖本地 localStorage 再渲染；请求失败（离线/后端没起来）静默 fallback 到原本的
+  localStorage 内容，不影响离线可用性。`smsg()`/`addMsg()` 发消息逻辑本身没动。
+
+需要跑的 SQL（去 Supabase SQL Editor 跑一次，之前的表不受影响）：
+
+```sql
+create table if not exists conversation_history (
+  id bigint generated always as identity primary key,
+  role text not null,
+  content text not null,
+  thinking text,
+  image_data text,
+  created_at timestamptz default now()
+);
+```
+
+不影响现有功能：/watch /logs /memory 等既有接口对外行为不变，SSE 串流、
+图片发送、思考框渲染都没有改动。
+
+已验证：py_compile 语法检查、state.py/routes.py 独立载入、完整 app.main 载入、
+TestClient 打 /health /conversation /logs（无 Supabase 时优雅返回空值不报错）、
+写入一轮对话后 /conversation 能读出、frontend.py 两段 script 提取后过 Node 语法检查。
+
+已知其他 bug：（无）

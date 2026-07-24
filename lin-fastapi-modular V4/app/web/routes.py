@@ -118,6 +118,36 @@ def get_logs():
         "quota": state.daily_count.get("count", 0),
     }
 
+@router.get("/conversation")
+def get_conversation():
+    """
+    给前端载入用：回传 Supabase 里存的共享聊天记录（不是浏览器 localStorage）。
+    手机 dock / 电脑 dock / 网页版打开页面时都打这个接口，看到的是同一份记录，
+    这样才能做到跨装置同步。
+    """
+    from datetime import datetime as _dt
+
+    def _display_time(iso_str):
+        if not iso_str:
+            return ""
+        try:
+            return _dt.fromisoformat(iso_str).strftime("%H:%M")
+        except Exception:
+            return ""
+
+    messages = []
+    for turn in state.conversation_history:
+        entry = {
+            "r": "anna" if turn.get("role") == "anna" else "lin",
+            "t": turn.get("content", ""),
+            "iso": turn.get("time", ""),
+            "time": _display_time(turn.get("time", "")),
+        }
+        if turn.get("thinking"):
+            entry["think"] = turn["thinking"]
+        messages.append(entry)
+    return {"messages": messages}
+
 @router.get("/memory")
 def list_memory():
     """给记忆库分页面用：回传目前所有记忆（来自 Supabase，不是浏览器本地存的）。"""

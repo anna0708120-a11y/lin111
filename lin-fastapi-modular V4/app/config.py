@@ -58,6 +58,11 @@ APP_COOLDOWN_MINUTES = int(os.getenv("APP_COOLDOWN_MINUTES", 20))
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
 
+# ---- 聊天记录持久化（跨装置同步用）----
+# 手机 dock / 电脑 dock / 网页版，三端现在都从 Supabase 读同一份聊天记录，不再各自存在浏览器 localStorage 里。
+# 保留条数做成配置项，以后觉得 500 太少，改这个数字就好，不用动数据库结构。
+CHAT_HISTORY_LIMIT = int(os.getenv("CHAT_HISTORY_LIMIT", 500))
+
 # ---- Context Provider 总开关（每个功能都能单独关，改.env就好，不用删代码） ----
 ENABLE_MAC = os.getenv("ENABLE_MAC", "true").lower() == "true"
 ENABLE_WEATHER = os.getenv("ENABLE_WEATHER", "true").lower() == "true"

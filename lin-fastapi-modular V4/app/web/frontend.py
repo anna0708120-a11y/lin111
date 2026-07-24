@@ -614,6 +614,22 @@ function lchat(){
   renderMessages(JSON.parse(localStorage.getItem(CK)||'[]'));
 }
 
+async function syncChat(){
+  // 跨装置同步：从 Supabase 共享的聊天记录覆盖本地 localStorage，
+  // 这样手机 dock / 电脑 dock / 网页版打开时看到的是同一份对话，不是各自锁死的本地缓存。
+  // 失败（离线/后端没起来）就安静地退回原本的 localStorage 内容，不影响原有体验。
+  try{
+    const r = await fetch(AU+'/conversation');
+    const d = await r.json();
+    if(d && Array.isArray(d.messages)){
+      localStorage.setItem(CK, JSON.stringify(d.messages));
+    }
+  }catch(e){
+    console.error('[syncChat] 同步聊天记录失败，先显示本地缓存:', e);
+  }
+  lchat();
+}
+
 function smsg(role,text,think){
   const h=JSON.parse(localStorage.getItem(CK)||'[]');
   const entry = {r:role,t:text,time:ts(),iso:new Date().toISOString()};
@@ -1044,7 +1060,7 @@ async function delmem(id){
   rmem();
 }
 
-lchat();llogs();setInterval(()=>{llogs();if(document.getElementById('tb-monitor').classList.contains('active'))loadMood();},10000);
+syncChat();llogs();setInterval(()=>{llogs();if(document.getElementById('tb-monitor').classList.contains('active'))loadMood();},10000);
 
 // ========== 经期记录功能 ==========
 let periodData = { records: [], cycle: 28 };

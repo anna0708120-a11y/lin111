@@ -574,6 +574,11 @@ function avatarHtml(role){
 }
 
 function renderMessages(history){
+  console.log('[DEBUG] 🔄 renderMessages called, history.length:', history ? history.length : 0);
+  if(history && history.length > 0){
+    const lastMsg = history[history.length - 1];
+    console.log('[DEBUG] Last message:', lastMsg);
+  }
   const cm=document.getElementById('cm');
   if(!history||history.length===0){
     cm.innerHTML='<div class="clabel">with Lin</div><div class="msg lin"><div class="msg-row">'+avatarHtml('lin')+'<div class="bub">打開了？</div></div><div class="mtime2">'+ts()+'</div></div>';
@@ -602,6 +607,8 @@ function renderMessages(history){
   });
   cm.innerHTML=html;
   cm.scrollTop=cm.scrollHeight;
+  const msgDivs = cm.querySelectorAll('.msg.lin');
+  console.log('[DEBUG] After renderMessages, .msg.lin count:', msgDivs.length);
 }
 
 function lchat(){
@@ -784,6 +791,7 @@ async function confirmImageSend() {
                 rowDiv.appendChild(bubDiv);
                 msgDiv.appendChild(rowDiv);
                 document.getElementById('cm').appendChild(msgDiv);
+                console.log('[DEBUG] Content msgDiv appended to #cm');
                 
                 currentMsgDiv = bubDiv;
               } else {
@@ -850,11 +858,15 @@ async function send(){
     typing(false);
     
     function processChunk({done, value}){
+      console.log('[DEBUG] processChunk called, done:', done);
       if(done){
+        console.log('[DEBUG] Stream done. contentBuffer:', contentBuffer, 'reasoningBuffer:', reasoningBuffer);
         if(contentBuffer){
+          console.log('[DEBUG] Saving to localStorage. content:', contentBuffer, 'thinking:', reasoningBuffer);
           const chatData = JSON.parse(localStorage.getItem(CK)||'[]');
           chatData.push({role:'lin', content:contentBuffer, thinking:reasoningBuffer, time:ts()});
           localStorage.setItem(CK, JSON.stringify(chatData));
+          console.log('[DEBUG] ChatData after push:', chatData.length, 'items');
         }
         scrollDown();
         return;
@@ -878,9 +890,11 @@ async function send(){
             const data = JSON.parse(line.slice(6));
             
             if(currentEvent === 'reasoning' && data.content !== undefined){
+              console.log('[DEBUG] ✅ REASONING event received, data.content:', data.content);
               reasoningBuffer += data.content;
               
               if(!thinkDiv){
+                console.log('[DEBUG] Creating thinking msgDiv');
                 const msgDiv = document.createElement('div');
                 msgDiv.className = 'msg lin';
                 
@@ -905,9 +919,11 @@ async function send(){
             }
             
             else if(currentEvent === 'content' && data.delta !== undefined){
+              console.log('[DEBUG] ✅ CONTENT event received, data.delta:', data.delta);
               contentBuffer += data.delta;
               
               if(!currentMsgDiv){
+                console.log('[DEBUG] Creating content msgDiv');
                 const msgDiv = document.createElement('div');
                 msgDiv.className = 'msg lin';
                 

@@ -110,28 +110,28 @@ def call_deepseek_stream(system_prompt, temperature=0.95, max_tokens=None, top_p
                 data = json.loads(payload_str)
                 delta = data["choices"][0]["delta"]
                 
-                # TEMP DEBUG: dump raw delta to verify key/value shape (remove after verified)
-                yield ("reasoning", "[RAW_DELTA_DEBUG]" + json.dumps(delta, ensure_ascii=False) + "\n")
+                # 用值是否為 None 判斷，而不是 key 是否存在：
+                # DeepSeek 吐正式 content 的 chunk 裡，"reasoning_content" 這個 key
+                # 通常還在，只是值是 null，用 "in delta" 判斷會誤判成 reasoning，
+                # 導致 content 永遠被吃掉、送不到前端。
+                reasoning_chunk = delta.get("reasoning_content")
+                content_chunk = delta.get("content")
                 
                 # 處理 reasoning_content
-                if "reasoning_content" in delta:
-                    chunk = delta["reasoning_content"]
-                    if chunk is not None:
-                        reasoning_buffer.append(chunk)
-                    else:
-                        chunk = ""
+                if reasoning_chunk is not None:
+                    reasoning_buffer.append(reasoning_chunk)
                     
                     # 檢查是否包含隱藏標籤
                     full_reasoning = "".join(reasoning_buffer)
                     if "[MEMORY_DECISION]" in full_reasoning or "[MOOD_REPORT]" in full_reasoning:
                         # 暫時不發送，等完整 reasoning 結束後過濾
-                        continue
+                        pass
                     else:
-                        yield ("reasoning", chunk)
+                        yield ("reasoning", reasoning_chunk)
                 
-                # 處理 content
-                elif "content" in delta:
-                    yield ("content", delta["content"] or "")
+                # 處理 content（獨立判斷，不用 elif，避免同一個 chunk 裡兩者都有時漏掉）
+                if content_chunk is not None:
+                    yield ("content", content_chunk)
                 
                 # 結束標記
                 if data["choices"][0].get("finish_reason"):

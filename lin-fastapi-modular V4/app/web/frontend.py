@@ -720,9 +720,7 @@ async function confirmImageSend() {
     function processChunk({done, value}) {
       if (done) {
         if (contentBuffer) {
-          const chatData = JSON.parse(localStorage.getItem(CK)||'[]');
-          chatData.push({role:'lin', content:contentBuffer, thinking:reasoningBuffer, time:ts()});
-          localStorage.setItem(CK, JSON.stringify(chatData));
+          smsg('lin', contentBuffer, reasoningBuffer || null);
         }
         scrollDown();
         pendingImageDataUrl = null;
@@ -862,11 +860,7 @@ async function send(){
       if(done){
         console.log('[DEBUG] Stream done. contentBuffer:', contentBuffer, 'reasoningBuffer:', reasoningBuffer);
         if(contentBuffer){
-          console.log('[DEBUG] Saving to localStorage. content:', contentBuffer, 'thinking:', reasoningBuffer);
-          const chatData = JSON.parse(localStorage.getItem(CK)||'[]');
-          chatData.push({role:'lin', content:contentBuffer, thinking:reasoningBuffer, time:ts()});
-          localStorage.setItem(CK, JSON.stringify(chatData));
-          console.log('[DEBUG] ChatData after push:', chatData.length, 'items');
+          smsg('lin', contentBuffer, reasoningBuffer || null);
         }
         scrollDown();
         return;

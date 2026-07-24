@@ -330,8 +330,7 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
   <div class="img-preview-bar" id="imgPreviewBar" style="display:none">
     <img id="imgPreviewThumb" class="img-preview-thumb">
     <span class="img-preview-label">已選擇圖片</span>
-    <button class="img-preview-btn img-preview-cancel" onclick="cancelImagePreview()">取消</button>
-    <button class="img-preview-btn img-preview-send" onclick="confirmImageSend()">送出</button>
+    <button class="img-preview-btn img-preview-cancel" onclick="cancelImagePreview()">✕</button>
   </div>
   <div class="ciw">
     <input type="file" id="chatImageUpload" accept="image/*" style="display:none">
@@ -829,6 +828,7 @@ async function confirmImageSend() {
 }
 
 async function send(){
+  if (pendingImageDataUrl) return confirmImageSend();
 
   const inp=document.getElementById('ci');
   let txt=inp.value.trim();

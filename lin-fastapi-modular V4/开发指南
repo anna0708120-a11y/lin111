@@ -71,6 +71,9 @@ Commit 9b4fb71 已部署到 main (2026-07-23 17:58:25Z)
 使用正確的 buffer 累積機制
 清理:隱藏預覽、清空變數
 
-已知其他 bug:
-圖片上傳後 Lin 的回覆沒有渲染 (processChunk 裡只有空註解)
+3.思考框(reasoning)先出現
+對話氣泡(content)接著獨立出現
 
+已知其他 bug:
+圖片失敗
+圖片上傳後, content 被後端吃掉

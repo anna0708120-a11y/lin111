@@ -44,8 +44,18 @@ File Status:
 | `routes.py` | ✅ 確認正常,**不能碰** | SSE 轉發邏輯正常運作 |
 | `brain.py` | ✅ 確認正常,**不能碰** | 不處理圖片,純文字對話邏輯正常 |
 | `deepseek_client.py` | ✅ 確認正常,**不能碰** | 串流邏輯正常 |
-
-
-
 | `provider.py` | ✅ 確認正常,**不能碰** | HTTP 請求層正常 |
 | `state.py` | ✅ 確認正常,**不能碰** | 對話歷史存儲正常 |
+
+
+已修復 send() 函式裡的 SSE buffer 累積 bug
+執行結果:
+Commit 9b4fb71 已部署到 main (2026-07-23 17:58:25Z)
+兩處修改已確認存在:
+第 744 行:let sseBuffer = ''; ✅
+第 760-762 行:buffer 累積邏輯 ✅
+Render 已同步 live ✅
+
+已知其他 bug:
+圖片上傳後 Lin 的回覆沒有渲染 (processChunk 裡只有空註解)
+預覽列按鈕沒有函式定義 (cancelImagePreview/confirmImageSend)

@@ -110,6 +110,9 @@ def call_deepseek_stream(system_prompt, temperature=0.95, max_tokens=None, top_p
                 data = json.loads(payload_str)
                 delta = data["choices"][0]["delta"]
                 
+                # TEMP DEBUG: dump raw delta to verify key/value shape (remove after verified)
+                yield ("reasoning", "[RAW_DELTA_DEBUG]" + json.dumps(delta, ensure_ascii=False) + "\n")
+                
                 # 處理 reasoning_content
                 if "reasoning_content" in delta:
                     chunk = delta["reasoning_content"]

@@ -75,3 +75,5 @@ send() 函式裡的 SSE buffer 累積 bug
 
 已知其他 bug:
 圖片失敗
+圖片上傳回 500 錯誤本身的後端原因,還沒查
+之前留在 main 上的那個 debug commit(7381221d)還沒清理

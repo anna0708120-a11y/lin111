@@ -21,3 +21,31 @@
 •⁠  ⁠修改后必须自动运行检查。
 •⁠  ⁠不允许因为猜测就重构。
 •⁠  ⁠如果连续两次失败，先定位，不继续修改。
+
+3.Project State:
+用戶瀏覽器 (frontend.py)
+    ↓ HTTP POST /watch
+routes.py (FastAPI endpoint)
+    ↓ 呼叫
+brain.py (think_and_reply)
+    ↓ 呼叫
+deepseek_client.py (stream_chat)
+    ↓ 呼叫
+provider.py (實際 HTTP 請求到 DeepSeek API)
+    ↓ SSE 串流回傳
+    ↓
+routes.py → 轉發 SSE events 給瀏覽器
+    ↓
+frontend.py processChunk() 解析並渲染
+
+File Status:
+| 檔案 | 狀態 | 說明 |
+| `frontend.py` | **正在修改** | 目前修 `send()` 的 SSE buffer 累積 bug |
+| `routes.py` | ✅ 確認正常,**不能碰** | SSE 轉發邏輯正常運作 |
+| `brain.py` | ✅ 確認正常,**不能碰** | 不處理圖片,純文字對話邏輯正常 |
+| `deepseek_client.py` | ✅ 確認正常,**不能碰** | 串流邏輯正常 |
+
+
+
+| `provider.py` | ✅ 確認正常,**不能碰** | HTTP 請求層正常 |
+| `state.py` | ✅ 確認正常,**不能碰** | 對話歷史存儲正常 |

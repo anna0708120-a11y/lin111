@@ -40,40 +40,15 @@ frontend.py processChunk() 解析並渲染
 
 File Status:
 | 檔案 | 狀態 | 說明 |
-| `frontend.py` | **正在修改** | 目前修 `send()` 的 SSE buffer 累積 bug |
-| `routes.py` | ✅ 確認正常,**不能碰** | SSE 轉發邏輯正常運作 |
-| `brain.py` | ✅ 確認正常,**不能碰** | 不處理圖片,純文字對話邏輯正常 |
-| `deepseek_client.py` | ✅ 確認正常,**不能碰** | 串流邏輯正常 |
-| `provider.py` | ✅ 確認正常,**不能碰** | HTTP 請求層正常 |
-| `state.py` | ✅ 確認正常,**不能碰** | 對話歷史存儲正常 |
+| `frontend.py` |  |  |
+| `routes.py` | ✅ 確認正常 | SSE 轉發邏輯正常運作 |
+| `brain.py` | ✅ 確認正常 | 不處理圖片,純文字對話邏輯正常 |
+| `deepseek_client.py` | ✅ 確認正常 | 串流邏輯正常 |
+| `provider.py` | ✅ 確認正常 | HTTP 請求層正常 |
+| `state.py` | ✅ 確認正常 | 對話歷史存儲正常 |
 
 
-已修復;
-send() 函式裡的 SSE buffer 累積 bug
-第 744 行:let sseBuffer = ''; ✅
-第 760-762 行:buffer 累積邏輯 ✅
-
-修改 chatImageUpload handler (第 656 行):
-改為只顯示預覽,不立即上傳
-設置 pendingImageDataUrl 並顯示預覽列
-
-新增 cancelImagePreview() 函式:
-清空 pendingImageDataUrl
-隱藏預覽列
-清空 file input
-
-新增 confirmImageSend() 函式:
-完整 SSE 串流處理(reasoning + content + error)
-與 send() 相同的思考框渲染邏輯
-使用正確的 buffer 累積機制
-清理:隱藏預覽、清空變數
-
-消息被吞修復
-
-思考框(reasoning)先出現
-對話氣泡(content)接著獨立出現
-
-圖片請求能送到後端、不被 500 擋掉
+已修復:
 
 已知其他 bug:
 之前留在 main 上的那個 debug commit(7381221d)還沒清理

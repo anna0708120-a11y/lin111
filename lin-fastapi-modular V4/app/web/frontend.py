@@ -1225,10 +1225,20 @@ async function recordPeriod(date) {
   }
 }
 
+let pendingPeriodDate = null;
+
 function quickRecord(date) {
-  document.querySelectorAll('.calendar-day').forEach(d => d.classList.remove('selected'));
-  event.target.classList.add('selected');
-  recordPeriod(date);
+  // 防误触：第一次点击只显示边框（选中态），不动数据库；
+  // 对同一天再点一次才真的送出新增/取消。点别的日期则边框转移，不触发任何请求。
+  if (pendingPeriodDate === date) {
+    document.querySelectorAll('.calendar-day').forEach(d => d.classList.remove('selected'));
+    pendingPeriodDate = null;
+    recordPeriod(date);
+  } else {
+    document.querySelectorAll('.calendar-day').forEach(d => d.classList.remove('selected'));
+    event.target.classList.add('selected');
+    pendingPeriodDate = date;
+  }
 }
 
 </script>

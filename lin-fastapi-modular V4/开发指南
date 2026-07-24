@@ -125,3 +125,33 @@ DELETE /period/{date}。
 不影响现有功能：/watch /logs /memory /conversation 等接口没有改动，
 经期记录本身的预测逻辑（predictDates/predictFertile/updatePrediction）没有改动。
 
+
+
+---
+
+本轮已完成：经期记录 - 防误触（点一下先显边框，再点一下才生效）
+
+需求：为了防止容易误触，改为"先选中显示边框，再点一次才真正记录/取消"，
+而不是点一下就直接送出请求。
+
+定位：quickRecord() 原本点一下就立刻加边框 + 直接呼叫 recordPeriod()（送出
+POST/DELETE），中间没有任何缓冲，手滑碰到旁边那天或不小心点两下都会直接
+改动数据库记录。
+
+改动（只改这一个函式，没碰 recordPeriod()、没碰 CSS、没碰后端）：
+- frontend.py：新增模块级变量 pendingPeriodDate 记录"目前显示边框、等待
+  确认"的日期。quickRecord(date) 逻辑改为：
+  - 如果点的这天就是 pendingPeriodDate（也就是已经有边框了）→ 才真的呼叫
+    recordPeriod(date)，清空 pendingPeriodDate
+  - 否则（点了别的日期，或还没选过）→ 只把边框转移到这天，记录为
+    pendingPeriodDate，不触发任何后端请求
+
+已验证：
+- py_compile 语法检查通过
+- frontend.py 提取 <script> 后过 Node 语法检查
+- 模拟点击序列跑过 5 个场景：单点一次不触发请求、同天点第二次才真正
+  POST/DELETE、点别的日期边框转移且不触发请求、对已记录的日期同样先边框
+  后确认才 DELETE——全部符合预期
+
+不影响现有功能：recordPeriod() 内部的新增/取消 toggle 逻辑、predictDates/
+predictFertile/updatePrediction、后端 /period 相关接口都没有改动。

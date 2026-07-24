@@ -48,11 +48,8 @@ File Status:
 | `state.py` | ✅ 確認正常,**不能碰** | 對話歷史存儲正常 |
 
 
-已修復 send() 函式裡的 SSE buffer 累積 bug
-執行結果:
-Commit 9b4fb71 已部署到 main (2026-07-23 17:58:25Z)
-
-兩處修改已確認存在:
+已修復;
+send() 函式裡的 SSE buffer 累積 bug
 第 744 行:let sseBuffer = ''; ✅
 第 760-762 行:buffer 累積邏輯 ✅
 
@@ -71,9 +68,10 @@ Commit 9b4fb71 已部署到 main (2026-07-23 17:58:25Z)
 使用正確的 buffer 累積機制
 清理:隱藏預覽、清空變數
 
+消息被吞修復
+
 3.思考框(reasoning)先出現
 對話氣泡(content)接著獨立出現
 
 已知其他 bug:
 圖片失敗
-圖片上傳後, content 被後端吃掉

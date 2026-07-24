@@ -51,11 +51,26 @@ File Status:
 已修復 send() 函式裡的 SSE buffer 累積 bug
 執行結果:
 Commit 9b4fb71 已部署到 main (2026-07-23 17:58:25Z)
+
 兩處修改已確認存在:
 第 744 行:let sseBuffer = ''; ✅
 第 760-762 行:buffer 累積邏輯 ✅
-Render 已同步 live ✅
+
+修改 chatImageUpload handler (第 656 行):
+改為只顯示預覽,不立即上傳
+設置 pendingImageDataUrl 並顯示預覽列
+
+新增 cancelImagePreview() 函式:
+清空 pendingImageDataUrl
+隱藏預覽列
+清空 file input
+
+新增 confirmImageSend() 函式:
+完整 SSE 串流處理(reasoning + content + error)
+與 send() 相同的思考框渲染邏輯
+使用正確的 buffer 累積機制
+清理:隱藏預覽、清空變數
 
 已知其他 bug:
 圖片上傳後 Lin 的回覆沒有渲染 (processChunk 裡只有空註解)
-預覽列按鈕沒有函式定義 (cancelImagePreview/confirmImageSend)
+

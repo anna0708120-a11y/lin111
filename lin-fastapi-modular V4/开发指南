@@ -70,10 +70,10 @@ send() 函式裡的 SSE buffer 累積 bug
 
 消息被吞修復
 
-3.思考框(reasoning)先出現
+思考框(reasoning)先出現
 對話氣泡(content)接著獨立出現
 
+圖片請求能送到後端、不被 500 擋掉
+
 已知其他 bug:
-圖片失敗
-圖片上傳回 500 錯誤本身的後端原因,還沒查
 之前留在 main 上的那個 debug commit(7381221d)還沒清理

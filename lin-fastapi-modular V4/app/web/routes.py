@@ -257,7 +257,7 @@ def get_period_data():
             records = cached["payload"]["dates"]
         else:
             # 舊格式相容：直接從 context_state 的 data 欄位讀取（最多一個日期）
-            result = db.supabase.table('context_state').select('data').eq('source', 'period').limit(1).execute()
+            result = db._client.table('context_state').select('data').eq('source', 'period').limit(1).execute()
             if hasattr(result, 'data') and result.data:
                 row = result.data[0]
                 if row.get('data') and row['data'].get('date'):
@@ -295,7 +295,7 @@ def record_period(payload: PeriodRecord):
             records = cached["payload"]["dates"]
         else:
             # 舊格式相容：讀取 data 欄位中的單一日期
-            result = db.supabase.table('context_state').select('data').eq('source', 'period').limit(1).execute()
+            result = db._client.table('context_state').select('data').eq('source', 'period').limit(1).execute()
             if hasattr(result, 'data') and result.data:
                 row = result.data[0]
                 if row.get('data') and row['data'].get('date'):

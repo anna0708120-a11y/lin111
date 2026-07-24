@@ -1209,10 +1209,12 @@ async function recordPeriod(date) {
   if (!date) return;
   
   try {
-    const r = await fetch(AU + '/period', {
-      method: 'POST',
+    // 已经记录过的日期再点一次 = 取消记录（呼叫 DELETE）
+    const isRecorded = (periodData.records || []).includes(date);
+    const r = await fetch(AU + '/period' + (isRecorded ? '/' + date : ''), {
+      method: isRecorded ? 'DELETE' : 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ date })
+      body: isRecorded ? undefined : JSON.stringify({ date })
     });
     if (r.ok) {
       await loadPeriod();

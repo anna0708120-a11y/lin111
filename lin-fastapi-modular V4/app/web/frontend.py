@@ -688,19 +688,22 @@ async function confirmImageSend() {
   if (!pendingImageDataUrl) return;
   
   const base64 = pendingImageDataUrl.split(',')[1];
+  const inp = document.getElementById('ci');
+  const txt = inp.value.trim();
+  inp.value = '';
   
   // 隱藏預覽列
   document.getElementById('imgPreviewBar').style.display = 'none';
   document.getElementById('chatImageUpload').value = '';
   
-  addMsg('anna', '[圖片]');
+  addMsg('anna', txt ? ('[圖片] ' + txt) : '[圖片]');
   typing(true);
   
   try {
     const response = await fetch(AU + '/watch', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({activity: '看圖片', image: base64})
+      body: JSON.stringify({activity: txt || '看圖片', image: base64})
     });
     
     if (!response.ok) throw new Error('Upload failed');

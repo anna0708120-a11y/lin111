@@ -204,7 +204,7 @@ class AppState:
         return f"\n\n【Lin对Anna的记忆】\n{lines}"
 
     # ---------- 对话历史 ----------
-    def add_conversation_turn(self, role, content, thinking=None):
+    def add_conversation_turn(self, role, content, thinking=None, image_data=None):
         """
         记录一轮对话：role 是 'anna' 或 'lin'，content 是说的话。
         用 deque(maxlen=50) 自动保留最近50条，超过自动丢弃最旧的。
@@ -213,6 +213,7 @@ class AppState:
             "role": role,
             "content": content,
             "thinking": thinking,
+            "image_data": image_data,
             "time": datetime.now().isoformat(),
         })
 

@@ -205,7 +205,7 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 .calendar-day.recorded { background: #E89A9A; color: #FFF; }
 .calendar-day.predicted { background: #F5C6C6; color: var(--dark); }
 .calendar-day.fertile { background: #B8A4E8; color: #FFF; }
-.calendar-day.today { border: 2px solid var(--rose); }
+.calendar-day.today { border: 2px solid #D9AEB0; }
 .period-legend { 
   display: flex; 
   gap: 16px; 
@@ -1122,6 +1122,7 @@ function renderCalendar() {
   }
   
   // 渲染日期
+  const isCurrentMonth = (year === now.getFullYear() && month === now.getMonth());
   const today = now.getDate();
   const records = periodData.records || [];
   const predicted = predictDates();
@@ -1130,7 +1131,7 @@ function renderCalendar() {
   for (let d = 1; d <= daysInMonth; d++) {
     const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     let cls = 'calendar-day';
-    if (d === today) cls += ' today';
+    if (isCurrentMonth && d === today) cls += ' today';
     if (records.includes(dateStr)) cls += ' recorded';
     else if (predicted.includes(dateStr)) cls += ' predicted';
     else if (fertile.includes(dateStr)) cls += ' fertile';

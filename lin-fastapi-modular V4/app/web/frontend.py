@@ -202,8 +202,8 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
   background: transparent;
 }
 .calendar-day:hover { background: var(--blush); }
-.calendar-day.recorded { background: #E89A9A; color: #FFF; }
-.calendar-day.predicted { background: #F5C6C6; color: var(--dark); }
+.calendar-day.recorded { background: #C9897A; color: #FFF; }
+.calendar-day.predicted { background: #E8C9A0; color: var(--dark); }
 .calendar-day.fertile { background: #B8A4E8; color: #FFF; }
 .calendar-day.today { border: 2px solid #D9AEB0; }
 .period-legend { 
@@ -220,8 +220,8 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
   height: 12px; 
   border-radius: 50%; 
 }
-.legend-dot.recorded { background: #E89A9A; }
-.legend-dot.predicted { background: #F5C6C6; }
+.legend-dot.recorded { background: #C9897A; }
+.legend-dot.predicted { background: #E8C9A0; }
 .legend-dot.fertile { background: #B8A4E8; }
 .period-input-box { 
   display: flex; 

@@ -34,6 +34,7 @@ def generate_reply(context, app_name=None, use_cache=True):
         return "今天额度用完了，或者刚刚问太快了，等一下再说。", None
 
     memory_summary = state.recent_memory_text()
+    memory_summary = state.recent_memory_text()
     conv_list = state.get_recent_conversation(n=20)
     if conv_list:
         formatted = []
@@ -115,7 +116,13 @@ def generate_reply_stream(context, app_name=None, use_cache=True):
         return
     
     if use_cache and state.last_context_cache == context and state.last_reply_at:
-        if datetime.now() - state.last_reply_at < timedellist = state.get_recent_conversation(n=20)
+        if datetime.now() - state.last_reply_at < timedelta(minutes=2):
+            yield f"data: {json.dumps({'type': 'content', 'text': random.choice(FALLBACK_REPLIES)})}\n\n"
+            yield "data: {\"type\": \"done\"}\n\n"
+            return
+    
+    memory_summary = state.recent_memory_text()
+    conv_list = state.get_recent_conversation(n=20)
     if conv_list:
         formatted = []
         for turn in conv_list:
@@ -138,7 +145,11 @@ def generate_reply_stream(context, app_name=None, use_cache=True):
         for event_type, data in call_deepseek_stream(system_prompt, max_tokens=config.DEEPSEEK_MAX_TOKENS):
             if event_type == "reasoning":
                 full_reasoning += data
-                type == "done":
+                yield f"data: {json.dumps({'type': 'thinking', 'text': data})}\n\n"
+            elif event_type == "content":
+                full_content += data
+                yield f"data: {json.dumps({'type': 'content', 'text': data})}\n\n"
+            elif event_type == "done":
                 parse_source = raw_reasoning or full_reasoning
                 if parse_source:
                     decision = parse_memory_decision(parse_source)
@@ -165,3 +176,9 @@ def generate_reply_stream(context, app_name=None, use_cache=True):
                 
                 state.mark_conversation_anchor()
                 yield "event: done\n" 
+                yield "{\"type\": \"done\"}\n\n"
+    
+    except Exception as e:
+        state.add_log("AI回复", f"失败：{str(e)}")
+        yield f"data: {json.dumps({"type": "content", "text": "信号不好。"})}\n\n"
+        yield "data: {\"type\": \"done\"}\n\n"

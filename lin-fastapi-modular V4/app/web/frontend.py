@@ -86,7 +86,7 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 .avatar-del{position:absolute;top:-4px;right:-4px;width:16px;height:16px;border-radius:50%;background:var(--rose-deep);color:#fff;font-size:11px;line-height:16px;text-align:center;cursor:pointer;}
 .tdiv{text-align:center;font-size:11px;color:var(--muted);margin:18px 0 12px;}
 .status-card{padding:16px;}
-.status-top{display:flex;align-items:center;gap:14px;margin-bottom:18px;}
+.status-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;}
 .status-avatar-lg{width:64px;height:64px;flex-shrink:0;position:relative;display:flex;align-items:center;justify-content:center;overflow:visible;}
 .status-avatar-lg .cat{transform:scale(2.3);cursor:pointer;}
 .avatar-img-lg{width:64px;height:64px;border-radius:50%;object-fit:cover;border:1px solid var(--border);cursor:pointer;}

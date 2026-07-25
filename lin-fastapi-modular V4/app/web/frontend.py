@@ -387,16 +387,19 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
   </div>
 
   <!-- 聊天记录配置 -->
-  <div class="card">
+  <div class="card" style="max-width: 60%; margin-left: auto; margin-right: auto;">
     <div class="cl">⚙️ 聊天记录配置</div>
-    <div style="font-size: 13px; color: var(--muted); margin-bottom: 12px; line-height: 1.6;">
-      设置保留的聊天记录数量（当前：<span id="current-limit" style="color: var(--rose-deep); font-weight: 600;">500</span>）
+    <div style="font-size: 13px; color: var(--muted); margin-bottom: 8px; line-height: 1.6;">
+      保留的聊天记录数量
+    </div>
+    <div style="font-size: 15px; color: var(--dark); margin-bottom: 12px;">
+      当前：<span id="current-limit" style="color: var(--rose-deep); font-weight: 600;">500</span>
     </div>
     <div style="display: flex; gap: 10px; align-items: center;">
       <input type="number" id="chat-limit-input" class="msel" placeholder="输入数量 (100-10000)" min="100" max="10000" style="flex: 1;">
       <button class="msave" onclick="updateChatLimit()" style="padding: 10px 20px; position: relative;">
         保存
-        <span id="save-check" style="display: none; position: absolute; top: -8px; right: -8px; font-size: 20px;">✔️</span>
+        <span id="save-check" style="display: none; position: absolute; top: -12px; right: -12px; font-size: 24px; color: #5CB85C;">✔</span>
       </button>
     </div>
   </div>

@@ -330,14 +330,11 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
         <img id="avatarImgLg" class="avatar-img-lg" style="display:none" onclick="pickAvatar('lin')">
       </div>
       <div class="status-line" id="statusLine">在等妳的消息</div>
-      <div class="pet-container" id="petContainer">
-        <div class="cat" id="catPet">
-          <div class="cat-head"><div class="cat-ear-l"></div><div class="cat-ear-r"></div><div class="cat-eye-l"></div><div class="cat-eye-r"></div><div class="cat-nose"></div></div>
-          <div class="cat-body"><div class="cat-tail"></div></div>
-        </div>
-      </div>
     </div>
     <div id="moodBars"></div>
+    <div class="pet-container" id="petContainer">
+      <span id="petIcon" style="font-size: 40px; cursor: pointer;">🐈</span>
+    </div>
   </div>
 
   <!-- 在一起日子 -->

@@ -43,6 +43,19 @@ document.addEventListener('DOMContentLoaded', () => {
 body,.hdr,.card,.tab-bar,.bub,.pill,.mtab,.msel,.minp,.ci,.theme-toggle{transition:background-color .2s ease,color .2s ease,border-color .2s ease;}
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;color:var(--dark);overflow:hidden;}
+.together-card{position:relative;width:100%;height:140px;margin-bottom:16px;border-radius:20px;overflow:hidden;background:var(--blush);}
+.together-bg{position:absolute;top:0;left:0;right:0;bottom:0;background-size:cover;background-position:center;opacity:0.3;}
+.together-content{position:relative;z-index:1;display:flex;align-items:center;padding:20px;height:100%;}
+.together-date{display:flex;flex-direction:column;align-items:center;margin-right:24px;min-width:60px;}
+.together-day-num{font-size:48px;font-weight:700;line-height:1;color:var(--dark);}
+.together-day-label{font-size:14px;color:var(--muted);margin-top:4px;}
+.together-text{flex:1;}
+.together-title{font-size:20px;font-weight:600;color:var(--dark);margin-bottom:4px;}
+.together-subtitle{font-size:13px;color:var(--muted);}
+.together-camera{position:absolute;top:16px;right:16px;width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,0.9);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.2s;}
+.together-camera:hover{background:rgba(255,255,255,1);transform:scale(1.1);}
+.together-camera svg{color:var(--rose-deep);}
+
 .hdr{background:var(--white);padding:16px 20px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:fixed;top:0;left:0;right:0;z-index:200;height:65px;}
 .cat-wrap{display:flex;align-items:center;gap:12px;}
 .cat{position:relative;width:44px;height:36px;cursor:pointer;}
@@ -319,6 +332,28 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
     </div>
     <div id="moodBars"></div>
   </div>
+
+  <!-- 在一起日子 -->
+  <div class="together-card" id="togetherCard">
+    <div class="together-bg"></div>
+    <div class="together-content">
+      <div class="together-date">
+        <div class="together-day-num" id="togetherDayNum">1</div>
+        <div class="together-day-label">Day</div>
+      </div>
+      <div class="together-text">
+        <div class="together-title">在一起第 <span id="togetherDays">1</span> 天</div>
+        <div class="together-subtitle">今天还没记事，点开看看</div>
+      </div>
+      <div class="together-camera" onclick="uploadTogetherBg()">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+          <circle cx="12" cy="13" r="4"></circle>
+        </svg>
+      </div>
+    </div>
+  </div>
+
   <div class="card"><div class="cl">今日 API 配額</div><div class="qb"><span>0</span><div class="qt"><div class="qf" id="qf" style="width:0%"></div></div><span id="qt">180 次</span></div></div>
   <div class="card"><div class="cl">實時監控日誌</div><div id="lc"><div class="es">📡 等待監控觸發...</div></div></div>
   <div class="card"><div class="cl">今日碎碎念</div><div id="nc"><div class="es">🖤 今天還沒寫</div></div></div>
@@ -557,6 +592,7 @@ function stab(tab){
 }
 // 页面加载时如果是Mine tab,立即展开
 if(document.getElementById('pg-mine')?.classList.contains('active')){loadPeriod();loadChatConfig();}
+loadTogetherDays(); // 页面加载时初始化在一起日子
 
 function toggleThink(el){
   const box=el.nextElementSibling;
@@ -1305,6 +1341,61 @@ async function updateChatLimit() {
   }
 }
 
+
+
+// ========== 在一起日子 ==========
+async function loadTogetherDays() {
+  try {
+    const res = await fetch("/together-config");
+    const data = await res.json();
+    if (data.start_date) {
+      const startDate = new Date(data.start_date);
+      const today = new Date();
+      const diffTime = Math.abs(today - startDate);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 因为第一天算 Day 1
+      
+      document.getElementById("togetherDayNum").textContent = diffDays;
+      document.getElementById("togetherDays").textContent = diffDays;
+      
+      // 如果有背景图
+      if (data.background_url) {
+        document.querySelector(".together-bg").style.backgroundImage = `url(${data.background_url})`;
+      }
+    }
+  } catch (err) {
+    console.error("Failed to load together days:", err);
+  }
+}
+
+function uploadTogetherBg() {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "image/*";
+  input.onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const base64 = event.target.result;
+      try {
+        const res = await fetch("/together-background", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image: base64 })
+        });
+        const data = await res.json();
+        if (data.status === "Success") {
+          document.querySelector(".together-bg").style.backgroundImage = `url(${base64})`;
+        }
+      } catch (err) {
+        console.error("Failed to upload background:", err);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+  input.click();
+}
 
 </script>
 </body>

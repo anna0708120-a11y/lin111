@@ -364,3 +364,68 @@ def update_chat_config(payload: ChatConfigPayload):
         }
     except Exception as e:
         return {"status": "Error", "message": str(e)}
+
+# ========== 在一起日子配置 ==========
+@router.get("/together-config")
+def get_together_config():
+    """获取在一起的开始日期和背景图"""
+    config = db.load_context("together_config")
+    if config and config.get("payload"):
+        return config["payload"]
+    else:
+        # 默认返回今天作为开始日期
+        from datetime import datetime
+        return {
+            "start_date": datetime.now().strftime("%Y-%m-%d"),
+            "background_url": None
+        }
+
+class TogetherBackgroundPayload(BaseModel):
+    image: str
+
+@router.post("/together-background")
+def update_together_background(payload: TogetherBackgroundPayload):
+    """更新在一起卡片的背景图"""
+    try:
+        # 获取现有配置
+        config = db.load_context("together_config")
+        if config and config.get("payload"):
+            data = config["payload"]
+        else:
+            from datetime import datetime
+            data = {"start_date": datetime.now().strftime("%Y-%m-%d")}
+        
+        # 更新背景图
+        data["background_url"] = payload.image
+        
+        # 保存到数据库
+        db.save_context("together_config", data)
+        
+        return {"status": "Success", "message": "背景图已更新"}
+    except Exception as e:
+        return {"status": "Error", "message": str(e)}
+
+class TogetherStartDatePayload(BaseModel):
+    start_date: str
+
+@router.post("/together-start-date")
+def update_together_start_date(payload: TogetherStartDatePayload):
+    """设置在一起的开始日期"""
+    try:
+        # 获取现有配置
+        config = db.load_context("together_config")
+        if config and config.get("payload"):
+            data = config["payload"]
+        else:
+            data = {"background_url": None}
+        
+        # 更新开始日期
+        data["start_date"] = payload.start_date
+        
+        # 保存到数据库
+        db.save_context("together_config", data)
+        
+        return {"status": "Success", "message": "开始日期已设置"}
+    except Exception as e:
+        return {"status": "Error", "message": str(e)}
+

@@ -79,9 +79,22 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 .cat.poked .cat-eye-l,.cat.poked .cat-eye-r{animation-play-state:paused;}
 .cat-eye-l.poked{clip-path:polygon(0% 15%,100% 50%,0% 85%);}
 .cat-eye-r.poked{clip-path:polygon(100% 15%,0% 50%,100% 85%);}
-.pet-bubble{position:absolute;top:-34px;left:50%;transform:translateX(-50%) scale(.7);background:var(--blush);color:var(--rose-deep);border:1px solid var(--border);border-radius:14px;padding:4px 10px;font-size:16px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .25s ease,transform .25s ease;box-shadow:0 2px 8px var(--shadow);z-index:5;}
-.pet-bubble::after{content:'';position:absolute;bottom:-5px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:5px solid var(--blush);}
-.pet-bubble.show{opacity:1;transform:translateX(-50%) scale(1);}
+.pet-bubble{position:absolute;top:50%;left:-10px;transform:translate(-100%,-50%) scale(.7);background:var(--white);color:var(--dark);border:1px solid var(--border);border-radius:14px;padding:5px 9px;font-size:14px;line-height:1;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .25s ease,transform .25s ease;box-shadow:0 2px 8px var(--shadow);z-index:5;}
+.pet-bubble::after{content:'';position:absolute;top:50%;right:-8px;transform:translateY(-50%);width:0;height:0;border-top:5px solid transparent;border-bottom:5px solid transparent;border-left:5px solid var(--white);}
+.pet-bubble::before{content:'';position:absolute;top:50%;right:-13px;transform:translateY(-50%);width:4px;height:4px;background:var(--white);border-radius:50%;border:1px solid var(--border);}
+.pet-bubble.show{opacity:1;transform:translate(-100%,-50%) scale(1);}
+#catIconLg .cat-mouth{display:none;position:absolute;top:16px;left:50%;transform:translateX(-50%);}
+#catIconLg .cat-qmark{display:none;position:absolute;top:-8px;right:-6px;font-size:11px;font-weight:700;color:var(--dark);}
+#catIconLg.mood-happy .cat-eye-l,#catIconLg.mood-happy .cat-eye-r{width:7px;height:4px;background:none;border-top:2px solid var(--dark);border-radius:50% 50% 0 0/100% 100% 0 0;animation:none;clip-path:none;}
+#catIconLg.mood-happy .cat-mouth{display:block;width:8px;height:5px;background:var(--rose-deep);border-radius:0 0 8px 8px;}
+#catIconLg.mood-sad .cat-eye-l,#catIconLg.mood-sad .cat-eye-r{width:6px;height:3px;background:none;border-bottom:2px solid var(--dark);border-radius:0 0 50% 50%/0 0 100% 100%;animation:none;clip-path:none;}
+#catIconLg.mood-sad .cat-mouth{display:block;width:6px;height:2px;background:var(--dark);border-radius:2px;transform:translateX(-50%) rotate(180deg);}
+#catIconLg.mood-blank .cat-eye-l,#catIconLg.mood-blank .cat-eye-r{width:6px;height:2px;border-radius:2px;animation:none;clip-path:none;}
+#catIconLg.mood-blank .cat-mouth{display:block;width:7px;height:2px;background:var(--dark);border-radius:2px;}
+#catIconLg.mood-curious .cat-head{transform:rotate(-10deg);}
+#catIconLg.mood-curious .cat-eye-l,#catIconLg.mood-curious .cat-eye-r{width:6px;height:6px;border-radius:50%;animation:none;clip-path:none;}
+#catIconLg.mood-curious .cat-mouth{display:block;width:4px;height:4px;background:none;border:1.5px solid var(--dark);border-radius:50%;}
+#catIconLg.mood-curious .cat-qmark{display:block;}
 .hdr-txt h1{font-family:'DM Serif Display',serif;font-size:18px;color:var(--dark);}
 .hdr-txt p{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;}
 .pill{display:flex;align-items:center;gap:5px;background:var(--blush);padding:5px 10px;border-radius:20px;font-size:11px;color:var(--rose-deep);font-weight:500;}
@@ -346,9 +359,9 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
         <div class="status-line" id="statusLine">在等妳的消息</div>
       </div>
       <div class="status-avatar-lg" id="statusAvatarLg" onclick="pokeCat()">
-        <div class="pet-bubble" id="petBubble">💭</div>
+        <div class="pet-bubble" id="petBubble"></div>
         <div class="cat" id="catIconLg">
-          <div class="cat-head"><div class="cat-ear-l"></div><div class="cat-ear-r"></div><div class="cat-eye-l"></div><div class="cat-eye-r"></div><div class="cat-nose"></div></div>
+          <div class="cat-head"><div class="cat-ear-l"></div><div class="cat-ear-r"></div><div class="cat-eye-l"></div><div class="cat-eye-r"></div><div class="cat-nose"></div><div class="cat-mouth"></div><div class="cat-qmark">?</div></div>
           <div class="cat-body"><div class="cat-tail"></div></div>
         </div>
       </div>
@@ -594,14 +607,38 @@ function renderMood(mood){
   const line=document.getElementById('statusLine');
   if(line)line.textContent = mood.line || '在想妳';
   const wrap=document.getElementById('moodBars');
-  if(!wrap)return;
-  let html='';
-  Object.keys(MOOD_LABELS).forEach(key=>{
-    const val = mood[key]!=null ? mood[key] : 0.5;
-    const pct = Math.max(0,Math.min(100,Math.round(val*100)));
-    html+='<div class="mood-row"><div class="mood-label">'+MOOD_LABELS[key]+'</div><div class="mood-track"><div class="mood-fill" style="width:'+pct+'%"></div></div><div class="mood-val">'+val.toFixed(2)+'</div></div>';
-  });
-  wrap.innerHTML=html;
+  if(wrap){
+    let html='';
+    Object.keys(MOOD_LABELS).forEach(key=>{
+      const val = mood[key]!=null ? mood[key] : 0.5;
+      const pct = Math.max(0,Math.min(100,Math.round(val*100)));
+      html+='<div class="mood-row"><div class="mood-label">'+MOOD_LABELS[key]+'</div><div class="mood-track"><div class="mood-fill" style="width:'+pct+'%"></div></div><div class="mood-val">'+val.toFixed(2)+'</div></div>';
+    });
+    wrap.innerHTML=html;
+  }
+  updateCatExpression(mood);
+}
+
+let currentMoodIcon = '❤️';
+function updateCatExpression(mood){
+  const catEl = document.getElementById('catIconLg');
+  const bubble = document.getElementById('petBubble');
+  if(!catEl) return;
+  const stress = mood.stress!=null?mood.stress:0.2;
+  const fatigue = mood.fatigue!=null?mood.fatigue:0.2;
+  const curiosity = mood.curiosity!=null?mood.curiosity:0.5;
+  const attachment = mood.attachment!=null?mood.attachment:0.6;
+  const social = mood.social!=null?mood.social:0.5;
+  let cls='mood-happy', icon='❤️';
+  if(stress>0.7||fatigue>0.7){ cls='mood-sad'; icon='💧'; }
+  else if(curiosity>0.7){ cls='mood-curious'; icon='？'; }
+  else if(attachment<0.3||social<0.3){ cls='mood-blank'; icon='···'; }
+  else if(attachment>0.7||social>0.7){ cls='mood-happy'; icon='❤️'; }
+  else { cls='mood-blank'; icon='···'; }
+  catEl.classList.remove('mood-happy','mood-sad','mood-blank','mood-curious');
+  catEl.classList.add(cls);
+  currentMoodIcon = icon;
+  if(bubble && !pokeTimeoutId && !bubble.classList.contains('thinking')) bubble.textContent = icon;
 }
 loadMood();
 
@@ -742,6 +779,11 @@ function typing(show) {
   } else if (!show && typingDiv) {
     typingDiv.remove();
   }
+  const b = document.getElementById('petBubble');
+  if(b){
+    if(show){ b.classList.add('thinking'); b.textContent='💭'; }
+    else { b.classList.remove('thinking'); b.textContent=currentMoodIcon; }
+  }
   showPetBubble(show);
 }
 
@@ -767,6 +809,8 @@ function pokeCat(){
   catEl.classList.add('poked');
   if(eyeL) eyeL.classList.add('poked');
   if(eyeR) eyeR.classList.add('poked');
+  const b = document.getElementById('petBubble');
+  if(b) b.textContent = currentMoodIcon;
   showPetBubble(true);
   pokeTimeoutId = setTimeout(()=>{
     catEl.classList.remove('poked');

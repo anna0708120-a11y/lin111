@@ -135,6 +135,7 @@ def generate_reply_stream(context, app_name=None, use_cache=True):
     state.record_call()
     
     full_reasoning = ""
+    raw_reasoning = ""
     full_content = ""
     
     try:
@@ -143,17 +144,21 @@ def generate_reply_stream(context, app_name=None, use_cache=True):
                 full_reasoning += data
                 yield "event: reasoning\ndata: " + json.dumps({"content": data}) + "\n\n"
                 
+            elif event_type == "raw_reasoning":
+                raw_reasoning = data
+                
             elif event_type == "content":
                 full_content += data
                 yield "event: content\ndata: " + json.dumps({"delta": data}) + "\n\n"
                 
             elif event_type == "done":
-                if full_reasoning:
-                    decision = parse_memory_decision(full_reasoning)
+                parse_source = raw_reasoning or full_reasoning
+                if parse_source:
+                    decision = parse_memory_decision(parse_source)
                     if decision:
                         state.remember_or_reinforce(decision)
                     
-                    mood = parse_mood_report(full_reasoning)
+                    mood = parse_mood_report(parse_source)
                     if mood:
                         state.update_mood(mood)
                 

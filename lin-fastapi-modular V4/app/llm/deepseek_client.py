@@ -140,9 +140,13 @@ def call_deepseek_stream(system_prompt, temperature=0.95, max_tokens=None, top_p
                     cleaned = re.sub(r'\[MEMORY_DECISION\].*?\[/MEMORY_DECISION\]', '', full_reasoning, flags=re.DOTALL)
                     cleaned = re.sub(r'\[MOOD_REPORT\].*?\[/MOOD_REPORT\]', '', cleaned, flags=re.DOTALL)
                     
-                    # 如果 reasoning 被過濾了，補發乾淨版本
+                    # 如果 reasoning 被過濾了，補發乾淨版本給前端顯示
                     if cleaned != full_reasoning:
                         yield ("reasoning", cleaned)
+                    
+                    # 把未經過濾的原始 reasoning 單獨傳出，供上層解析 [MOOD_REPORT]/[MEMORY_DECISION]
+                    # 標籤用；不能拿上面那份 cleaned 版本解析，因為標籤已經被拔掉了
+                    yield ("raw_reasoning", full_reasoning)
                     
                     yield ("done", data.get("usage", {}))
                     

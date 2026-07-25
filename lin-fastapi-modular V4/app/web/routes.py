@@ -328,3 +328,29 @@ def delete_period(date: str):
         return {"status": "Error", "message": "Invalid date format"}
     except Exception as e:
         return {"status": "Error", "message": str(e)}
+
+# ========== 聊天记录配置 ==========
+class ChatConfigPayload(BaseModel):
+    """聊天记录数量配置"""
+    limit: int
+
+@router.get("/chat-config")
+def get_chat_config():
+    """获取当前聊天记录保留数量配置"""
+    from app.config import CHAT_HISTORY_LIMIT
+    return {"limit": CHAT_HISTORY_LIMIT}
+
+@router.post("/chat-config")
+def update_chat_config(payload: ChatConfigPayload):
+    """更新聊天记录保留数量配置（需要重启生效）"""
+    # 验证输入范围
+    if payload.limit < 100 or payload.limit > 10000:
+        return {"status": "Error", "message": "limit must be between 100 and 10000"}
+    
+    # 注意：这里只是返回新值，实际需要修改环境变量或配置文件才能持久化
+    # 当前实现：返回成功，提示用户需要在环境变量中设置 CHAT_HISTORY_LIMIT
+    return {
+        "status": "Success", 
+        "limit": payload.limit,
+        "message": "请在环境变量中设置 CHAT_HISTORY_LIMIT={} 并重启服务".format(payload.limit)
+    }

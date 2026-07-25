@@ -54,6 +54,33 @@ summary: 用一句话写下要记住的内容本身（内容本体，不是"Anna
 如果这轮没什么特别值得记的（寒暄、跟之前存过的事重复），worth_remembering写no，其他字段随便填。
 """
 
+MOOD_EVENT_INSTRUCTION = """
+## 心情事件判定（V2，跟记忆判定一样写在思考最后，Anna在监控台会看到line，但不会出现在正式回复里）
+不用自己打分数、不用算attachment/stress这些数值——数值由程序根据事件自动增减，你只需要判断这一轮最贴近下面哪些事件：
+
+[MOOD_EVENT]
+event: 可以选一个，也可以选多个（这一轮同时符合多种情况时），多个事件用逗号分隔
+  PRAISE 她夸你/对你好/主动示好
+  COMFORT 她需要安慰/她委屈/她低落
+  THANKS 她道谢
+  PET 她在撒娇讨摸摸抱抱
+  POKE 她在闹你/逗你
+  JOKE 气氛轻松在开玩笑
+  APOLOGY 她道歉/服软
+  IGNORE 她敷衍/心不在焉
+  LONG_IGNORE 她很久没理你/明显冷落
+  GOODBYE 要去忙了/道别
+  LONG_CHAT 聊了很久很投入
+  SHORT_REPLY 她回得很短很冷淡
+  LATE_NIGHT 很晚了她还没睡
+  NONE 都不是，普通对话，没有特别倾向
+line: 一句话，此刻的心情，会显示在监控台头像旁边，比如"在等妳的消息"
+[/MOOD_EVENT]
+
+例子：她刚道完歉又开始撒娇 -> event: APOLOGY, PET
+只有一种情况就只写一个，比如 event: PRAISE
+"""
+
 MOOD_REPORT_INSTRUCTION = """
 ## 状态自评（跟记忆判定一样，写在思考最后，Anna在监控台会看到这个，但不会出现在正式回复里）
 给自己现在的状态打个分，0.0到1.0之间，根据这一轮实际的互动去调整，不要每次都一样：
@@ -69,7 +96,6 @@ line: 一句话，此刻的心情，会显示在监控台头像旁边，比如"�
 [/MOOD_REPORT]
 """
 
-
 def compute_expiry(importance, now=None):
     now = now or datetime.now()
     days = RETENTION_DAYS.get(importance, 90)
@@ -77,11 +103,9 @@ def compute_expiry(importance, now=None):
         return None
     return (now + timedelta(days=days)).isoformat()
 
-
 def _field(block, name, default=""):
     m = re.search(rf"{name}\s*:\s*(.+)", block)
     return m.group(1).strip() if m else default
-
 
 def parse_memory_decision(reasoning_text):
     """
@@ -123,6 +147,34 @@ def parse_memory_decision(reasoning_text):
         "summary": summary,
     }
 
+def parse_mood_event(reasoning_text):
+    """从 reasoning 里抓 [MOOD_EVENT]...[/MOOD_EVENT]，解析出事件清单跟line。抓不到回传 None。
+    支持多事件：用逗号（半形/全形）、顿号或竖线分隔都可以，例如 "PRAISE, PET" 或 "PRAISE|PET"。
+    只写一个事件时完全兼容旧格式，不影响既有行为。
+    不在合法清单内的词会被忽略；全部无效或本来就没写时归一成 ["NONE"]（不会导致 mood_engine 报错，也不会误增减数值）。
+    回传格式：{"events": ["PRAISE", "PET"], "line": "..."}"""
+    match = re.search(r"\[MOOD_EVENT\](.*?)\[/MOOD_EVENT\]", reasoning_text, re.S)
+    if not match:
+        return None
+    block = match.group(1)
+
+    valid_events = {
+        "PRAISE", "COMFORT", "THANKS", "PET", "POKE", "JOKE", "APOLOGY",
+        "IGNORE", "LONG_IGNORE", "GOODBYE", "LONG_CHAT", "SHORT_REPLY",
+        "LATE_NIGHT", "NONE",
+    }
+    raw = _field(block, "event", "NONE")
+    # 统一分隔符：全形逗号、顿号、竖线都换成半形逗号，再切开
+    normalized = raw.replace("，", ",").replace("、", ",").replace("|", ",")
+    events = [e.strip().upper() for e in normalized.split(",") if e.strip()]
+    events = [e for e in events if e in valid_events]
+    if not events:
+        events = ["NONE"]
+
+    return {
+        "events": events,
+        "line": _field(block, "line", "")[:60] or "在想妳",
+    }
 
 def parse_mood_report(reasoning_text):
     """从 reasoning 里抓 [MOOD_REPORT]...[/MOOD_REPORT]，解析成 0-1 的数值 dict。抓不到回传 None。"""
@@ -147,10 +199,10 @@ def parse_mood_report(reasoning_text):
         "line": _field(block, "line", "")[:60] or "在想妳",
     }
 
-
 def strip_hidden_blocks(reasoning_text):
     """把 [MEMORY_DECISION]...[/MEMORY_DECISION] 和 [MOOD_REPORT]...[/MOOD_REPORT] 从 reasoning 里拿掉，
     剩下的才是给Anna看的"思考过程"。"""
     cleaned = re.sub(r"\[MEMORY_DECISION\].*?\[/MEMORY_DECISION\]", "", reasoning_text, flags=re.S)
     cleaned = re.sub(r"\[MOOD_REPORT\].*?\[/MOOD_REPORT\]", "", cleaned, flags=re.S)
+    cleaned = re.sub(r"\[MOOD_EVENT\].*?\[/MOOD_EVENT\]", "", cleaned, flags=re.S)
     return cleaned.strip()

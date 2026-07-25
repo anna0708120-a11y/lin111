@@ -139,6 +139,7 @@ def call_deepseek_stream(system_prompt, temperature=0.95, max_tokens=None, top_p
                     full_reasoning = "".join(reasoning_buffer)
                     cleaned = re.sub(r'\[MEMORY_DECISION\].*?\[/MEMORY_DECISION\]', '', full_reasoning, flags=re.DOTALL)
                     cleaned = re.sub(r'\[MOOD_REPORT\].*?\[/MOOD_REPORT\]', '', cleaned, flags=re.DOTALL)
+                    cleaned = re.sub(r'\[MOOD_EVENT\].*?\[/MOOD_EVENT\]', '', cleaned, flags=re.DOTALL)
                     
                     # 如果 reasoning 被過濾了，補發乾淨版本給前端顯示
                     if cleaned != full_reasoning:

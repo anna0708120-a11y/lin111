@@ -59,7 +59,7 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 .hdr{background:var(--white);padding:16px 20px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:fixed;top:0;left:0;right:0;z-index:200;height:65px;}
 .cat-wrap{display:flex;align-items:center;gap:12px;}
 .pet-container{position:absolute;top:140px;right:30px;z-index:10;}
-.pet-container-chat{position:absolute;bottom:4px;left:20px;z-index:10;transform:scale(0.6);}
+.pet-container-chat{position:absolute;bottom:12px;left:20px;z-index:10;transform:scale(0.6);}
 
 .cat{position:relative;width:44px;height:36px;cursor:pointer;}
 .cat-body{width:36px;height:26px;background:var(--rose);border-radius:50% 50% 45% 45%;position:absolute;bottom:0;left:4px;}

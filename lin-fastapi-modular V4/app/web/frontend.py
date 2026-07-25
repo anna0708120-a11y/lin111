@@ -390,13 +390,15 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
   <div class="card">
     <div class="cl">⚙️ 聊天记录配置</div>
     <div style="font-size: 13px; color: var(--muted); margin-bottom: 12px; line-height: 1.6;">
-      设置保留的聊天记录数量（当前：<span id="current-limit" style="color: var(--rose-deep); font-weight: 600;">加载中...</span>）
+      设置保留的聊天记录数量（当前：<span id="current-limit" style="color: var(--rose-deep); font-weight: 600;">500</span>）
     </div>
-    <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 12px;">
+    <div style="display: flex; gap: 10px; align-items: center;">
       <input type="number" id="chat-limit-input" class="msel" placeholder="输入数量 (100-10000)" min="100" max="10000" style="flex: 1;">
-      <button class="msave" onclick="updateChatLimit()" style="padding: 10px 20px;">保存</button>
+      <button class="msave" onclick="updateChatLimit()" style="padding: 10px 20px; position: relative;">
+        保存
+        <span id="save-check" style="display: none; position: absolute; top: -8px; right: -8px; font-size: 20px;">✔️</span>
+      </button>
     </div>
-    <div id="chat-config-message" style="font-size: 12px; color: var(--muted); margin-top: 8px;"></div>
   </div>
 </div>
 
@@ -1265,18 +1267,15 @@ async function loadChatConfig() {
     document.getElementById("chat-limit-input").value = data.limit;
   } catch (err) {
     console.error("Failed to load chat config:", err);
-    document.getElementById("current-limit").textContent = "加载失败";
   }
 }
 
 async function updateChatLimit() {
   const input = document.getElementById("chat-limit-input");
   const limit = parseInt(input.value);
-  const msgDiv = document.getElementById("chat-config-message");
+  const checkMark = document.getElementById("save-check");
   
   if (isNaN(limit) || limit < 100 || limit > 10000) {
-    msgDiv.textContent = "请输入 100-10000 之间的数字";
-    msgDiv.style.color = "var(--rose-deep)";
     return;
   }
   
@@ -1289,17 +1288,17 @@ async function updateChatLimit() {
     const data = await res.json();
     
     if (data.status === "Success") {
-      msgDiv.textContent = data.message;
-      msgDiv.style.color = "var(--emerald-deep)";
+      // 更新当前显示的数字
       document.getElementById("current-limit").textContent = limit;
-    } else {
-      msgDiv.textContent = data.message || "更新失败";
-      msgDiv.style.color = "var(--rose-deep)";
+      // 显示勾
+      checkMark.style.display = "inline";
+      // 2秒后隐藏勾
+      setTimeout(() => {
+        checkMark.style.display = "none";
+      }, 2000);
     }
   } catch (err) {
     console.error("Failed to update chat config:", err);
-    msgDiv.textContent = "网络错误，请稍后重试";
-    msgDiv.style.color = "var(--rose-deep)";
   }
 }
 

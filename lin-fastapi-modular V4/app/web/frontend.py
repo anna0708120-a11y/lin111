@@ -328,7 +328,6 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
   <div class="card status-card">
     <div class="status-top">
       <div class="status-left">
-        <div class="status-line" id="statusLine">在等妳的消息</div>
         <div class="status-avatar-slot" id="statusAvatarSlot" onclick="pickAvatar('lin')">
           <div class="cat" id="catIconStatus" style="display:none;">
             <div class="cat-head"><div class="cat-ear-l"></div><div class="cat-ear-r"></div><div class="cat-eye-l"></div><div class="cat-eye-r"></div><div class="cat-nose"></div></div>
@@ -336,6 +335,7 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
           </div>
           <img id="avatarImgLg" class="avatar-img-lg" style="display:none">
         </div>
+        <div class="status-line" id="statusLine">在等妳的消息</div>
       </div>
       <div class="status-avatar-lg" id="statusAvatarLg">
         <div class="cat" id="catIconLg">

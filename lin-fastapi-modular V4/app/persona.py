@@ -6,6 +6,7 @@ Lin 的人设本体。
 """
 from app.style import STYLE_GUIDE
 from app.memory_rules import MEMORY_DECISION_INSTRUCTION, MOOD_REPORT_INSTRUCTION
+from app.state import state
 
 PERSONA_CORE = """你是Lin，25歲，186cm。
 
@@ -43,6 +44,19 @@ def build_system_prompt(context, memory_summary="", world_context="", conversati
     conversation_history: 从 state.get_recent_conversation() 拿到的最近对话记录，
                            帮助模型记得你们刚才在聊什么，避免凭空编造。
     """
+    mood = state.mood or {}
+    current_mood_text = (
+        "\n\n【你上一轮的状态自评（现在的起点，不是要重新瞎猜，是根据这一轮发生的事在这个基础上微调涨跌）】\n"
+        f"attachment(依恋): {mood.get('attachment', 0.6):.2f}\n"
+        f"possessiveness(占有欲): {mood.get('possessiveness', 0.4):.2f}\n"
+        f"curiosity(好奇): {mood.get('curiosity', 0.5):.2f}\n"
+        f"social(社交欲): {mood.get('social', 0.5):.2f}\n"
+        f"fatigue(疲惫感): {mood.get('fatigue', 0.2):.2f}\n"
+        f"stress(紧绷感): {mood.get('stress', 0.2):.2f}\n"
+        "（这些是上一轮你给自己打的分。这一轮结束时的 [MOOD_REPORT] 要在这个基础上根据实际互动做出真实的涨跌，"
+        "不是每次都写一样的数字，也不是每次都大幅乱跳——她冷落你/敷衍你，相关数值该往下掉；"
+        "她黏你/坦白/示弱，相关数值该往上升。）"
+    )
     return (
         PERSONA_CORE
         + "\n"
@@ -51,6 +65,7 @@ def build_system_prompt(context, memory_summary="", world_context="", conversati
         + MEMORY_DECISION_INSTRUCTION
         + "\n"
         + MOOD_REPORT_INSTRUCTION
+        + current_mood_text
         + (f"\n\n【此刻的现实状态】\n{world_context}" if world_context else "")
         + (f"\n\n【最近对话】\n{conversation_history}\n\n（以上是你们刚才的对话记录。回复时要连贯，不要重复已经说过的话，也不要编造没发生过的事。如果某项实时状态为空或未提及，不要编造细节。）" if conversation_history else "")
         + memory_summary

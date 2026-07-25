@@ -145,10 +145,17 @@ def generate_reply_stream(context, app_name=None, use_cache=True):
         for event_type, data in call_deepseek_stream(system_prompt, max_tokens=config.DEEPSEEK_MAX_TOKENS):
             if event_type == "reasoning":
                 full_reasoning += data
-                yield f"data: {json.dumps({'type': 'thinking', 'text': data})}\n\n"
+                yield f"event: reasoning\ndata: {json.dumps({'content': data})}\n\n"
             elif event_type == "content":
                 full_content += data
-                yield f"data: {json.dumps({'type': 'content', 'text': data})}\n\n"
+                yield f"event: content\ndata: {json.dumps({'delta': data})}\n\n"
+            elif event_type == "raw_reasoning":
+                raw_reasoning = data
+            elif event_type == "error":
+                state.add_log("AI回复", f"API失败：{data}")
+                yield 'event: content\ndata: ' + json.dumps({'delta': '信号不好。'}) + '\n\n'
+                yield "event: done\ndata: {}\n\n"
+                return
             elif event_type == "done":
                 parse_source = raw_reasoning or full_reasoning
                 if parse_source:
@@ -175,10 +182,10 @@ def generate_reply_stream(context, app_name=None, use_cache=True):
                     send_to_bark(full_content)
                 
                 state.mark_conversation_anchor()
-                yield "event: done\n" 
-                yield "{\"type\": \"done\"}\n\n"
+                yield "event: done\ndata: {}\n\n"
     
     except Exception as e:
         state.add_log("AI回复", f"失败：{str(e)}")
-        yield f"data: {json.dumps({"type": "content", "text": "信号不好。"})}\n\n"
-        yield "data: {\"type\": \"done\"}\n\n"
+        fallback_payload = json.dumps({'delta': '信号不好。'})
+        yield "event: content\ndata: " + fallback_payload + "\n\n"
+        yield "event: done\ndata: {}\n\n"

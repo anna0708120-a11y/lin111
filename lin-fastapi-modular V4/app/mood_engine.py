@@ -8,7 +8,12 @@ STYLE_GUIDE 里"意识流/禁止工具性格式"的规则跟这个结构化格�
 from app.state import state
 
 # 事件 -> 各数值的增减量。只列出会变动的欄位，没列到的欄位这次不动。
-EVENT_DELTAS = {
+EVENT_EFFECTS = {
+    "PRAISE": {
+        "attachment": +0.08,  # 原本 0.05，改成 0.08
+        "stress": -0.07,      # 原本 -0.05，改成 -0.07
+    },
+}
     "PRAISE":      {"attachment": 0.03, "stress": -0.02},
     "COMFORT":     {"attachment": 0.02, "stress": -0.03, "fatigue": -0.01},
     "THANKS":      {"attachment": 0.01, "social": 0.01},

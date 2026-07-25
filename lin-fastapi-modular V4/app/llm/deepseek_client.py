@@ -123,7 +123,7 @@ def call_deepseek_stream(system_prompt, temperature=0.95, max_tokens=None, top_p
                     
                     # 檢查是否包含隱藏標籤
                     full_reasoning = "".join(reasoning_buffer)
-                    if "[MEMORY_DECISION]" in full_reasoning or "[MOOD_REPORT]" in full_reasoning:
+                    if "[MEMORY_DECISION]" in full_reasoning or "[MOOD_REPORT]" in full_reasoning or "[MOOD_EVENT]" in full_reasoning:
                         # 暫時不發送，等完整 reasoning 結束後過濾
                         pass
                     else:

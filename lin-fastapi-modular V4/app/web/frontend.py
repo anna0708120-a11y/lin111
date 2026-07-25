@@ -44,7 +44,7 @@ body,.hdr,.card,.tab-bar,.bub,.pill,.mtab,.msel,.minp,.ci,.theme-toggle{transiti
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;color:var(--dark);overflow:hidden;}
 .together-card{position:relative;width:100%;height:140px;margin-bottom:16px;border-radius:20px;overflow:hidden;background:var(--blush);}
-.together-bg{position:absolute;top:0;left:0;right:0;bottom:0;background-size:cover;background-position:center;opacity:0.75;}
+.together-bg{position:absolute;top:0;left:0;right:0;bottom:0;background-size:cover;background-position:center;opacity:0.90;}
 .together-content{position:relative;z-index:1;display:flex;align-items:center;padding:20px;height:100%;}
 .together-date{display:flex;flex-direction:column;align-items:center;margin-right:24px;min-width:60px;}
 .together-day-num{font-size:48px;font-weight:700;line-height:1;color:var(--dark);}

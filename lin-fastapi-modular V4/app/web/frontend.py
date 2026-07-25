@@ -87,6 +87,9 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 .tdiv{text-align:center;font-size:11px;color:var(--muted);margin:18px 0 12px;}
 .status-card{padding:16px;}
 .status-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;}
+.status-left{display:flex;align-items:center;gap:12px;}
+.status-avatar-slot{position:relative;width:60px;height:60px;border-radius:50%;background:var(--bg);border:2px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;}
+.status-avatar-slot .cat{transform:scale(0.5);}
 .status-avatar-lg{width:64px;height:64px;flex-shrink:0;position:relative;display:flex;align-items:center;justify-content:center;overflow:visible;}
 .status-avatar-lg .cat{transform:scale(2.3);cursor:pointer;}
 .avatar-img-lg{width:64px;height:64px;border-radius:50%;object-fit:cover;border:1px solid var(--border);cursor:pointer;}
@@ -324,16 +327,22 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 <div class="pg active" id="pg-monitor">
   <div class="card status-card">
     <div class="status-top">
-      <div class="status-line" id="statusLine">
-        在等妳的消息
-        <span class="camera-icon" onclick="pickAvatar('lin')" style="margin-left: 8px; cursor: pointer; font-size: 18px;">📷</span>
+      <div class="status-left">
+        <div class="status-line" id="statusLine">在等妳的消息</div>
+        <div class="status-avatar-slot" id="statusAvatarSlot" onclick="pickAvatar('lin')">
+          <div class="cat" id="catIconStatus" style="display:none;">
+            <div class="cat-head"><div class="cat-ear-l"></div><div class="cat-ear-r"></div><div class="cat-eye-l"></div><div class="cat-eye-r"></div><div class="cat-nose"></div></div>
+            <div class="cat-body"><div class="cat-tail"></div></div>
+          </div>
+          <img id="avatarImgLg" class="avatar-img-lg" style="display:none">
+          <span class="camera-icon" style="position:absolute;bottom:0;right:0;background:var(--white);border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;">📷</span>
+        </div>
       </div>
-      <div class="status-avatar-lg" id="statusAvatarLg" onclick="pickAvatar('lin')">
+      <div class="status-avatar-lg" id="statusAvatarLg">
         <div class="cat" id="catIconLg">
           <div class="cat-head"><div class="cat-ear-l"></div><div class="cat-ear-r"></div><div class="cat-eye-l"></div><div class="cat-eye-r"></div><div class="cat-nose"></div></div>
           <div class="cat-body"><div class="cat-tail"></div></div>
         </div>
-        <img id="avatarImgLg" class="avatar-img-lg" style="display:none" onclick="pickAvatar('lin')">
       </div>
     </div>
     <div id="moodBars"></div>
@@ -500,13 +509,13 @@ function applyAvatar(who, dataUrl){
     const cat=document.getElementById('catIcon');
     const del=document.getElementById('avatarDel');
     const imgLg=document.getElementById('avatarImgLg');
-    const catLg=document.getElementById('catIconLg');
+    const catStatus=document.getElementById('catIconStatus');
     if(dataUrl){
       img.src=dataUrl;img.style.display='block';cat.style.display='none';del.style.display='block';
-      imgLg.src=dataUrl;imgLg.style.display='block';catLg.style.display='none';
+      imgLg.src=dataUrl;imgLg.style.display='block';catStatus.style.display='none';
     }else{
       img.style.display='none';cat.style.display='block';del.style.display='none';
-      imgLg.style.display='none';catLg.style.display='block';
+      imgLg.style.display='none';catStatus.style.display='block';
     }
   }
   lchat(); // 头像变了，重画一次聊天记录让气泡头像同步

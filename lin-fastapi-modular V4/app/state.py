@@ -101,7 +101,15 @@ class AppState:
 
         # 对话历史：最近的聊天记录，用于给模型看上下文，不然模型每次都"失忆"
         # 启动时从 Supabase 读一份进内存，让三端（手机/电脑/网页）打开时看到同一份记录；
-        # 之后新增的同时写回 Supabase。保留条数上限见 config.CHAT_HISTORY_LIMIT。
+        # 之后新增的同时写回 Supabase。保留条数上限优先从 Supabase 读取用户配置。
+        
+        # 读取用户配置的聊天记录数量（优先 Supabase，fallback 到环境变量）
+        cached_config = db.load_context("chat_config")
+        if cached_config and cached_config.get("payload") and cached_config["payload"].get("limit"):
+            chat_limit = cached_config["payload"]["limit"]
+        else:
+            chat_limit = config.CHAT_HISTORY_LIMIT
+        
         self.conversation_history = deque(
             (
                 {
@@ -111,9 +119,9 @@ class AppState:
                     "image_data": r.get("image_data"),
                     "time": r.get("time") or r.get("created_at", ""),
                 }
-                for r in db.load_conversations(limit=config.CHAT_HISTORY_LIMIT)
+                for r in db.load_conversations(limit=chat_limit)
             ),
-            maxlen=config.CHAT_HISTORY_LIMIT,
+            maxlen=chat_limit,
         )
 
     # ---------- 日志 ----------

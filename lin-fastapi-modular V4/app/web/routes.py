@@ -337,20 +337,30 @@ class ChatConfigPayload(BaseModel):
 @router.get("/chat-config")
 def get_chat_config():
     """获取当前聊天记录保留数量配置"""
-    from app.config import CHAT_HISTORY_LIMIT
-    return {"limit": CHAT_HISTORY_LIMIT}
+    # 优先从 Supabase 读取用户设置的值
+    cached = db.load_context("chat_config")
+    if cached and cached.get("payload") and cached["payload"].get("limit"):
+        limit = cached["payload"]["limit"]
+    else:
+        # 没有保存过，使用环境变量默认值
+        from app.config import CHAT_HISTORY_LIMIT
+        limit = CHAT_HISTORY_LIMIT
+    return {"limit": limit}
 
 @router.post("/chat-config")
 def update_chat_config(payload: ChatConfigPayload):
-    """更新聊天记录保留数量配置（需要重启生效）"""
+    """更新聊天记录保留数量配置（立即生效）"""
     # 验证输入范围
     if payload.limit < 100 or payload.limit > 10000:
-        return {"status": "Error", "message": "limit must be between 100 and 10000"}
+        return {"status": "Error", "message": "数量必须在 100-10000 之间"}
     
-    # 注意：这里只是返回新值，实际需要修改环境变量或配置文件才能持久化
-    # 当前实现：返回成功，提示用户需要在环境变量中设置 CHAT_HISTORY_LIMIT
-    return {
-        "status": "Success", 
-        "limit": payload.limit,
-        "message": "请在环境变量中设置 CHAT_HISTORY_LIMIT={} 并重启服务".format(payload.limit)
-    }
+    try:
+        # 调用 state 方法动态更新
+        state.update_chat_history_limit(payload.limit)
+        return {
+            "status": "Success", 
+            "limit": payload.limit,
+            "message": "配置已更新并立即生效"
+        }
+    except Exception as e:
+        return {"status": "Error", "message": str(e)}

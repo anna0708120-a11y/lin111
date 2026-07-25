@@ -117,6 +117,20 @@ class AppState:
         )
 
     # ---------- 日志 ----------
+    # ---------- 聊天记录配置 ----------
+    def update_chat_history_limit(self, new_limit: int):
+        """动态更新聊天记录保留数量"""
+        # 将现有记录转为列表
+        existing = list(self.conversation_history)
+        # 只保留最新的 new_limit 条
+        if len(existing) > new_limit:
+            existing = existing[-new_limit:]
+        # 重新创建 deque
+        self.conversation_history = deque(existing, maxlen=new_limit)
+        # 保存配置到 Supabase
+        from app import db
+        db.save_context("chat_config", {"limit": new_limit})
+
     def add_log(self, event_type, content):
         self.activity_log.append({
             "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),

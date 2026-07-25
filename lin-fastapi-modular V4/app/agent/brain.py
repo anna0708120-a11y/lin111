@@ -15,8 +15,9 @@ from app import config
 from app.state import state
 from app.llm.deepseek_client import call_deepseek
 from app.persona import build_system_prompt
-from app.memory_rules import parse_memory_decision, parse_mood_report, strip_hidden_blocks
+from app.memory_rules import parse_memory_decision, parse_mood_event, strip_hidden_blocks
 from app.context.provider import get_context, format_context_for_prompt
+from app import mood_engine
 
 FALLBACK_REPLIES = ["还没走远。", "嗯。", "我看着你。"]
 
@@ -58,9 +59,13 @@ def generate_reply(context, app_name=None, use_cache=True):
         if decision:
             state.remember_or_reinforce(decision)
 
-        mood = parse_mood_report(reasoning)
-        if mood:
-            state.update_mood(mood)
+        mood_event = parse_mood_event(reasoning)
+        if mood_event:
+            events = mood_event["events"]
+            line = mood_event.get("line")
+            for i, ev in enumerate(events):
+                # line 只在最后一次调用时写入，避免中间事件把 line 覆盖成空/重复
+                mood_engine.apply_event(ev, line=line if i == len(events) - 1 else None)
 
         thinking_display = strip_hidden_blocks(reasoning) or None
 
@@ -97,29 +102,20 @@ def write_daily_journal():
         state.add_note(content)
     state.mark_journal_written()
 
-
 def generate_reply_stream(context, app_name=None, use_cache=True):
     """
     流式生成回覆，yield SSE 格式的事件。
     """
     from app.llm.deepseek_client import call_deepseek_stream
-    from app.memory_rules import parse_memory_decision, parse_mood_report, strip_hidden_blocks
+    from app.memory_rules import parse_memory_decision, parse_mood_event, strip_hidden_blocks
+    from app import mood_engine
     
     if not state.check_rate_limit():
-        err_msg = "今天额度用完了，或者刚刚问太快了，等一下再说。"
-        yield "event: error\ndata: " + json.dumps({"message": err_msg}) + "\n\n"
-        yield "event: done\ndata: {}\n\n"
+        err_msg = "今天额度用完了，或者刚刚问太快了，ata: {}\n\n"
         return
     
     if use_cache and state.last_context_cache == context and state.last_reply_at:
-        if datetime.now() - state.last_reply_at < timedelta(minutes=2):
-            fallback = random.choice(FALLBACK_REPLIES)
-            yield "event: content\ndata: " + json.dumps({"delta": fallback}) + "\n\n"
-            yield "event: done\ndata: {}\n\n"
-            return
-    
-    memory_summary = state.recent_memory_text()
-    conv_list = state.get_recent_conversation(n=20)
+        if datetime.now() - state.last_reply_at < timedellist = state.get_recent_conversation(n=20)
     if conv_list:
         formatted = []
         for turn in conv_list:
@@ -142,25 +138,19 @@ def generate_reply_stream(context, app_name=None, use_cache=True):
         for event_type, data in call_deepseek_stream(system_prompt, max_tokens=config.DEEPSEEK_MAX_TOKENS):
             if event_type == "reasoning":
                 full_reasoning += data
-                yield "event: reasoning\ndata: " + json.dumps({"content": data}) + "\n\n"
-                
-            elif event_type == "raw_reasoning":
-                raw_reasoning = data
-                
-            elif event_type == "content":
-                full_content += data
-                yield "event: content\ndata: " + json.dumps({"delta": data}) + "\n\n"
-                
-            elif event_type == "done":
+                type == "done":
                 parse_source = raw_reasoning or full_reasoning
                 if parse_source:
                     decision = parse_memory_decision(parse_source)
                     if decision:
                         state.remember_or_reinforce(decision)
                     
-                    mood = parse_mood_report(parse_source)
-                    if mood:
-                        state.update_mood(mood)
+                    mood_event = parse_mood_event(parse_source)
+                    if mood_event:
+                        events = mood_event["events"]
+                        line = mood_event.get("line")
+                        for i, ev in enumerate(events):
+                            mood_engine.apply_event(ev, line=line if i == len(events) - 1 else None)
                 
                 state.last_context_cache = context
                 state.mark_reply()
@@ -174,13 +164,4 @@ def generate_reply_stream(context, app_name=None, use_cache=True):
                     send_to_bark(full_content)
                 
                 state.mark_conversation_anchor()
-                yield "event: done\ndata: " + json.dumps(data) + "\n\n"
-                
-            elif event_type == "error":
-                yield "event: error\ndata: " + json.dumps({"message": data}) + "\n\n"
-                yield "event: done\ndata: {}\n\n"
-                
-    except Exception as e:
-        print(f"[brain] Stream error: {e}")
-        yield "event: error\ndata: " + json.dumps({"message": "信号不好。"}) + "\n\n"
-        yield "event: done\ndata: {}\n\n"
+                yield "event: done\n" 

@@ -255,13 +255,6 @@ def get_period_data():
         cached = db.load_context("period")
         if cached and cached.get("payload") and cached["payload"].get("dates"):
             records = cached["payload"]["dates"]
-        else:
-            # 舊格式相容：直接從 context_state 的 data 欄位讀取（最多一個日期）
-            result = db._client.table('context_state').select('data').eq('source', 'period').limit(1).execute()
-            if hasattr(result, 'data') and result.data:
-                row = result.data[0]
-                if row.get('data') and row['data'].get('date'):
-                    records.append(row['data']['date'])
     except Exception as e:
         print(f"Load period records failed: {e}")
 
@@ -293,13 +286,6 @@ def record_period(payload: PeriodRecord):
         records = []
         if cached and cached.get("payload") and cached["payload"].get("dates"):
             records = cached["payload"]["dates"]
-        else:
-            # 舊格式相容：讀取 data 欄位中的單一日期
-            result = db._client.table('context_state').select('data').eq('source', 'period').limit(1).execute()
-            if hasattr(result, 'data') and result.data:
-                row = result.data[0]
-                if row.get('data') and row['data'].get('date'):
-                    records.append(row['data']['date'])
         
         # 防重複：只有日期不存在時才加入
         if payload.date not in records:

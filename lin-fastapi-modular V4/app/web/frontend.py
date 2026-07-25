@@ -59,6 +59,8 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 .hdr{background:var(--white);padding:16px 20px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:fixed;top:0;left:0;right:0;z-index:200;height:65px;}
 .cat-wrap{display:flex;align-items:center;gap:12px;}
 .pet-container{position:absolute;top:140px;right:30px;z-index:10;}
+.pet-container-chat{position:absolute;bottom:70px;left:20px;z-index:10;transform:scale(0.7);}
+
 .cat{position:relative;width:44px;height:36px;cursor:pointer;}
 .cat-body{width:36px;height:26px;background:var(--rose);border-radius:50% 50% 45% 45%;position:absolute;bottom:0;left:4px;}
 .cat-head{width:28px;height:24px;background:var(--rose);border-radius:50% 50% 40% 40%;position:absolute;top:0;left:8px;animation:hb 3s ease-in-out infinite;}
@@ -332,12 +334,6 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
       <div class="status-line" id="statusLine">在等妳的消息</div>
     </div>
     <div id="moodBars"></div>
-    <div class="pet-container" id="petContainer">
-      <div class="cat" id="catPet">
-        <div class="cat-head"><div class="cat-ear-l"></div><div class="cat-ear-r"></div><div class="cat-eye-l"></div><div class="cat-eye-r"></div><div class="cat-nose"></div></div>
-        <div class="cat-body"><div class="cat-tail"></div></div>
-      </div>
-    </div>
   </div>
 
   <!-- 在一起日子 -->

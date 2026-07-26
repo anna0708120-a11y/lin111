@@ -6,6 +6,7 @@ brain.py 不会、也不应该自己去各个模块东拼西凑——
 以后加新来源（App监控、Bark历史、宠物互动...），
 只要在这里加一个 case，不用碰 brain.py。
 """
+from datetime import datetime
 from app.context import calendar as calendar_source
 from app.context import location as location_source
 from app.context import mac as mac_source
@@ -47,6 +48,11 @@ def format_context_for_prompt(context_dict):
     只在有值时才组装对应那一行，不会出现"天气：无"这种废话占 token。
     """
     lines = []
+    
+    # 當前真實時間（伺服器時間，UTC+0 或系統時區）
+    now = datetime.now()
+    lines.append(f"當前真實時間：{now.strftime('%Y-%m-%d %H:%M:%S')}（24小時制）")
+    
     if "weather" in context_dict:
         w = context_dict["weather"]
         lines.append(f"目前天气：{w.get('temperature')}°C（体感{w.get('feels_like')}°C），湿度{w.get('humidity')}%")

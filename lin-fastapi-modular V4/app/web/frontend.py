@@ -1149,7 +1149,9 @@ async function llogs(){
   try{
     const r=await fetch(AU+'/logs');const d=await r.json();
     const lc=document.getElementById('lc');
-    if(d.logs&&d.logs.length>0){lc.innerHTML=[...d.logs].reverse().slice(0,15).map(l=>'<div class="li"><div class="lm"><span class="lt">'+l.type+'</span><span class="ltime">'+l.time+'</span></div><div>'+l.content+'</div></div>').join('');}
+    const sysLogs=[...d.logs].filter(l=>l.type!=='AI回复').reverse().slice(0,15);
+    if(sysLogs.length>0){lc.innerHTML=sysLogs.map(l=>'<div class="li"><div class="lm"><span class="lt">'+l.type+'</span><span class="ltime">'+l.time+'</span></div><div>'+l.content+'</div></div>').join('');}
+    else{lc.innerHTML='<div class="es">📡 等待系統事件...</div>';}
     const nc=document.getElementById('nc');
     if(d.notes&&d.notes.length>0){nc.innerHTML=[...d.notes].reverse().map(n=>'<div class="ni"><div class="nt">'+n.time+'</div>'+n.content+'</div>').join('');}
     if(d.quota!==undefined){const p=Math.round((d.quota/180)*100);document.getElementById('qf').style.width=p+'%';document.getElementById('qt').textContent=(180-d.quota)+' 次剩餘';}

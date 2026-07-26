@@ -51,10 +51,9 @@ def build_system_prompt(context, memory_summary="", world_context="", conversati
     # 親密引擎：關係階段 + 互動意願（只讀，不寫入Memory，每次重新計算）
     from app.intimacy.engine import compute_willingness, get_atmosphere
     willingness = compute_willingness(mood)
-    atmosphere = get_atmosphere(willingness)
+    atmosphere = get_atmosphere(willingness, mood)
     intimacy_text = (
         "\n\n【親密狀態（僅供參考，體現在語氣和態度裡，不用直接說出這些詞）】\n"
-        "關係階段：戀人\n"
         f"互動意願：{willingness}\n"
         f"此刻氛圍：{atmosphere}\n"
     )

@@ -1,85 +1,96 @@
 """
-親密引擎核心：互動意願 + 親密氛圍計算
-讀取 Mood，不修改 Mood
+親密引擎核心邏輯
+
+計算：
+1. 互動意願（每次請求重新計算，不保存）
+2. 親密氛圍描述（根據意願 + Mood 生成）
 """
 
 def compute_willingness(mood):
     """
-    計算互動意願（每次回覆前重新計算，不保存）
+    計算當前互動意願（低/中/高）
     
-    Args:
-        mood: dict，來自 state.mood，包含依戀/佔有/壓力/疲勞等
-    
-    Returns:
-        str: "低" / "中" / "高"
+    依據：
+    - 依戀 (attachment)
+    - 壓力 (stress)
+    - 疲勞 (fatigue)
+    - 佔有 (possessiveness)
     """
     score = 0.5  # 基準值
     
-    # 正向因素
-    score += mood.get("attachment", 0.5) * 0.3      # 依戀提升意願
-    score += mood.get("possessiveness", 0.3) * 0.2  # 佔有欲提升意願
+    # 依戀提升意願
+    score += mood.get("attachment", 0.5) * 0.3
     
-    # 負向因素
-    score -= mood.get("stress", 0.3) * 0.4          # 壓力降低意願
-    score -= mood.get("fatigue", 0.3) * 0.3         # 疲勞降低意願
+    # 佔有提升意願（戀人關係）
+    score += mood.get("possessiveness", 0.3) * 0.2
     
-    # 邊界處理
-    score = max(0.0, min(1.0, score))
+    # 壓力降低意願
+    score -= mood.get("stress", 0.3) * 0.4
     
-    if score < 0.4:
+    # 疲勞降低意願
+    score -= mood.get("fatigue", 0.3) * 0.3
+    
+    # 分級
+    if score < 0.35:
         return "低"
-    elif score < 0.7:
+    elif score < 0.65:
         return "中"
     else:
         return "高"
 
 
-def get_atmosphere(willingness):
+def get_atmosphere(willingness, mood):
     """
-    根據互動意願生成親密氛圍描述
+    根據互動意願 + Mood 生成親密氛圍描述
     
-    Args:
-        willingness: str，"低" / "中" / "高"
-    
-    Returns:
-        str: 氛圍描述（保持距離/慢慢靠近/有點依偎/有點害羞/想撒嬌/有點忍耐/特別黏人）
+    映射表（戀人關係預設）：
     """
-    # 關係固定為戀人，所以只看互動意願
+    # 戀人階段的氛圍映射
     atmosphere_map = {
-        "低": "有點忍耐",      # 戀人關係但意願低 → 需要空間
-        "中": "有點害羞",      # 中等意願 → 溫和狀態
-        "高": "特別黏人",      # 高意願 → 主動親密
+        "低": [
+            "需要空間", "有點累了", "想安靜一下"
+        ],
+        "中": [
+            "有點依偎", "慢慢靠近", "有點害羞"
+        ],
+        "高": [
+            "想撒嬌", "特別黏人", "很想靠近"
+        ]
     }
-    return atmosphere_map.get(willingness, "慢慢靠近")
+    
+    options = atmosphere_map.get(willingness, ["慢慢靠近"])
+    
+    # 根據 mood 微調選擇
+    stress = mood.get("stress", 0.3)
+    possessiveness = mood.get("possessiveness", 0.3)
+    
+    if willingness == "低":
+        return options[0] if stress > 0.6 else options[1]
+    elif willingness == "中":
+        return options[1] if possessiveness < 0.4 else options[0]
+    else:
+        return options[1] if possessiveness > 0.6 else options[0]
 
 
 def get_intimacy_state(mood):
     """
-    獲取完整的親密狀態（V1：只有互動意願 + 氛圍）
-    
-    Args:
-        mood: dict，來自 state.mood
-    
-    Returns:
-        dict: {
-            "willingness": str,       # "低" / "中" / "高"
-            "atmosphere": str,        # 氛圍描述
-            "body_state": dict        # V2 預留，V1 返回模擬數據
-        }
+    給 API / Prompt 用的統一入口。
+
+    回傳：
+    - willingness：互動意願（低/中/高，每次重新計算，不保存）
+    - atmosphere：親密氛圍描述（一句話總結）
+    - body_state：V2 身體狀態（V1 階段為預留假資料）
+
+    注意：這裡不包含「關係階段」——已依需求移除，
+    因為目前設定 Lin 與 Anna 一律是戀人關係，不需要再判斷陌生/熟悉/親近。
     """
+    from app.intimacy.body_state import get_body_state
+
     willingness = compute_willingness(mood)
-    atmosphere = get_atmosphere(willingness)
-    
-    # V2 預留：身體狀態（V1 先返回固定/隨機值供 UI 展示）
-    body_state = {
-        "heat": 0.38,          # 熱度（0-1）
-        "sensitivity": 1.0,    # 敏感度（0-1）
-        "control": 0.69,       # 控制力（0-1）
-        "tension": 0.37,       # 蓄積感（0-1）
-    }
-    
+    atmosphere = get_atmosphere(willingness, mood)
+    body_state = get_body_state()
+
     return {
-        "relationship": "戀人",  # 固定
         "willingness": willingness,
         "atmosphere": atmosphere,
         "body_state": body_state,

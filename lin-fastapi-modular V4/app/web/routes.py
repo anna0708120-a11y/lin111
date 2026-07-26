@@ -232,15 +232,6 @@ def get_mood():
     """给状态面板用：Lin目前的状态自评。"""
     return {"mood": state.mood}
 
-@router.get("/intimacy")
-def get_intimacy():
-    """
-    親密引擎狀態查詢（給 Home UI 的身體狀態卡片用）
-    返回：關係階段、互動意願、親密氛圍、身體狀態（V2預留）
-    """
-    from app.intimacy.engine import get_intimacy_state
-    return get_intimacy_state(state.mood)
-
 @router.get("/avatar")
 def get_avatar(who: str = "lin"):
     return {"avatar": state.anna_avatar if who == "anna" else state.lin_avatar}

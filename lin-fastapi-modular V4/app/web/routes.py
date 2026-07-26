@@ -63,6 +63,32 @@ class LocationPayload(BaseModel):
     label: Optional[str] = None  # 地点名称（如果有的话）
     accuracy: Optional[float] = None
 
+class DeviceEventPayload(BaseModel):
+    """iPhone 捷徑統一上報 endpoint，所有欄位皆可選"""
+    event_type: str  # 必填：battery/wifi/reminder/arrive_home/leave_home/charging/unplug/airpods/app_opened
+    # 電量相關
+    battery_level: Optional[int] = None  # 0-100
+    battery_state: Optional[str] = None  # "charging" / "unplugged" / "full"
+    # Wi-Fi
+    wifi_ssid: Optional[str] = None
+    wifi_connected: Optional[bool] = None
+    # 提醒事項
+    reminder_title: Optional[str] = None
+    reminder_due: Optional[str] = None  # ISO 8601
+    # 到家/離家
+    location_event: Optional[str] = None  # "arrive_home" / "leave_home"
+    # AirPods
+    airpods_connected: Optional[bool] = None
+    airpods_name: Optional[str] = None
+    # App 自動化
+    app_name: Optional[str] = None
+    # 通用附加資訊
+    note: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    label: Optional[str] = None  # 地点名称（如果有的话）
+    accuracy: Optional[float] = None
+
 @router.get("/health")
 def health():
     """给 Render / 之后的监控用的健康检查接口，顺便回报 Supabase 有没有连上。"""
@@ -260,9 +286,80 @@ def update_location(payload: LocationPayload):
     """
     from app.context import location as location_context
     location_context.save_location(payload.dict(exclude_none=True))
-    loc_label = payload.label or f"{payload.latitude:.3f}, {payload.longitude:.3f}" if payload.latitude else "未知位置"
+    loc_label = payload.label or (f"{payload.latitude:.3f}, {payload.longitude:.3f}" if payload.latitude else "未知位置")
     event_bus.emit("location", f"目前位置：{loc_label}")
     return {"status": "Success"}
+
+@router.post("/context/device", dependencies=[Depends(verify_context_token)])
+def device_event(payload: DeviceEventPayload):
+    """
+    iPhone 捷徑統一上報 endpoint。
+    所有手機感知事件（電量、Wi-Fi、提醒、到家/離家、充電、AirPods、App 自動化）
+    都打這一支，依 event_type 分類寫入 Event Bus。
+    Persistent 類（battery/wifi）覆蓋舊值；Activity 類（其餘）保留歷史。
+    """
+    t = payload.event_type
+
+    if t == "battery":
+        level = payload.battery_level
+        state_str = {"charging": " ⚡充電中", "full": " ✅已充滿", "unplugged": ""}.get(payload.battery_state or "", "")
+        if level is not None:
+            event_bus.emit("app", f"📱 電量 {level}%{state_str}")
+
+    elif t == "wifi":
+        if payload.wifi_connected is False:
+            event_bus.emit("app", "📶 Wi-Fi 已斷線")
+        else:
+            ssid = payload.wifi_ssid or "未知網路"
+            event_bus.emit("app", f"📶 已連接 {ssid}")
+
+    elif t == "reminder":
+        title = payload.reminder_title or payload.note or "提醒事項"
+        due = f"（{payload.reminder_due}）" if payload.reminder_due else ""
+        event_bus.emit("system", f"🔔 提醒：{title}{due}")
+
+    elif t in ("arrive_home", "leave_home"):
+        emoji = "🏠" if t == "arrive_home" else "🚶"
+        msg = "Anna 到家了" if t == "arrive_home" else "Anna 離家了"
+        event_bus.emit("system", f"{emoji} {msg}")
+
+    elif t == "charging":
+        level = f"  {payload.battery_level}%" if payload.battery_level is not None else ""
+        event_bus.emit("system", f"⚡ 開始充電{level}")
+
+    elif t == "unplug":
+        level = f"  {payload.battery_level}%" if payload.battery_level is not None else ""
+        event_bus.emit("system", f"🔌 拔除充電{level}")
+
+    elif t == "airpods":
+        name = payload.airpods_name or "AirPods"
+        if payload.airpods_connected is False:
+            event_bus.emit("system", f"🎧 {name} 已斷開")
+        else:
+            event_bus.emit("system", f"🎧 {name} 已連接")
+
+    elif t == "app_opened":
+        app = payload.app_name or payload.note or "未知 App"
+        event_bus.emit("system", f"📲 開啟 {app}")
+
+    elif t == "status":
+        # 定時上報：battery + wifi 一起打
+        parts = []
+        if payload.battery_level is not None:
+            state_str = {"charging": "⚡", "full": "✅", "unplugged": ""}.get(payload.battery_state or "", "")
+            parts.append(f"📱{payload.battery_level}%{state_str}")
+        if payload.wifi_ssid:
+            parts.append(f"📶{payload.wifi_ssid}")
+        elif payload.wifi_connected is False:
+            parts.append("📶離線")
+        if parts:
+            event_bus.emit("app", "  ".join(parts))
+
+    else:
+        # 未知類型，用 note 或 event_type 本身記錄
+        event_bus.emit("system", payload.note or t)
+
+    return {"status": "ok", "event_type": t}
 
 # ========== 经期记录 API ==========
 from pydantic import BaseModel

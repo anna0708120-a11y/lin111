@@ -149,10 +149,16 @@ def parse_memory_decision(reasoning_text):
 
 def parse_mood_event(reasoning_text):
     """从 reasoning 里抓 [MOOD_EVENT]...[/MOOD_EVENT]，解析出事件清单跟line。抓不到回传 None。
-    支持多事件：用逗号（半形/全形）、顿号或竖线分隔都可以，例如 "PRAISE, PET" 或 "PRAISE|PET"。
-    只写一个事件时完全兼容旧格式，不影响既有行为。
-    不在合法清单内的词会被忽略；全部无效或本来就没写时归一成 ["NONE"]（不会导致 mood_engine 报错，也不会误增减数值）。
-    回传格式：{"events": ["PRAISE", "PET"], "line": "..."}"""
+    
+    支持格式：
+    1. 单事件不带强度：PRAISE → 默认 MEDIUM
+    2. 单事件带强度：PRAISE:HIGH
+    3. 多事件：PRAISE:HIGH, PET:LOW, JOKE
+    
+    强度标签：LOW/MEDIUM/HIGH（不区分大小写），缺省时默认 MEDIUM
+    
+    回传格式：{"events": [("PRAISE", "HIGH"), ("PET", "LOW")], "line": "..."}
+    """
     match = re.search(r"\[MOOD_EVENT\](.*?)\[/MOOD_EVENT\]", reasoning_text, re.S)
     if not match:
         return None
@@ -163,13 +169,33 @@ def parse_mood_event(reasoning_text):
         "IGNORE", "LONG_IGNORE", "GOODBYE", "LONG_CHAT", "SHORT_REPLY",
         "LATE_NIGHT", "NONE",
     }
+    valid_levels = {"LOW", "MEDIUM", "HIGH"}
+    
     raw = _field(block, "event", "NONE")
     # 统一分隔符：全形逗号、顿号、竖线都换成半形逗号，再切开
     normalized = raw.replace("，", ",").replace("、", ",").replace("|", ",")
-    events = [e.strip().upper() for e in normalized.split(",") if e.strip()]
-    events = [e for e in events if e in valid_events]
+    tokens = [t.strip() for t in normalized.split(",") if t.strip()]
+    
+    # 解析每个 token，格式：EVENT_NAME 或 EVENT_NAME:LEVEL
+    events = []
+    for token in tokens:
+        if ":" in token:
+            parts = token.split(":", 1)
+            event_name = parts[0].strip().upper()
+            level = parts[1].strip().upper() if len(parts) > 1 else "MEDIUM"
+        else:
+            event_name = token.upper()
+            level = "MEDIUM"
+        
+        # 验证事件名和强度
+        if event_name in valid_events:
+            if level not in valid_levels:
+                level = "MEDIUM"
+            events.append((event_name, level))
+    
+    # 如果没有合法事件，返回 NONE:MEDIUM
     if not events:
-        events = ["NONE"]
+        events = [("NONE", "MEDIUM")]
 
     return {
         "events": events,

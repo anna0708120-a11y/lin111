@@ -24,43 +24,60 @@ FALLBACK_REPLIES = ["还没走远。", "嗯。", "我看着你。"]
 def _auto_detect_mood_events(user_msg, lin_reply):
     """
     根據 user_msg 和 lin_reply 內容自動偵測情緒事件，不依賴 LLM 標籤。
-    回傳事件名稱列表，例如 ["PRAISE", "LONG_CHAT"]
+    回傳事件列表，格式：[(event_name, level), ...]
+    例如 [("PRAISE", "MEDIUM"), ("LONG_CHAT", "HIGH")]
     """
     events = []
     combined = (user_msg + " " + lin_reply).lower()
     
     # APOLOGY: sorry, 對不起, 抱歉
     if any(kw in combined for kw in ["sorry", "對不起", "对不起", "抱歉", "我錯", "我错"]):
-        events.append("APOLOGY")
+        events.append(("APOLOGY", "MEDIUM"))
     
     # PRAISE: 誇讚、稱讚
     if any(kw in combined for kw in ["喜歡你", "喜欢你", "愛你", "爱你", "想你", "厲害", "厉害", "真棒", "好厲害", "好厉害"]):
-        events.append("PRAISE")
+        events.append(("PRAISE", "MEDIUM"))
     
     # COMFORT: 安慰
     if any(kw in combined for kw in ["沒事", "没事", "別怕", "别怕", "陪你", "抱抱", "親親", "亲亲"]):
-        events.append("COMFORT")
+        events.append(("COMFORT", "MEDIUM"))
     
     # THANKS: 謝謝
     if any(kw in combined for kw in ["謝謝", "谢谢", "感謝", "感谢", "thank"]):
-        events.append("THANKS")
+        events.append(("THANKS", "MEDIUM"))
     
     # JOKE: 笑、有趣
     if any(kw in combined for kw in ["哈哈", "笑死", "好笑", "有趣", "lol", "哈哈", "😂", "🤣"]):
-        events.append("JOKE")
+        events.append(("JOKE", "MEDIUM"))
     
-    # LONG_CHAT: 對話長度超過 100 字
-    if len(user_msg) + len(lin_reply) > 100:
-        events.append("LONG_CHAT")
+    # LONG_CHAT: 對話長度判斷
+    # LOW: 50-150 字
+    # MEDIUM: 150-300 字
+    # HIGH: 300+ 字
+    total_len = len(user_msg) + len(lin_reply)
+    if total_len > 300:
+        events.append(("LONG_CHAT", "HIGH"))
+    elif total_len > 150:
+        events.append(("LONG_CHAT", "MEDIUM"))
+    elif total_len > 50:
+        events.append(("LONG_CHAT", "LOW"))
     
-    # SHORT_REPLY: Lin 回覆很短（<10字）且 user 訊息不短
+    # SHORT_REPLY: Lin 回覆很短且 user 訊息不短
     if len(lin_reply) < 10 and len(user_msg) > 15:
-        events.append("SHORT_REPLY")
+        events.append(("SHORT_REPLY", "MEDIUM"))
     
     # LATE_NIGHT: 現在是深夜（23:00~05:00）
+    # 強度根據時間深淺判斷：
+    # LOW: 23:00-00:00 或 04:00-05:00 (剛入夜或接近天亮)
+    # MEDIUM: 00:00-01:00 或 03:00-04:00
+    # HIGH: 01:00-03:00 (深夜核心時段)
     hour = datetime.now().hour
-    if hour >= 23 or hour < 5:
-        events.append("LATE_NIGHT")
+    if 1 <= hour < 3:
+        events.append(("LATE_NIGHT", "HIGH"))
+    elif (0 <= hour < 1) or (3 <= hour < 4):
+        events.append(("LATE_NIGHT", "MEDIUM"))
+    elif (23 <= hour < 24) or (4 <= hour < 5):
+        events.append(("LATE_NIGHT", "LOW"))
     
     return events
 
@@ -107,9 +124,13 @@ def generate_reply(context, app_name=None, use_cache=True):
         if mood_event:
             events = mood_event["events"]
             line = mood_event.get("line")
-            for i, ev in enumerate(events):
+            for i, (event_name, event_level) in enumerate(events):
                 # line 只在最后一次调用时写入，避免中间事件把 line 覆盖成空/重复
-                mood_engine.apply_event(ev, line=line if i == len(events) - 1 else None)
+                mood_engine.apply_event(
+                    event_name, 
+                    level=event_level,
+                    line=line if i == len(events) - 1 else None
+                )
 
         thinking_display = strip_hidden_blocks(reasoning) or None
 
@@ -208,8 +229,8 @@ def generate_reply_stream(context, app_name=None, use_cache=True):
                 
                 # Auto-detect mood events from user + Lin content
                 detected_events = _auto_detect_mood_events(context, full_content)
-                for ev in detected_events:
-                    mood_engine.apply_event(ev)
+                for event_name, event_level in detected_events:
+                    mood_engine.apply_event(event_name, level=event_level)
                 
                 state.last_context_cache = context
                 state.mark_reply()

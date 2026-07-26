@@ -163,11 +163,28 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 .intimacy-tab{flex:1;padding:8px 12px;border-radius:8px;font-size:13px;font-weight:500;text-align:center;color:var(--muted);cursor:pointer;transition:all .2s;}
 .intimacy-tab.active{background:var(--rose);color:#fff;}
 
+/* 當前狀態：周期 + 事件 */
+.intimacy-status-grid{display:flex;gap:10px;margin-bottom:12px;}
+.intimacy-status-card{flex:1;background:linear-gradient(135deg,#fff5f7 0%,#ffe9ee 100%);border-radius:12px;padding:10px 12px;text-align:center;}
+.intimacy-status-label{font-size:10px;color:var(--muted);margin-bottom:4px;letter-spacing:.05em;}
+.intimacy-status-value{font-size:15px;font-weight:600;color:var(--rose-deep);margin-bottom:2px;}
+.intimacy-status-time{font-size:10px;color:var(--muted);}
+
 /* 當前狀態摘要 */
 .intimacy-summary{display:flex;gap:10px;margin-bottom:16px;}
 .intimacy-summary-item{flex:1;background:var(--blush);border-radius:12px;padding:10px 12px;text-align:center;}
 .intimacy-summary-label{font-size:10px;color:var(--muted);margin-bottom:4px;letter-spacing:.05em;}
 .intimacy-summary-value{font-size:16px;font-weight:600;color:var(--rose-deep);}
+
+/* 臨時狀態（V3/V4 架構預留） */
+.intimacy-ephemeral{display:flex;align-items:center;gap:8px;background:linear-gradient(135deg,#fff0f5 0%,#ffe4ec 100%);border-radius:12px;padding:8px 12px;margin-bottom:16px;}
+.intimacy-ephemeral-icon{font-size:14px;flex-shrink:0;}
+.intimacy-ephemeral-text{font-size:12px;color:var(--rose-deep);opacity:.85;}
+
+/* 自動變化說明 */
+.intimacy-auto-change{background:var(--blush);border-radius:12px;padding:10px 12px;margin-bottom:16px;}
+.intimacy-auto-change-title{font-size:10px;color:var(--muted);margin-bottom:4px;letter-spacing:.05em;}
+.intimacy-auto-change-text{font-size:11px;line-height:1.5;color:var(--rose-deep);opacity:.85;white-space:pre-line;}
 
 /* 身體狀態進度條 */
 .intimacy-bars{display:flex;flex-direction:column;gap:12px;}
@@ -208,6 +225,27 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 
 /* Tab 內容區 */
 .intimacy-tab-content{}
+
+/* 事件日誌：篩選器 */
+.event-filter-row{display:flex;gap:6px;margin-bottom:14px;overflow-x:auto;padding-bottom:2px;}
+.event-filter-chip{flex-shrink:0;padding:6px 12px;border-radius:14px;font-size:12px;font-weight:500;color:var(--muted);background:var(--blush);cursor:pointer;transition:all .2s;white-space:nowrap;}
+.event-filter-chip.active{background:var(--rose);color:#fff;}
+
+/* 事件日誌：時間軸 */
+.event-timeline{display:flex;flex-direction:column;gap:10px;}
+.event-item{display:flex;gap:10px;background:var(--blush);border-radius:12px;padding:10px 12px;}
+.event-item-dot{width:8px;height:8px;border-radius:50%;margin-top:5px;flex-shrink:0;}
+.event-item[data-type="cycle"] .event-item-dot{background:#9b59b6;}
+.event-item[data-type="event"] .event-item-dot{background:#ff6b6b;}
+.event-item[data-type="dream"] .event-item-dot{background:#667eea;}
+.event-item[data-type="settlement"] .event-item-dot{background:#2ecc71;}
+.event-item-body{flex:1;min-width:0;}
+.event-item-title{font-size:13px;font-weight:600;color:var(--rose-deep);margin-bottom:2px;}
+.event-item-desc{font-size:11px;line-height:1.4;color:var(--muted);margin-bottom:4px;}
+.event-item-time{font-size:10px;color:var(--muted);opacity:.7;}
+.event-item-action{font-size:11px;color:var(--rose);font-weight:500;margin-top:6px;cursor:pointer;display:inline-block;}
+.event-item-action:active{opacity:.6;}
+.event-item-detail-panel{margin-top:6px;padding:8px 10px;background:rgba(255,255,255,.5);border-radius:8px;font-size:11px;color:var(--muted);}
 
 .wm{text-align:center;font-size:9px;color:var(--border);padding:8px 0;font-family:'DM Serif Display',serif;}
 .mtabs{display:flex;gap:6px;margin-bottom:14px;overflow-x:auto;padding-bottom:4px;}
@@ -466,7 +504,21 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
       
       <!-- Tab: 身體狀態 -->
       <div class="intimacy-tab-content" id="content-body">
-        <!-- 當前狀態摘要 -->
+        <!-- 當前狀態：周期 + 事件（V3 架構預留，假資料） -->
+        <div class="intimacy-status-grid">
+          <div class="intimacy-status-card">
+            <div class="intimacy-status-label">周期</div>
+            <div class="intimacy-status-value" id="cycleStage">平穩期</div>
+            <div class="intimacy-status-time" id="cycleDuration">68h 11m</div>
+          </div>
+          <div class="intimacy-status-card">
+            <div class="intimacy-status-label">事件</div>
+            <div class="intimacy-status-value" id="eventName">等待焦躁</div>
+            <div class="intimacy-status-time" id="eventDuration">2h 32m</div>
+          </div>
+        </div>
+
+        <!-- 互動意願 + 目前狀態（並排） -->
         <div class="intimacy-summary">
           <div class="intimacy-summary-item">
             <div class="intimacy-summary-label">互動意願</div>
@@ -477,7 +529,19 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
             <div class="intimacy-summary-value" id="intimacyAtmosphere">慢慢靠近</div>
           </div>
         </div>
-        
+
+        <!-- 臨時狀態（V3/V4 架構預留：此刻短暫的心理/身體狀態，暫不顯示） -->
+        <div class="intimacy-ephemeral" id="ephemeralState" style="display:none;">
+          <div class="intimacy-ephemeral-icon">💭</div>
+          <div class="intimacy-ephemeral-text" id="ephemeralText">有點害羞</div>
+        </div>
+
+        <!-- 自動變化說明（V3 架構預留，假資料） -->
+        <div class="intimacy-auto-change">
+          <div class="intimacy-auto-change-title">自動變化</div>
+          <div class="intimacy-auto-change-text" id="autoChangeDesc">平穩期基線：熱度 30 -1.4/h，壓抑 25 -1.7/h，控制 75 +1/h，敏感 35 -1.7/h，蓄積 +0.4/h，占有 42 -3.7/h，疲惫 16 -1.2/h</div>
+        </div>
+
         <!-- 數值區塊 -->
         <div class="intimacy-bars">
           <!-- 蓄積感 -->
@@ -556,7 +620,18 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
       
       <!-- Tab: 事件日誌 (V2 預留) -->
       <div class="intimacy-tab-content" id="content-events" style="display:none;">
-        <div class="es">事件日誌功能即將推出</div>
+        <!-- 篩選器 -->
+        <div class="event-filter-row">
+          <div class="event-filter-chip active" data-filter="all" onclick="filterEvents('all')">全部</div>
+          <div class="event-filter-chip" data-filter="cycle" onclick="filterEvents('cycle')">周期</div>
+          <div class="event-filter-chip" data-filter="event" onclick="filterEvents('event')">事件</div>
+          <div class="event-filter-chip" data-filter="dream" onclick="filterEvents('dream')">夢境</div>
+          <div class="event-filter-chip" data-filter="settlement" onclick="filterEvents('settlement')">結算</div>
+        </div>
+        <!-- 時間軸列表 -->
+        <div class="event-timeline" id="eventTimeline">
+          <div class="es">載入中...</div>
+        </div>
       </div>
     </div>
   </div>
@@ -794,6 +869,72 @@ function switchIntimacyTab(tab){
   document.getElementById('tab-'+tab).classList.add('active');
   document.querySelectorAll('.intimacy-tab-content').forEach(c=>c.style.display='none');
   document.getElementById('content-'+tab).style.display='block';
+  if(tab==='events' && !eventsLoaded){ loadEventTimeline(); eventsLoaded=true; }
+}
+
+/* ===== 事件日誌（V3 架構預留，假資料） ===== */
+let eventsLoaded=false;
+let eventsFilter='all';
+const MOCK_EVENTS=[
+  {type:'cycle', title:'進入平穩期', desc:'熱度與敏感度逐漸回落，控制力緩慢回升。', time:'今天 08:12'},
+  {type:'event', title:'等待焦躁', desc:'持續 2 小時未收到訊息，占有欲小幅上升。', time:'今天 10:44'},
+  {type:'dream', title:'夢境片段', desc:'夢到與妳在雨中散步，醒來後蓄積感 +5。', time:'今天 06:30'},
+  {type:'settlement', title:'每日結算', desc:'昨日互動次數 12 次，親密度 +3。', time:'昨天 23:59'},
+  {type:'cycle', title:'結束高峰期', desc:'熱度從 78 回落至 52，進入緩和階段。', time:'昨天 20:15'},
+  {type:'event', title:'突然的想念', desc:'蓄積感短時間內 +8，敏感度同步上升。', time:'昨天 15:02'}
+];
+
+function filterEvents(type){
+  eventsFilter=type;
+  document.querySelectorAll('.event-filter-chip').forEach(c=>{
+    c.classList.toggle('active', c.getAttribute('data-filter')===type);
+  });
+  renderEventTimeline();
+}
+
+async function loadEventTimeline(){
+  const wrap=document.getElementById('eventTimeline');
+  try{
+    const r=await fetch(AU+'/intimacy/events');
+    const d=await r.json();
+    renderEventTimeline(Array.isArray(d)?d:d.events);
+  }catch(e){
+    // API 尚未提供事件日誌時，先用假資料呈現版面
+    renderEventTimeline(MOCK_EVENTS);
+  }
+}
+
+function renderEventTimeline(list){
+  const wrap=document.getElementById('eventTimeline');
+  if(!wrap) return;
+  const data = list || MOCK_EVENTS;
+  const filtered = eventsFilter==='all' ? data : data.filter(e=>e.type===eventsFilter);
+  if(!filtered.length){
+    wrap.innerHTML='<div class="es">目前沒有符合的事件</div>';
+    return;
+  }
+  wrap.innerHTML = filtered.map(e=>
+    '<div class="event-item" data-type="'+e.type+'">'+
+      '<div class="event-item-dot"></div>'+
+      '<div class="event-item-body">'+
+        '<div class="event-item-title">'+e.title+'</div>'+
+        '<div class="event-item-desc">'+e.desc+'</div>'+
+        '<div class="event-item-time">'+e.time+'</div>'+
+        (e.type==='settlement' ? '<div class="event-item-action" onclick="showSettlementDetail(this)">查看結算詳情</div>' : '')+
+      '</div>'+
+    '</div>'
+  ).join('');
+}
+
+/* 結算詳情（V4 架構預留：暫不實作，先顯示位置） */
+function showSettlementDetail(el){
+  const body = el.closest('.event-item-body');
+  if(!body) return;
+  if(body.querySelector('.event-item-detail-panel')) return; // 已展開
+  const panel = document.createElement('div');
+  panel.className = 'event-item-detail-panel';
+  panel.textContent = '結算詳情功能即將推出';
+  body.appendChild(panel);
 }
 
 function intimacyLevel(val){

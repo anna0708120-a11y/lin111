@@ -160,6 +160,33 @@ def get_intimacy():
     from app.intimacy.engine import get_intimacy_state
     return get_intimacy_state(state.mood)
 
+@router.get("/intimacy/status")
+def get_intimacy_status():
+    """
+    V3：周期 + 事件當前狀態（給身體狀態卡片「當前狀態」區塊用）
+    全部為架構預留假資料，V4 補上真實邏輯。
+    """
+    from app.intimacy.cycle import get_current_cycle
+    from app.intimacy.event_log import get_current_event
+    return {
+        "cycle": get_current_cycle(),
+        "event": get_current_event(),
+        "auto_change_desc": (
+            "平穩期基線：熱度 30 -1.4/h，壓抑 25 -1.7/h，控制 75 +1/h，"
+            "敏感 35 -1.7/h，蓄積 +0.4/h，占有 42 -3.7/h，疲惫 16 -1.2/h\n\n"
+            "等待焦躁疊加：占有 +1.4/h，壓抑 +1.5/h，控制 -1/h"
+        )
+    }
+
+@router.get("/intimacy/events")
+def get_intimacy_events(type: str = "all"):
+    """
+    V3：事件日誌時間軸（給「事件日誌」Tab 用）
+    全部為架構預留假資料，V4 補上真實資料庫邏輯。
+    """
+    from app.intimacy.event_log import get_event_timeline
+    return {"events": get_event_timeline(type)}
+
 @router.get("/conversation")
 def get_conversation():
     """

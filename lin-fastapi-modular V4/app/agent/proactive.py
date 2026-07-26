@@ -12,6 +12,7 @@
 from datetime import datetime
 
 from app import db
+from app.event_bus import event_bus
 from app.state import state
 from app.agent.brain import generate_reply, write_daily_journal
 from app.notify.bark import send_to_bark
@@ -68,6 +69,7 @@ def _run_nudge_check():
     # Lin 可以选择不发送：如果回复是「不发」，就跳过推送
     if reply.strip() == "不发":
         state.add_log("主動推送", "Lin 判断现在不适合打扰，选择不发送")
+        event_bus.emit("initiative", "💭 Lin 判斷現在不適合打擾，選擇沉默")
         state.mark_conversation_anchor()  # 仍然记录这次判断，避免频繁重试
         return
     
@@ -75,6 +77,7 @@ def _run_nudge_check():
     state.add_conversation_turn("lin", reply, thinking=thinking)
     send_to_bark(reply)
     state.add_log("主動推送", reply)
+    event_bus.emit("initiative", f"💬 Lin 主動開口：{reply[:50]}{'…' if len(reply) > 50 else ''}")
 
     # 主动开口本身也是一次"锚点"，避免几分钟后又立刻再触发一次
     state.mark_conversation_anchor()

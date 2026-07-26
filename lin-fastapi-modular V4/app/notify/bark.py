@@ -11,6 +11,7 @@ Bark 推送封装。
 import requests
 
 from app import config
+from app.event_bus import event_bus
 from app.state import state
 
 
@@ -27,3 +28,4 @@ def send_to_bark(message, title="Lin"):
         except Exception as e:
             print(f"[bark] 推送失败 ({key}): {e}")
     state.add_log("推送", message)
+    event_bus.emit("bark", f"📲 {message[:60]}{'…' if len(message) > 60 else ''}")

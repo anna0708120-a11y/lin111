@@ -14,6 +14,7 @@ from app import db
 from app.agent.brain import generate_reply, generate_reply_stream
 from app.context.auth import verify_context_token
 from app.context import mac as mac_context
+from app.event_bus import event_bus
 from app.notify.bark import send_to_bark
 from app.state import state
 from app.web.pwa import MANIFEST_JSON, SERVICE_WORKER_JS
@@ -109,6 +110,11 @@ def observe_anna(activity: Activity):
             "X-Accel-Buffering": "no"  # 防止 Nginx 緩衝
         }
     )
+
+@router.get("/events")
+def get_events():
+    """System Monitor Event Bus 快照，給 Home UI 使用。"""
+    return event_bus.get_snapshot()
 
 @router.get("/logs")
 def get_logs():
@@ -212,6 +218,22 @@ def update_mac_status(payload: MacStatus):
     （鉴权逻辑集中在 app/context/auth.py，见 verify_context_token）。
     """
     mac_context.save_mac_status(payload.dict(exclude_none=True))
+    # 組合人類可讀的訊息，寫入 Event Bus（Persistent，覆蓋）
+    parts = []
+    if payload.asleep is True:
+        parts.append("Mac 休眠中")
+    elif payload.locked is True:
+        parts.append("Mac 已鎖定")
+    else:
+        parts.append("Mac 運作中")
+    if payload.cpu is not None:
+        parts.append(f"CPU {payload.cpu:.0f}%")
+    if payload.ram is not None:
+        parts.append(f"RAM {payload.ram:.0f}%")
+    if payload.battery is not None:
+        charging_str = " ⚡" if payload.charging else ""
+        parts.append(f"電量 {payload.battery}%{charging_str}")
+    event_bus.emit("mac", "  ·  ".join(parts))
     return {"status": "Success"}
 
 @router.post("/context/screentime", dependencies=[Depends(verify_context_token)])
@@ -222,6 +244,10 @@ def update_screentime(payload: ScreenTimePayload):
     """
     from app.context import screentime as screentime_context
     screentime_context.save_screentime(payload.dict(exclude_none=True))
+    if payload.total_minutes is not None:
+        hrs, mins = divmod(payload.total_minutes, 60)
+        msg = f"今日螢幕使用 {hrs}h {mins}m" if hrs else f"今日螢幕使用 {mins}m"
+        event_bus.emit("screentime", msg)
     return {"status": "Success"}
 
 @router.post("/context/location", dependencies=[Depends(verify_context_token)])
@@ -232,6 +258,8 @@ def update_location(payload: LocationPayload):
     """
     from app.context import location as location_context
     location_context.save_location(payload.dict(exclude_none=True))
+    loc_label = payload.label or f"{payload.latitude:.3f}, {payload.longitude:.3f}" if payload.latitude else "未知位置"
+    event_bus.emit("location", f"目前位置：{loc_label}")
     return {"status": "Success"}
 
 # ========== 经期记录 API ==========

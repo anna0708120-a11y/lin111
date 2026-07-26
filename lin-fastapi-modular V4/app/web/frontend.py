@@ -1147,15 +1147,47 @@ document.getElementById('ci').addEventListener('keypress',e=>{if(e.key==='Enter'
 
 async function llogs(){
   try{
-    const r=await fetch(AU+'/logs');const d=await r.json();
-    const lc=document.getElementById('lc');
-    const sysLogs=[...d.logs].filter(l=>l.type!=='AI回复').reverse().slice(0,15);
-    if(sysLogs.length>0){lc.innerHTML=sysLogs.map(l=>'<div class="li"><div class="lm"><span class="lt">'+l.type+'</span><span class="ltime">'+l.time+'</span></div><div>'+l.content+'</div></div>').join('');}
-    else{lc.innerHTML='<div class="es">📡 等待系統事件...</div>';}
+    // 同時拉 logs（配額 / 備忘）和 events（Event Bus 快照）
+    const [lr, er] = await Promise.all([fetch(AU+'/logs'), fetch(AU+'/events')]);
+    const d = await lr.json();
+    const ev = er.ok ? await er.json() : null;
+
+    // ── 備忘欄 / 配額（不變）──────────────────────────
     const nc=document.getElementById('nc');
     if(d.notes&&d.notes.length>0){nc.innerHTML=[...d.notes].reverse().map(n=>'<div class="ni"><div class="nt">'+n.time+'</div>'+n.content+'</div>').join('');}
     if(d.quota!==undefined){const p=Math.round((d.quota/180)*100);document.getElementById('qf').style.width=p+'%';document.getElementById('qt').textContent=(180-d.quota)+' 次剩餘';}
-  }catch(e){}
+
+    // ── 監控卡片：Event Bus 優先，降級到舊 /logs ──────
+    const lc=document.getElementById('lc');
+    if(ev){
+      let html='';
+      // 持久狀態列（Mac / 定位 / 螢幕）
+      const PORDER=['mac','location','screentime','weather'];
+      const pItems=PORDER.map(k=>ev.persistent[k]).filter(Boolean);
+      if(pItems.length>0){
+        html+='<div style="display:flex;flex-wrap:wrap;gap:6px;padding:4px 0 10px">';
+        html+=pItems.map(e=>'<div style="font-size:11px;background:var(--blush);color:var(--rose-deep);border-radius:8px;padding:3px 8px;line-height:1.4"><span style="opacity:.65">'+e.time+'</span>  '+e.message+'</div>').join('');
+        html+='</div>';
+      }
+      // 活動流
+      const acts=ev.activity||[];
+      const LEVEL_COLOR={info:'var(--rose-deep)',warn:'#b86e00',alert:'#c0392b'};
+      if(acts.length>0){
+        html+=acts.map(e=>{
+          const col=LEVEL_COLOR[e.level]||'var(--rose-deep)';
+          return '<div class="li"><div class="lm"><span class="lt" style="color:'+col+'">'+e.type+'</span><span class="ltime">'+e.time+'</span></div><div>'+e.message+'</div></div>';
+        }).join('');
+      } else if(pItems.length===0){
+        html='<div class="es">📡 等待系統事件...</div>';
+      }
+      lc.innerHTML=html;
+    } else {
+      // 降級：舊 /logs 邏輯
+      const sysLogs=[...d.logs].filter(l=>l.type!=='AI回复').reverse().slice(0,15);
+      if(sysLogs.length>0){lc.innerHTML=sysLogs.map(l=>'<div class="li"><div class="lm"><span class="lt">'+l.type+'</span><span class="ltime">'+l.time+'</span></div><div>'+l.content+'</div></div>').join('');}
+      else{lc.innerHTML='<div class="es">📡 等待系統事件...</div>';}
+    }
+  }catch(e){console.error('[llogs]',e);}
 }
 
 const TM={'长期记忆':'lt','短期记忆':'st','Relationship':'rl','Reflection':'rf'};

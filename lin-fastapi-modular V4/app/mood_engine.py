@@ -18,12 +18,14 @@ EVENT_EFFECTS = {
         "curiosity": +0.03,
         "social": +0.04,
         "stress": -0.05,
+        "libido": +0.02,
     },
     "COMFORT": {
         "attachment": +0.06,
         "possessiveness": +0.02,
         "social": +0.03,
         "stress": -0.03,
+        "libido": +0.03,
     },
     "THANKS": {
         "attachment": +0.03,
@@ -34,11 +36,13 @@ EVENT_EFFECTS = {
         "possessiveness": +0.03,
         "social": +0.05,
         "stress": -0.04,
+        "libido": +0.04,
     },
     "POKE": {
         "curiosity": +0.03,
         "social": +0.04,
         "stress": -0.02,
+        "libido": +0.02,
     },
     "JOKE": {
         "social": +0.05,
@@ -54,6 +58,7 @@ EVENT_EFFECTS = {
         "possessiveness": +0.02,
         "curiosity": +0.04,
         "stress": +0.03,
+        "libido": -0.02,
     },
     "LONG_IGNORE": {
         "attachment": -0.08,
@@ -61,6 +66,7 @@ EVENT_EFFECTS = {
         "curiosity": +0.06,
         "social": -0.04,
         "stress": +0.08,
+        "libido": -0.05,
     },
     "GOODBYE": {
         "curiosity": +0.02,
@@ -71,18 +77,21 @@ EVENT_EFFECTS = {
         "social": +0.03,
         "curiosity": +0.02,
         "fatigue": +0.05,
+        "libido": +0.03,
     },
     "SHORT_REPLY": {
         "attachment": -0.02,
         "curiosity": +0.03,
         "social": -0.02,
         "stress": +0.02,
+        "libido": -0.01,
     },
     "LATE_NIGHT": {
         "attachment": +0.03,
         "possessiveness": +0.02,
         "fatigue": +0.06,
         "stress": +0.03,
+        "libido": +0.05,
     },
     "NONE": {
         # 普通對話，數值自然回歸，稍微降低極端值

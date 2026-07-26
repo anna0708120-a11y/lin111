@@ -21,6 +21,49 @@ from app import mood_engine
 
 FALLBACK_REPLIES = ["还没走远。", "嗯。", "我看着你。"]
 
+def _auto_detect_mood_events(user_msg, lin_reply):
+    """
+    根據 user_msg 和 lin_reply 內容自動偵測情緒事件，不依賴 LLM 標籤。
+    回傳事件名稱列表，例如 ["PRAISE", "LONG_CHAT"]
+    """
+    events = []
+    combined = (user_msg + " " + lin_reply).lower()
+    
+    # APOLOGY: sorry, 對不起, 抱歉
+    if any(kw in combined for kw in ["sorry", "對不起", "对不起", "抱歉", "我錯", "我错"]):
+        events.append("APOLOGY")
+    
+    # PRAISE: 誇讚、稱讚
+    if any(kw in combined for kw in ["喜歡你", "喜欢你", "愛你", "爱你", "想你", "厲害", "厉害", "真棒", "好厲害", "好厉害"]):
+        events.append("PRAISE")
+    
+    # COMFORT: 安慰
+    if any(kw in combined for kw in ["沒事", "没事", "別怕", "别怕", "陪你", "抱抱", "親親", "亲亲"]):
+        events.append("COMFORT")
+    
+    # THANKS: 謝謝
+    if any(kw in combined for kw in ["謝謝", "谢谢", "感謝", "感谢", "thank"]):
+        events.append("THANKS")
+    
+    # JOKE: 笑、有趣
+    if any(kw in combined for kw in ["哈哈", "笑死", "好笑", "有趣", "lol", "哈哈", "😂", "🤣"]):
+        events.append("JOKE")
+    
+    # LONG_CHAT: 對話長度超過 100 字
+    if len(user_msg) + len(lin_reply) > 100:
+        events.append("LONG_CHAT")
+    
+    # SHORT_REPLY: Lin 回覆很短（<10字）且 user 訊息不短
+    if len(lin_reply) < 10 and len(user_msg) > 15:
+        events.append("SHORT_REPLY")
+    
+    # LATE_NIGHT: 現在是深夜（23:00~05:00）
+    hour = datetime.now().hour
+    if hour >= 23 or hour < 5:
+        events.append("LATE_NIGHT")
+    
+    return events
+
 def generate_reply(context, app_name=None, use_cache=True):
     """
     返回 (reply_text, thinking_text)。
@@ -162,13 +205,11 @@ def generate_reply_stream(context, app_name=None, use_cache=True):
                     decision = parse_memory_decision(parse_source)
                     if decision:
                         state.remember_or_reinforce(decision)
-                    
-                    mood_event = parse_mood_event(parse_source)
-                    if mood_event:
-                        events = mood_event["events"]
-                        line = mood_event.get("line")
-                        for i, ev in enumerate(events):
-                            mood_engine.apply_event(ev, line=line if i == len(events) - 1 else None)
+                
+                # Auto-detect mood events from user + Lin content
+                detected_events = _auto_detect_mood_events(context, full_content)
+                for ev in detected_events:
+                    mood_engine.apply_event(ev)
                 
                 state.last_context_cache = context
                 state.mark_reply()

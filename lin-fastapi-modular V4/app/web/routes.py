@@ -54,6 +54,7 @@ class ScreenTimePayload(BaseModel):
     """iPhone 快捷指令定期上传屏幕使用时间。字段都设成可选。"""
     total_minutes: Optional[int] = None
     date: Optional[str] = None  # YYYY-MM-DD
+    apps: Optional[list] = None  # [{"name": "Instagram", "minutes": 30}, ...]
 
 class LocationPayload(BaseModel):
     """iPhone 快捷指令上传定位。字段都设成可选。"""
@@ -238,15 +239,16 @@ def update_mac_status(payload: MacStatus):
 
 @router.post("/context/screentime", dependencies=[Depends(verify_context_token)])
 def update_screentime(payload: ScreenTimePayload):
-    """
-    iPhone 快捷指令定期上传屏幕使用时间，存进 context_state 表的 source='screentime'。
-    需要 header: Authorization: Bearer <TOKEN>。
-    """
     from app.context import screentime as screentime_context
     screentime_context.save_screentime(payload.dict(exclude_none=True))
     if payload.total_minutes is not None:
         hrs, mins = divmod(payload.total_minutes, 60)
         msg = f"今日螢幕使用 {hrs}h {mins}m" if hrs else f"今日螢幕使用 {mins}m"
+        # 若有 app 明細，附上前3個
+        if payload.apps:
+            top = payload.apps[:3]
+            app_str = "  |  ".join(f"{a.get('name','?')} {a.get('minutes','?')}m" for a in top)
+            msg += f"  （{app_str}）"
         event_bus.emit("screentime", msg)
     return {"status": "Success"}
 

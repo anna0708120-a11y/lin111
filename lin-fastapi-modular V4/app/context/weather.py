@@ -9,6 +9,17 @@ import requests
 
 from app import config, db
 
+# 天气码 → 簡易描述
+_WMO = {
+    0: "晴天", 1: "大致晴朗", 2: "局部多雲", 3: "陰天",
+    45: "霧", 48: "霧凇",
+    51: "毛毛雨", 53: "毛毛雨", 55: "毛毛雨",
+    61: "小雨", 63: "中雨", 65: "大雨",
+    71: "小雪", 73: "中雪", 75: "大雪",
+    80: "陣雨", 81: "陣雨", 82: "強陣雨",
+    95: "雷雨", 96: "雷雨夾冰雹", 99: "雷雨夾冰雹",
+}
+
 def get_weather():
     if not config.ENABLE_WEATHER:
         return None
@@ -41,6 +52,20 @@ def get_weather():
             "weather_code": data.get("weather_code"),
         }
         db.save_context("weather", payload)
+
+        # 寫入 Event Bus（Persistent，覆蓋）
+        try:
+            from app.event_bus import event_bus
+            desc = _WMO.get(payload.get("weather_code"), "")
+            msg = f"{payload['temperature']}°C"
+            if desc:
+                msg += f"  {desc}"
+            if payload.get("humidity") is not None:
+                msg += f"  濕度 {payload['humidity']}%"
+            event_bus.emit("weather", msg)
+        except Exception:
+            pass
+
         return payload
     except Exception as e:
         print(f"[context.weather] 拉取天气失败: {e}")

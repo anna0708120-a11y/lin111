@@ -123,6 +123,13 @@ class AppState:
             ),
             maxlen=chat_limit,
         )
+        
+        # Intimacy Engine 狀態（V1 新增）
+        self.cycle_key = "stable"
+        self.cycle_started_at = None
+        self.cycle_expires_at = None
+        self.body_values = {"tension": 20, "heat": 30, "sensitivity": 25, "control": 80}
+        self.last_tick_at = None
 
     # ---------- 日志 ----------
     # ---------- 聊天记录配置 ----------

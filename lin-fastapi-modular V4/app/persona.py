@@ -57,6 +57,13 @@ def build_system_prompt(context, memory_summary="", world_context="", conversati
         f"互動意願：{willingness}\n"
         f"此刻氛圍：{atmosphere}\n"
     )
+    
+    # Intimacy Engine V1：身體狀態（自然語言描述，不顯示數字）
+    from datetime import datetime
+    from app.intimacy.prompt import build_intimacy_prompt
+    intimacy_body_text = build_intimacy_prompt(state, datetime.now())
+    if intimacy_body_text:
+        intimacy_text += f"\n\n{intimacy_body_text}"
 
     return (
         PERSONA_CORE

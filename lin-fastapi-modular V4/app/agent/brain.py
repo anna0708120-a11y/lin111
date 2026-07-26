@@ -86,6 +86,11 @@ def generate_reply(context, app_name=None, use_cache=True):
     返回 (reply_text, thinking_text)。
     thinking_text 是清理过、可以直接显示给Anna看的思考内容；命中缓存或没配置API key时是 None。
     """
+    # V1 新增：對話前先 tick 身體狀態
+    from datetime import datetime
+    from app.intimacy.tick import tick_and_update
+    tick_and_update(state, datetime.now())
+    
     if use_cache and state.last_context_cache == context and state.last_reply_at:
         if datetime.now() - state.last_reply_at < timedelta(minutes=2):
             return random.choice(FALLBACK_REPLIES), None

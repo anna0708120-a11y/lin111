@@ -163,18 +163,40 @@ def get_intimacy():
 @router.get("/intimacy/status")
 def get_intimacy_status():
     """
-    V3：周期 + 事件當前狀態（給身體狀態卡片「當前狀態」區塊用）
-    全部為架構預留假資料，V4 補上真實邏輯。
+    V1：周期 + 身體數值當前狀態（給身體狀態卡片「當前狀態」區塊用）
+    回傳真實計算的數值
     """
-    from app.intimacy.cycle import get_current_cycle
-    from app.intimacy.event_log import get_current_event
+    from datetime import datetime
+    from app.intimacy.cycle import get_current_cycle, get_cycle_progress
+    from app.intimacy.tick import tick_and_update
+    
+    # 先 tick 確保數值最新
+    tick_and_update(state, datetime.now())
+    
+    cycle = get_current_cycle(state)
+    progress = get_cycle_progress(state, datetime.now())
+    body_values = getattr(state, 'body_values', {})
+    
+    # 計算周期經過時間
+    hours_elapsed = 0
+    if hasattr(state, 'cycle_started_at') and state.cycle_started_at:
+        hours_elapsed = (datetime.now() - state.cycle_started_at).total_seconds() / 3600.0
+    
     return {
-        "cycle": get_current_cycle(),
-        "event": get_current_event(),
+        "cycle": {
+            "key": cycle.key,
+            "label": cycle.label,
+            "description": cycle.description,
+            "progress": f"{progress * 100:.1f}%",
+            "hours_elapsed": int(hours_elapsed)
+        },
+        "body_values": body_values,
         "auto_change_desc": (
-            "平穩期基線：熱度 30 -1.4/h，壓抑 25 -1.7/h，控制 75 +1/h，"
-            "敏感 35 -1.7/h，蓄積 +0.4/h，占有 42 -3.7/h，疲惫 16 -1.2/h\n\n"
-            "等待焦躁疊加：占有 +1.4/h，壓抑 +1.5/h，控制 -1/h"
+            f"{cycle.label}基線：\n"
+            f"tension(蓄積感) → {cycle.targets['tension']:.0f} ({cycle.growth_rates['tension']:+.1f}/h)\n"
+            f"heat(熱度) → {cycle.targets['heat']:.0f} ({cycle.growth_rates['heat']:+.1f}/h)\n"
+            f"sensitivity(敏感度) → {cycle.targets['sensitivity']:.0f} ({cycle.growth_rates['sensitivity']:+.1f}/h)\n"
+            f"control(控制力) → {cycle.targets['control']:.0f} ({cycle.growth_rates['control']:+.1f}/h)"
         )
     }
 

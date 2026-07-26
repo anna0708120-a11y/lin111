@@ -148,6 +148,32 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 .qb{display:flex;align-items:center;padding:6px 0;font-size:11px;color:var(--muted);gap:10px;}
 .qt{flex:1;height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
 .qf{height:100%;background:var(--rose);border-radius:2px;transition:width .3s;}
+
+/* 親密狀態卡片 */
+.intimacy-card{cursor:default;}
+.intimacy-header{display:flex;align-items:center;justify-content:space-between;cursor:pointer;margin-bottom:0;}
+.intimacy-header .cl{margin-bottom:0;}
+.intimacy-toggle{font-size:11px;color:var(--muted);transition:transform .25s ease;}
+.intimacy-toggle.open{transform:rotate(180deg);}
+.intimacy-content{margin-top:14px;animation:intimacyFadeIn .25s ease;}
+@keyframes intimacyFadeIn{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:translateY(0);}}
+.intimacy-status{display:flex;gap:10px;margin-bottom:14px;}
+.intimacy-item{flex:1;background:var(--blush);border-radius:12px;padding:10px 12px;}
+.intimacy-label{font-size:10px;color:var(--muted);margin-bottom:4px;letter-spacing:.05em;}
+.intimacy-value{font-size:16px;font-weight:600;color:var(--rose-deep);}
+.intimacy-body{display:flex;flex-direction:column;gap:12px;margin-bottom:14px;}
+.body-bar{background:var(--blush);border-radius:12px;padding:10px 12px;}
+.body-bar-header{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+.body-icon{font-size:14px;width:22px;height:22px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:var(--white);flex-shrink:0;}
+.body-label{font-size:13px;font-weight:500;color:var(--dark);flex:1;}
+.body-value{font-size:13px;font-weight:600;color:var(--rose-deep);display:flex;align-items:center;gap:4px;}
+.body-value .body-level{font-size:11px;font-weight:400;color:var(--muted);}
+.body-bar-track{height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin-bottom:6px;}
+.body-bar-fill{height:100%;border-radius:3px;transition:width .4s ease;}
+.body-desc{font-size:11px;color:var(--muted);line-height:1.4;}
+.intimacy-atmosphere{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:linear-gradient(90deg,var(--blush),transparent);border-radius:12px;}
+.atmosphere-label{font-size:11px;color:var(--muted);}
+.atmosphere-value{font-size:14px;font-weight:600;color:var(--rose-deep);}
 .wm{text-align:center;font-size:9px;color:var(--border);padding:8px 0;font-family:'DM Serif Display',serif;}
 .mtabs{display:flex;gap:6px;margin-bottom:14px;overflow-x:auto;padding-bottom:4px;}
 .mtab{padding:5px 12px;border-radius:20px;font-size:11px;border:1.5px solid var(--border);background:var(--white);color:var(--muted);cursor:pointer;white-space:nowrap;}
@@ -390,6 +416,174 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
     </div>
   </div>
 
+  <!-- 親密狀態卡片 -->
+  <div class="card intimacy-card">
+    <div class="intimacy-header" onclick="toggleIntimacy()">
+      <div class="cl">身體狀態</div>
+      <div class="intimacy-toggle" id="intimacyToggle">▼</div>
+    </div>
+    <div class="intimacy-content" id="intimacyContent" style="display:none;">
+      <div class="intimacy-status">
+        <div class="intimacy-item">
+          <div class="intimacy-label">關係階段</div>
+          <div class="intimacy-value" id="intimacyStage">戀人</div>
+        </div>
+        <div class="intimacy-item">
+          <div class="intimacy-label">互動意願</div>
+          <div class="intimacy-value" id="intimacyWill">中</div>
+        </div>
+      </div>
+      
+      <!-- V2 身體狀態預留 -->
+      <div class="intimacy-body" id="intimacyBody" style="display:none;">
+        <div class="body-bar">
+          <div class="body-bar-header">
+            <span class="body-icon">💧</span>
+            <span class="body-label">蓄積感</span>
+            <span class="body-value"><span id="tensionVal">0</span> <span class="body-level">低</span></span>
+          </div>
+          <div class="body-bar-track"><div class="body-bar-fill" id="tensionBar" style="width:0%;background:linear-gradient(90deg,#B794F6,#9F7AEA)"></div></div>
+          <div class="body-desc">V2 功能預留</div>
+        </div>
+        
+        <div class="body-bar">
+          <div class="body-bar-header">
+            <span class="body-icon">🔥</span>
+            <span class="body-label">熱度</span>
+            <span class="body-value"><span id="heatVal">0</span> <span class="body-level">低</span></span>
+          </div>
+          <div class="body-bar-track"><div class="body-bar-fill" id="heatBar" style="width:0%;background:linear-gradient(90deg,#FC8181,#F56565)"></div></div>
+          <div class="body-desc">V2 功能預留</div>
+        </div>
+        
+        <div class="body-bar">
+          <div class="body-bar-header">
+            <span class="body-icon">⚡</span>
+            <span class="body-label">敏感度</span>
+            <span class="body-value"><span id="sensVal">0</span> <span class="body-level">低</span></span>
+          </div>
+          <div class="body-bar-track"><div class="body-bar-fill" id="sensBar" style="width:0%;background:linear-gradient(90deg,#B794F6,#9F7AEA)"></div></div>
+          <div class="body-desc">V2 功能預留</div>
+        </div>
+        
+        <div class="body-bar">
+          <div class="body-bar-header">
+            <span class="body-icon">🛡️</span>
+            <span class="body-label">控制力</span>
+            <span class="body-value"><span id="ctrlVal">0</span> <span class="body-level">低</span></span>
+          </div>
+          <div class="body-bar-track"><div class="body-bar-fill" id="ctrlBar" style="width:0%;background:linear-gradient(90deg,#63B3ED,#4299E1)"></div></div>
+          <div class="body-desc">V2 功能預留</div>
+        </div>
+      </div>
+      
+      <div class="intimacy-atmosphere">
+        <div class="atmosphere-label">目前狀態</div>
+        <div class="atmosphere-value" id="intimacyAtmo">平靜相處</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 親密引擎卡片 -->
+  <div class="card intimacy-card">
+    <div class="cl" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleIntimacy()">
+      <span>身體狀態</span>
+      <span id="intimacy-toggle" style="font-size:14px;color:var(--rose)">展開 ▼</span>
+    </div>
+    <div id="intimacy-content" style="display:none;margin-top:12px">
+      <div style="display:flex;gap:8px;margin-bottom:16px;font-size:13px">
+        <div style="flex:1;background:var(--blush);padding:8px 12px;border-radius:8px;text-align:center">
+          <div style="opacity:.6;margin-bottom:4px">關係階段</div>
+          <div style="font-weight:600;color:var(--rose-deep)" id="intimacy-relationship">戀人</div>
+        </div>
+        <div style="flex:1;background:var(--blush);padding:8px 12px;border-radius:8px;text-align:center">
+          <div style="opacity:.6;margin-bottom:4px">互動意願</div>
+          <div style="font-weight:600;color:var(--rose-deep)" id="intimacy-willingness">中</div>
+        </div>
+      </div>
+      
+      <!-- 身體狀態進度條 -->
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <!-- 蓄積感 -->
+        <div style="background:linear-gradient(135deg, #f3e7f9 0%, #e8d4f2 100%);padding:12px;border-radius:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="font-size:16px">💧</span>
+              <span style="font-weight:500;color:#7b4397">蓄積感</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span id="intimacy-tension-val" style="font-weight:600;color:#7b4397">37</span>
+              <span style="font-size:12px;opacity:.7;color:#7b4397">中低</span>
+            </div>
+          </div>
+          <div style="background:rgba(255,255,255,.5);height:8px;border-radius:4px;overflow:hidden">
+            <div id="intimacy-tension-bar" style="background:linear-gradient(90deg, #9b59b6, #b168d6);height:100%;width:37%;transition:width .3s"></div>
+          </div>
+          <div style="font-size:11px;margin-top:6px;opacity:.75;color:#7b4397">有一點沒說出口的念，但還不太重</div>
+        </div>
+        
+        <!-- 熱度 -->
+        <div style="background:linear-gradient(135deg, #ffe8e8 0%, #ffd4d4 100%);padding:12px;border-radius:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="font-size:16px">🔥</span>
+              <span style="font-weight:500;color:#d64545">熱度</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span id="intimacy-heat-val" style="font-weight:600;color:#d64545">38</span>
+              <span style="font-size:12px;opacity:.7;color:#d64545">中低</span>
+            </div>
+          </div>
+          <div style="background:rgba(255,255,255,.5);height:8px;border-radius:4px;overflow:hidden">
+            <div id="intimacy-heat-bar" style="background:linear-gradient(90deg, #ff6b6b, #ff8787);height:100%;width:38%;transition:width .3s"></div>
+          </div>
+          <div style="font-size:11px;margin-top:6px;opacity:.75;color:#d64545">身體有一點熱意，但還能很快收住</div>
+        </div>
+        
+        <!-- 壓抑感 -->
+        <div style="background:linear-gradient(135deg, #e8f0fe 0%, #d4e4fc 100%);padding:12px;border-radius:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="font-size:16px">📊</span>
+              <span style="font-weight:500;color:#4a6fa5">壓抑感</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span id="intimacy-control-val" style="font-weight:600;color:#4a6fa5">69</span>
+              <span style="font-size:12px;opacity:.7;color:#4a6fa5">中高</span>
+            </div>
+          </div>
+          <div style="background:rgba(255,255,255,.5);height:8px;border-radius:4px;overflow:hidden">
+            <div id="intimacy-control-bar" style="background:linear-gradient(90deg, #667eea, #8ba4f9);height:100%;width:69%;transition:width .3s"></div>
+          </div>
+          <div style="font-size:11px;margin-top:6px;opacity:.75;color:#4a6fa5">還能維持表面正常，但需要刻意壓住直接的欲望</div>
+        </div>
+        
+        <!-- 敏感度 -->
+        <div style="background:linear-gradient(135deg, #fef0ff 0%, #f9e0ff 100%);padding:12px;border-radius:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="font-size:16px">✨</span>
+              <span style="font-weight:500;color:#a855f7">敏感度</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span id="intimacy-sensitivity-val" style="font-weight:600;color:#a855f7">100</span>
+              <span style="font-size:12px;opacity:.7;color:#a855f7">高</span>
+            </div>
+          </div>
+          <div style="background:rgba(255,255,255,.5);height:8px;border-radius:4px;overflow:hidden">
+            <div id="intimacy-sensitivity-bar" style="background:linear-gradient(90deg, #c084fc, #d8b4fe);height:100%;width:100%;transition:width .3s"></div>
+          </div>
+          <div style="font-size:11px;margin-top:6px;opacity:.75;color:#a855f7">積累到頂，普通觸碰已經很難抵住</div>
+        </div>
+      </div>
+      
+      <div style="margin-top:16px;padding:12px;background:var(--blush);border-radius:8px;text-align:center">
+        <div style="font-size:12px;opacity:.6;margin-bottom:4px">目前狀態</div>
+        <div style="font-weight:600;color:var(--rose-deep);font-size:15px" id="intimacy-atmosphere">特別黏人</div>
+      </div>
+    </div>
+  </div>
+
   <div class="card"><div class="cl">今日 API 配額</div><div class="qb"><span>0</span><div class="qt"><div class="qf" id="qf" style="width:0%"></div></div><span id="qt">180 次</span></div></div>
   <div class="card"><div class="cl">實時監控日誌</div><div id="lc"><div class="es">📡 等待監控觸發...</div></div></div>
   <div class="card"><div class="cl">今日碎碎念</div><div id="nc"><div class="es">🖤 今天還沒寫</div></div></div>
@@ -600,6 +794,63 @@ async function loadMood(){
     const r=await fetch(AU+'/mood');const d=await r.json();
     renderMood(d.mood);
   }catch(e){}
+}
+
+let intimacyOpen=false;
+function toggleIntimacy(){
+  intimacyOpen=!intimacyOpen;
+  const content=document.getElementById('intimacyContent');
+  const toggle=document.getElementById('intimacyToggle');
+  if(content) content.style.display = intimacyOpen ? 'block' : 'none';
+  if(toggle) toggle.classList.toggle('open', intimacyOpen);
+  if(intimacyOpen) loadIntimacy();
+}
+
+function bodyLevelLabel(pct){
+  if(pct<25) return '低';
+  if(pct<50) return '中低';
+  if(pct<75) return '中高';
+  return '高';
+}
+
+async function loadIntimacy(){
+  try{
+    const r=await fetch(AU+'/intimacy');const d=await r.json();
+    renderIntimacy(d);
+  }catch(e){}
+}
+
+function renderIntimacy(d){
+  if(!d)return;
+  const stageEl=document.getElementById('intimacyStage');
+  const willEl=document.getElementById('intimacyWill');
+  const atmoEl=document.getElementById('intimacyAtmo');
+  if(stageEl) stageEl.textContent = d.relationship_stage || '戀人';
+  if(willEl) willEl.textContent = d.willingness || '中';
+  if(atmoEl) atmoEl.textContent = d.atmosphere || '平靜相處';
+
+  // V2 身體狀態：目前後端回傳 null，先隱藏區塊；未來有數值時自動顯示
+  const bs = d.body_state || {};
+  const bodyWrap = document.getElementById('intimacyBody');
+  const hasBodyState = bs.heat!=null || bs.sensitivity!=null || bs.control!=null || bs.tension!=null;
+  if(bodyWrap) bodyWrap.style.display = hasBodyState ? 'flex' : 'none';
+  if(hasBodyState){
+    const setBar=(key,val,barId,valId)=>{
+      const pct = Math.max(0,Math.min(100,Math.round((val||0)*100)));
+      const bar=document.getElementById(barId), lbl=document.getElementById(valId);
+      if(bar) bar.style.width = pct+'%';
+      if(lbl) lbl.textContent = pct;
+      const track=bar ? bar.closest('.body-bar') : null;
+      if(track){
+        const levelEl=track.querySelector('.body-level');
+        if(levelEl) levelEl.textContent = bodyLevelLabel(pct);
+      }
+    };
+    setBar('tension', bs.tension, 'tensionBar', 'tensionVal');
+    setBar('heat', bs.heat, 'heatBar', 'heatVal');
+    setBar('sensitivity', bs.sensitivity, 'sensBar', 'sensVal');
+    setBar('control', bs.control, 'ctrlBar', 'ctrlVal');
+  }
 }
 
 function renderMood(mood){
@@ -1190,6 +1441,59 @@ async function llogs(){
   }catch(e){console.error('[llogs]',e);}
 }
 
+// ── 親密引擎 ──────────────────────────────────
+let intimacyLoaded=false;
+let intimacyExpanded=false;
+
+function toggleIntimacy(){
+  intimacyExpanded=!intimacyExpanded;
+  const content=document.getElementById('intimacy-content');
+  const toggle=document.getElementById('intimacy-toggle');
+  if(intimacyExpanded){
+    content.style.display='block';
+    toggle.textContent='收起 ▲';
+    if(!intimacyLoaded){ rintimacy(); intimacyLoaded=true; }
+  } else {
+    content.style.display='none';
+    toggle.textContent='展開 ▼';
+  }
+}
+
+function intimacyLevel(val){
+  // val: 0-100
+  if(val<25) return '低';
+  if(val<45) return '中低';
+  if(val<70) return '中高';
+  return '高';
+}
+
+async function rintimacy(){
+  try{
+    const r=await fetch(AU+'/intimacy');
+    const d=await r.json();
+    document.getElementById('intimacy-relationship').textContent=d.relationship||'戀人';
+    document.getElementById('intimacy-willingness').textContent=d.willingness||'中';
+    document.getElementById('intimacy-atmosphere').textContent=d.atmosphere||'慢慢靠近';
+
+    const bs=d.body_state||{};
+    const fields=[
+      ['tension', bs.tension],
+      ['heat', bs.heat],
+      ['control', bs.control],
+      ['sensitivity', bs.sensitivity],
+    ];
+    fields.forEach(([key,val])=>{
+      const pct=Math.round((val||0)*100);
+      const bar=document.getElementById('intimacy-'+key+'-bar');
+      const num=document.getElementById('intimacy-'+key+'-val');
+      if(bar) bar.style.width=pct+'%';
+      if(num) num.textContent=pct;
+      const levelEl=num?num.nextElementSibling:null;
+      if(levelEl) levelEl.textContent=intimacyLevel(pct);
+    });
+  }catch(e){console.error('[rintimacy]',e);}
+}
+
 const TM={'长期记忆':'lt','短期记忆':'st','Relationship':'rl','Reflection':'rf'};
 const MEMORY_TAB_IDS=['lt','st','rl','rf'];
 
@@ -1254,7 +1558,7 @@ async function delmem(id){
   rmem();
 }
 
-syncChat();llogs();setInterval(()=>{llogs();if(document.getElementById('tb-monitor').classList.contains('active'))loadMood();},10000);
+syncChat();llogs();setInterval(()=>{llogs();if(document.getElementById('tb-monitor').classList.contains('active')){loadMood();if(intimacyOpen)loadIntimacy();}},10000);
 
 // ========== 经期记录功能 ==========
 let periodData = { records: [], cycle: 28 };

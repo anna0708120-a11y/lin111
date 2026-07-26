@@ -151,6 +151,15 @@ def get_logs():
         "quota": state.daily_count.get("count", 0),
     }
 
+@router.get("/intimacy")
+def get_intimacy():
+    """
+    親密引擎狀態查詢（給 Home UI 的身體狀態卡片用）
+    返回：關係階段、互動意願、親密氛圍、身體狀態（V2預留）
+    """
+    from app.intimacy.engine import get_intimacy_state
+    return get_intimacy_state(state.mood)
+
 @router.get("/conversation")
 def get_conversation():
     """
@@ -222,6 +231,33 @@ def update_settings(payload: ProactiveSettings):
 def get_mood():
     """给状态面板用：Lin目前的状态自评。"""
     return {"mood": state.mood}
+
+@router.get("/intimacy")
+def get_intimacy():
+    """
+    親密引擎狀態快照，供 Home UI 使用。
+    
+    返回：
+    {
+        "relationship_stage": "戀人",
+        "willingness": "高",
+        "atmosphere": "特別黏人",
+        "body_state": {
+            "heat": null,       # V2 實作
+            "sensitivity": null,
+            "control": null,
+            "tension": null
+        }
+    }
+    """
+    from app.intimacy.engine import get_intimacy_snapshot
+    
+    # 讀取最近對話內容（最後 3 輪）
+    recent_turns = state.conversation_history[-3:] if state.conversation_history else []
+    recent_context = " ".join(turn.get("content", "") for turn in recent_turns)
+    
+    snapshot = get_intimacy_snapshot(state.mood, recent_context)
+    return snapshot
 
 @router.get("/avatar")
 def get_avatar(who: str = "lin"):

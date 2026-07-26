@@ -47,6 +47,18 @@ def build_system_prompt(context, memory_summary="", world_context="", conversati
         "（这些数值只读，你不用输出、不用计算。这一轮结束时用 [MOOD_EVENT] 判断这一轮最贴近哪个事件即可，"
         "数值涨跌交给程序处理。）"
     )
+
+    # 親密引擎：關係階段 + 互動意願（只讀，不寫入Memory，每次重新計算）
+    from app.intimacy.engine import compute_willingness, get_atmosphere
+    willingness = compute_willingness(mood)
+    atmosphere = get_atmosphere(willingness)
+    intimacy_text = (
+        "\n\n【親密狀態（僅供參考，體現在語氣和態度裡，不用直接說出這些詞）】\n"
+        "關係階段：戀人\n"
+        f"互動意願：{willingness}\n"
+        f"此刻氛圍：{atmosphere}\n"
+    )
+
     return (
         PERSONA_CORE
         + "\n"
@@ -56,6 +68,7 @@ def build_system_prompt(context, memory_summary="", world_context="", conversati
         + "\n"
         + MOOD_EVENT_INSTRUCTION
         + current_mood_text
+        + intimacy_text
         + (f"\n\n【此刻的现实状态】\n{world_context}" if world_context else "")
         + (f"\n\n【最近对话】\n{conversation_history}\n\n（以上是你们刚才的对话记录。回复时要连贯，不要重复已经说过的话，也不要编造没发生过的事。如果某项实时状态为空或未提及，不要编造细节。）" if conversation_history else "")
         + memory_summary

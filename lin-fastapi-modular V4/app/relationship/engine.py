@@ -46,7 +46,7 @@ def update_relationship(relationship: Relationship, deltas: Dict[str, float]) ->
     )
 
 
-def get_relationship_description(relationship: Relationship) -> str:
+def get_relationship_description(relationship) -> str:
     """
     將關係數值轉成自然語言描述
     
@@ -55,36 +55,46 @@ def get_relationship_description(relationship: Relationship) -> str:
     - 默契高 → "最近很合拍，很多事情不用說就懂"
     - 互動溫度高 → "最近一直聊天、互動很多"
     """
+    # 支援 dict 或 Relationship dataclass
+    if isinstance(relationship, dict):
+        safety = relationship.get("safety", 50) / 100.0
+        rapport = relationship.get("rapport", 50) / 100.0
+        temperature = relationship.get("temperature", 50) / 100.0
+    else:
+        safety = relationship.safety
+        rapport = relationship.rapport
+        temperature = relationship.temperature
+    
     lines = []
     
     # 安全感
-    if relationship.safety > 0.8:
+    if safety > 0.8:
         lines.append("我們已經很穩定了，安全感很高。")
-    elif relationship.safety > 0.6:
+    elif safety > 0.6:
         lines.append("彼此還算安心，但有時候還是會有一點不確定。")
-    elif relationship.safety < 0.4:
+    elif safety < 0.4:
         lines.append("最近有點不安，不太確定對方的想法。")
     
     # 默契
-    if relationship.rapport > 0.8:
+    if rapport > 0.8:
         lines.append("最近很合拍，很多事情不用說就懂。")
-    elif relationship.rapport > 0.6:
+    elif rapport > 0.6:
         lines.append("默契還不錯，但偶爾還是需要解釋一下。")
-    elif relationship.rapport < 0.4:
+    elif rapport < 0.4:
         lines.append("最近好像有點對不上頻，溝通需要花更多力氣。")
     
     # 互動溫度
-    if relationship.temperature > 0.75:
+    if temperature > 0.75:
         lines.append("最近一直聊天、互動很多，關係很熱絡。")
-    elif relationship.temperature > 0.5:
+    elif temperature > 0.5:
         lines.append("互動頻率正常，沒有特別冷也沒有特別熱。")
-    elif relationship.temperature < 0.3:
+    elif temperature < 0.3:
         lines.append("最近因為忙而有點距離，聊天變少了。")
     
     # 行為影響
-    if relationship.safety > 0.8 and relationship.rapport > 0.7:
+    if safety > 0.8 and rapport > 0.7:
         lines.append("所以今天可以更放鬆地撒嬌、靠近，不用擔心被誤解。")
-    elif relationship.safety < 0.5:
+    elif safety < 0.5:
         lines.append("所以今天會把情緒藏起來，嘴硬一點，不太敢坦白。")
     
     return "\n".join(lines)

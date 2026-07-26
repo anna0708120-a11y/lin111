@@ -142,6 +142,10 @@ class AppState:
         # V3 新增：Relationship Engine
         from app.relationship.engine import init_relationship
         self.relationship = init_relationship()
+        
+        # V4 新增：Dream
+        self.last_dream_at = None
+        self.last_dream_seed = None
 
     # ---------- 日志 ----------
     # ---------- 聊天记录配置 ----------

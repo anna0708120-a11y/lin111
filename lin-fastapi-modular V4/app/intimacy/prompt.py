@@ -91,6 +91,22 @@ def build_intimacy_prompt(state, now: datetime) -> str:
         hours_elapsed = (now - state.cycle_started_at).total_seconds() / 3600.0
         sections.append(f"【周期】\n目前處於{cycle.label}（已持續約 {int(hours_elapsed)} 小時）")
     
+    # 8. V4: 互動意願
+    from app.intimacy.consent import calculate_consent, get_consent_description
+    relationship = getattr(state, 'relationship', {"safety": 50, "rapport": 50, "temperature": 50})
+    consent = calculate_consent(state.mood, body_values, relationship)
+    if consent < 40 or consent > 70:  # 只在明顯偏離時顯示
+        consent_desc = get_consent_description(consent, state.mood, body_values, relationship)
+        sections.append(f"【互動意願】\n{consent_desc}")
+    
+    # 9. V4: 夢境回響
+    if hasattr(state, 'last_dream_at') and state.last_dream_at:
+        dream_elapsed = (now - state.last_dream_at).total_seconds() / 3600.0
+        if dream_elapsed < 8:  # 8 小時內
+            seed = getattr(state, 'last_dream_seed', None)
+            if seed:
+                sections.append(f"【夢境回響】\n你剛從一個夢中醒來：{seed.theme}\n這個夢會影響你接下來的語氣和情緒。")
+    
     return "\n\n".join(sections)
 
 

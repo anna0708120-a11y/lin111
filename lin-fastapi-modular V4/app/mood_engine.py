@@ -9,6 +9,20 @@ Mood Engine V2 - Python 負責狀態管理，LLM 只負責演出人格
 """
 
 from app.state import state
+from collections import deque
+from datetime import datetime, timedelta
+
+
+# 重複事件追蹤（用於遞減效果）
+# 格式：deque of (event_name, timestamp)，保留最近 10 個事件
+_recent_events = deque(maxlen=10)
+
+# 遞減係數：第 N 次重複事件的效果倍率
+# 第 1 次：100%，第 2 次：70%，第 3 次：40%，第 4+ 次：20%
+DIMINISHING_MULTIPLIERS = [1.0, 0.7, 0.4, 0.2]
+
+# 重複事件的時間窗口（秒）：只有在此時間內的重複才會遞減
+REPEAT_WINDOW_SECONDS = 300  # 5 分鐘
 
 
 # Event → 數值變化對照表（三級強度：LOW/MEDIUM/HIGH）
@@ -279,16 +293,65 @@ def apply_event(event, level="MEDIUM", line=None):
     if level not in ["LOW", "MEDIUM", "HIGH"]:
         level = "MEDIUM"
     
+    # 計算重複事件遞減係數
+    now = datetime.now()
+    # 清理超過時間窗口的舊事件
+    while _recent_events and (now - _recent_events[0][1]).total_seconds() > REPEAT_WINDOW_SECONDS:
+        _recent_events.popleft()
+    
+    # 計算此事件在時間窗口內出現的次數（不包括這次）
+    repeat_count = sum(1 for ev_name, _ in _recent_events if ev_name == event)
+    
+    # 根據重複次數選擇遞減係數（超過陣列長度就用最後一個）
+    multiplier = DIMINISHING_MULTIPLIERS[min(repeat_count, len(DIMINISHING_MULTIPLIERS) - 1)]
+    
+    # 記錄這次事件
+    _recent_events.append((event, now))
+    
     # 取得當前 mood（深拷貝避免直接修改）
     current_mood = state.mood.copy()
     
     # 取得該事件的數值變化規則（根據強度）
     effects = EVENT_EFFECTS[event][level]
     
-    # 應用數值變化
+    # 應用數值變化（套用遞減係數 + 動態調整）
     for key, delta in effects.items():
         if key in current_mood:
-            new_value = current_mood[key] + delta
+            adjusted_delta = delta * multiplier
+            
+            # 動態調整：根據當前 mood 值微調效果
+            # 規則：越接近極端（0.0 或 1.0），變化幅度越小
+            current_value = current_mood[key]
+            
+            # 針對特定事件和 mood 組合進行動態調整
+            dynamic_multiplier = 1.0
+            
+            # COMFORT 對 stress 的效果：stress 越高，效果越好
+            if event in ["COMFORT", "APOLOGY"] and key == "stress" and delta < 0:
+                # stress 0.7+ 時效果提升 20%，0.5-0.7 提升 10%
+                if current_value >= 0.7:
+                    dynamic_multiplier = 1.2
+                elif current_value >= 0.5:
+                    dynamic_multiplier = 1.1
+            
+            # PRAISE/THANKS 對 attachment 的效果：attachment 越高，效果越小
+            if event in ["PRAISE", "THANKS", "COMFORT"] and key == "attachment" and delta > 0:
+                # attachment 0.8+ 時效果降低 30%，0.6-0.8 降低 15%
+                if current_value >= 0.8:
+                    dynamic_multiplier = 0.7
+                elif current_value >= 0.6:
+                    dynamic_multiplier = 0.85
+            
+            # IGNORE/LONG_IGNORE 對 attachment 的效果：attachment 越低，傷害越大
+            if event in ["IGNORE", "LONG_IGNORE"] and key == "attachment" and delta < 0:
+                # attachment 0.3 以下時傷害加重 20%
+                if current_value <= 0.3:
+                    dynamic_multiplier = 1.2
+            
+            # 套用動態係數
+            adjusted_delta *= dynamic_multiplier
+            
+            new_value = current_mood[key] + adjusted_delta
             # 限制在 0.0 ~ 1.0 範圍內（避免溢出）
             current_mood[key] = max(0.0, min(1.0, new_value))
     

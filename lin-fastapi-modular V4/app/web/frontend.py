@@ -1162,7 +1162,7 @@ async function llogs(){
     if(ev){
       let html='';
       // 持久狀態列（Mac / 定位 / 螢幕）
-      const PORDER=['mac','location','screentime','weather'];
+      const PORDER=['app','mac','location','screentime','weather'];
       const pItems=PORDER.map(k=>ev.persistent[k]).filter(Boolean);
       if(pItems.length>0){
         html+='<div style="display:flex;flex-wrap:wrap;gap:6px;padding:4px 0 10px">';

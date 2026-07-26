@@ -89,7 +89,46 @@ def generate_reply(context, app_name=None, use_cache=True):
     # V1 新增：對話前先 tick 身體狀態
     from datetime import datetime
     from app.intimacy.tick import tick_and_update
-    tick_and_update(state, datetime.now())
+    from app.intimacy.event import check_event_triggers
+    from app.intimacy.silence import detect_silence
+    
+    now = datetime.now()
+    tick_and_update(state, now)
+    
+    # V2 新增：更新用戶最後發消息時間，重置連續對話計數
+    if not hasattr(state, 'last_user_message_at'):
+        state.last_user_message_at = now
+    else:
+        # 檢查是否是連續對話（間隔少於 10 分鐘）
+        if state.last_user_message_at:
+            gap_minutes = (now - state.last_user_message_at).total_seconds() / 60.0
+            if gap_minutes < 10:
+                state.continuous_turns = getattr(state, 'continuous_turns', 0) + 1
+            else:
+                state.continuous_turns = 1
+        else:
+            state.continuous_turns = 1
+    
+    state.last_user_message_at = now
+    
+    # V2 新增：檢查是否該觸發事件
+    from app.intimacy.tick import start_event
+    
+    # 檢測等待焦躁（如果之前有等待）
+    silence_info = detect_silence(state.last_user_message_at, now) if hasattr(state, 'last_user_message_at') else {}
+    
+    # 組裝觸發情境
+    trigger_context = {
+        "silence_minutes": silence_info.get("silence_minutes", 0),
+        "continuous_turns": getattr(state, 'continuous_turns', 0)
+    }
+    
+    # 檢查所有觸發條件
+    triggered_events = check_event_triggers(state.body_values, trigger_context)
+    
+    # 如果有觸發且目前沒有事件，啟動第一個觸發的事件
+    if triggered_events and not getattr(state, 'active_event_key', None):
+        start_event(state, triggered_events[0], now)
     
     if use_cache and state.last_context_cache == context and state.last_reply_at:
         if datetime.now() - state.last_reply_at < timedelta(minutes=2):

@@ -1,7 +1,8 @@
 """
-Intimacy Prompt 組裝（V1）
+Intimacy Prompt 組裝（V1 + V2）
 
 用自然語言描述身體狀態，不顯示數字
+V2 新增：事件描述、門檻提示、餘波描述
 """
 
 from datetime import datetime
@@ -15,6 +16,8 @@ def build_intimacy_prompt(state, now: datetime) -> str:
     """
     from app.intimacy.cycle import get_current_cycle, get_cycle_progress
     from app.intimacy.consistency import render_consistency_prompt
+    from app.intimacy.threshold import get_threshold_prompt
+    from app.intimacy.event import get_event
     
     sections = []
     
@@ -41,12 +44,39 @@ def build_intimacy_prompt(state, now: datetime) -> str:
     if body_lines:
         sections.append(f"【身體狀態】\n{body_lines}")
     
-    # 2. 身心一致性
+    # 2. V2: 門檻觸發
+    threshold_prompt = get_threshold_prompt(body_values)
+    if threshold_prompt:
+        sections.append(f"【門檻觸發】\n{threshold_prompt}")
+    
+    # 3. 身心一致性
     consistency = render_consistency_prompt(state.mood, body_values)
     if consistency:
         sections.append(f"【身心一致性】\n{consistency}")
     
-    # 3. 周期資訊（僅在非平穩期時顯示）
+    # 4. V2: 當前事件
+    if hasattr(state, 'active_event_key') and state.active_event_key:
+        event = get_event(state.active_event_key)
+        if event and state.active_event_expires_at:
+            remaining_minutes = (state.active_event_expires_at - now).total_seconds() / 60.0
+            sections.append(
+                f"【當前事件】\n"
+                f"{event.label}（預計還剩 {int(remaining_minutes)} 分鐘）\n"
+                f"{event.prompt}"
+            )
+    
+    # 5. V2: 事件餘波
+    if hasattr(state, 'active_after_effects') and state.active_after_effects:
+        after_effect_lines = []
+        for effect in state.active_after_effects:
+            remaining_minutes = (effect.expires_at - now).total_seconds() / 60.0
+            if remaining_minutes > 0:
+                after_effect_lines.append(f"{effect.description}（還剩 {int(remaining_minutes)} 分鐘）")
+        
+        if after_effect_lines:
+            sections.append(f"【事件餘波】\n" + "\n".join(after_effect_lines))
+    
+    # 6. 周期資訊（僅在非平穩期時顯示）
     cycle = get_current_cycle(state)
     if cycle.key != "stable":
         progress = get_cycle_progress(state, now)

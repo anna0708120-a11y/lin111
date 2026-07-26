@@ -1,23 +1,29 @@
 """
-時間推進系統（V1）
+時間推進系統（V1 + V2）
 
-讓身體狀態隨時間自動變化
+讓身體狀態隨時間自動變化，V2 新增事件疊加與餘波處理
 """
 
 from datetime import datetime, timedelta
 from typing import Optional
+import random
 
 
 def tick_and_update(state, now: datetime):
     """
     主要入口：推進時間並更新狀態
     
-    Args:
-        state: 全局狀態對象
-        now: 當前時間
+    V2 新增：
+    - 檢查事件是否過期
+    - 疊加事件 tick_deltas
+    - 疊加餘波 deltas
+    - 檢測等待焦躁觸發
     """
     from app.intimacy.cycle import advance_cycle, get_current_cycle
     from app.intimacy.body_state import calculate_body_state
+    from app.intimacy.event import get_event
+    from app.intimacy.after_effect import apply_after_effects, cleanup_expired_effects
+    from app.intimacy.silence import detect_silence, calculate_silence_pressure
     
     # 初始化（第一次使用）
     if not hasattr(state, 'last_tick_at') or state.last_tick_at is None:
@@ -25,14 +31,18 @@ def tick_and_update(state, now: datetime):
         enter_cycle(state, 'stable', now)
         state.last_tick_at = now
         state.body_values = {"tension": 20, "heat": 30, "sensitivity": 25, "control": 80}
+        # V2 初始化
+        if not hasattr(state, 'active_event_key'):
+            state.active_event_key = None
+            state.active_event_started_at = None
+            state.active_event_expires_at = None
+            state.active_after_effects = []
         return
     
     # 計算時間差
     last_tick = state.last_tick_at
     if now <= last_tick:
         return  # 時間沒有前進，不更新
-    
-    total_elapsed = (now - last_tick).total_seconds() / 3600.0  # 轉成小時
     
     # 分段推進（借鑒 Eventide，每段最多 6 小時）
     MAX_SEGMENT_HOURS = 6.0
@@ -42,6 +52,11 @@ def tick_and_update(state, now: datetime):
     segments = 0
     
     while cursor < now and segments < MAX_SEGMENTS:
+        # V2: 檢查事件是否過期
+        if state.active_event_key and state.active_event_expires_at:
+            if cursor >= state.active_event_expires_at:
+                _finish_event(state, cursor)
+        
         # 檢查周期是否過期
         advance_cycle(state, cursor)
         
@@ -53,6 +68,11 @@ def tick_and_update(state, now: datetime):
             if cursor < state.cycle_expires_at < segment_end:
                 segment_end = state.cycle_expires_at
         
+        # 如果事件會在本段中過期，提前切到事件過期時間
+        if state.active_event_expires_at:
+            if cursor < state.active_event_expires_at < segment_end:
+                segment_end = state.active_event_expires_at
+        
         # 計算本段經過的小時數
         elapsed_hours = (segment_end - cursor).total_seconds() / 3600.0
         
@@ -60,17 +80,106 @@ def tick_and_update(state, now: datetime):
             # 取得當前周期
             cycle = get_current_cycle(state)
             
-            # 計算身體狀態變化
+            # 計算身體狀態變化（周期基線）
             state.body_values = calculate_body_state(
                 mood=state.mood,
                 cycle=cycle,
                 body_values=state.body_values,
                 elapsed_hours=elapsed_hours
             )
+            
+            # V2: 疊加事件 tick_deltas
+            if state.active_event_key:
+                event = get_event(state.active_event_key)
+                if event:
+                    for field, rate in event.tick_deltas.items():
+                        state.body_values[field] = state.body_values.get(field, 0) + rate * elapsed_hours
+            
+            # V2: 疊加餘波 deltas
+            if hasattr(state, 'active_after_effects') and state.active_after_effects:
+                state.body_values = apply_after_effects(
+                    state.body_values,
+                    state.active_after_effects,
+                    elapsed_hours
+                )
+            
+            # V2: 疊加等待焦躁壓力
+            if hasattr(state, 'last_user_message_at') and state.last_user_message_at:
+                silence_info = detect_silence(state.last_user_message_at, segment_end)
+                silence_deltas = calculate_silence_pressure(silence_info["silence_minutes"])
+                for field, delta in silence_deltas.items():
+                    state.body_values[field] = state.body_values.get(field, 0) + delta * elapsed_hours
+            
+            # clamp 到 0-100
+            for key in state.body_values:
+                state.body_values[key] = max(0, min(100, state.body_values[key]))
         
         # 移動游標
         cursor = segment_end
         segments += 1
     
+    # V2: 清理過期餘波
+    if hasattr(state, 'active_after_effects'):
+        state.active_after_effects = cleanup_expired_effects(state.active_after_effects, now)
+    
     # 更新最後 tick 時間
     state.last_tick_at = now
+
+
+def start_event(state, event_key: str, now: datetime) -> bool:
+    """
+    啟動事件
+    
+    Returns:
+        是否成功啟動（如果已有未過期事件則失敗）
+    """
+    from app.intimacy.event import get_event
+    
+    # 如果已有未過期事件，不覆蓋
+    if state.active_event_key and state.active_event_expires_at:
+        if now < state.active_event_expires_at:
+            return False
+    
+    event = get_event(event_key)
+    if not event:
+        return False
+    
+    # 隨機抽取持續時間
+    min_minutes, max_minutes = event.duration_minutes
+    duration_minutes = random.randint(min_minutes, max_minutes)
+    
+    state.active_event_key = event.key
+    state.active_event_started_at = now
+    state.active_event_expires_at = now + timedelta(minutes=duration_minutes)
+    
+    return True
+
+
+def _finish_event(state, now: datetime):
+    """
+    結束事件並施加 end_deltas
+    """
+    from app.intimacy.event import get_event
+    from app.intimacy.after_effect import create_after_effect
+    
+    if not state.active_event_key:
+        return
+    
+    event = get_event(state.active_event_key)
+    if event:
+        # 施加 end_deltas
+        for field, delta in event.end_deltas.items():
+            state.body_values[field] = state.body_values.get(field, 0) + delta
+        
+        # V2: 創建餘波（如果有對應模板）
+        after_effect = create_after_effect(event.key, now)
+        if after_effect:
+            if not hasattr(state, 'active_after_effects'):
+                state.active_after_effects = []
+            state.active_after_effects.append(after_effect)
+    
+    # 清空事件
+    state.active_event_key = None
+    state.active_event_started_at = None
+    state.active_event_expires_at = None
+

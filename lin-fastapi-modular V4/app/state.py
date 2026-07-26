@@ -138,6 +138,10 @@ class AppState:
         self.active_after_effects = []  # List[AfterEffect]
         self.continuous_turns = 0  # 連續對話輪數
         self.last_user_message_at = None  # 用戶最後發消息時間
+        
+        # V3 新增：Relationship Engine
+        from app.relationship.engine import init_relationship
+        self.relationship = init_relationship()
 
     # ---------- 日志 ----------
     # ---------- 聊天记录配置 ----------

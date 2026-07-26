@@ -1,8 +1,9 @@
 """
-Intimacy Prompt 組裝（V1 + V2）
+Intimacy Prompt 組裝（V1 + V2 + V3）
 
 用自然語言描述身體狀態，不顯示數字
 V2 新增：事件描述、門檻提示、餘波描述
+V3 新增：關係狀態
 """
 
 from datetime import datetime
@@ -18,6 +19,7 @@ def build_intimacy_prompt(state, now: datetime) -> str:
     from app.intimacy.consistency import render_consistency_prompt
     from app.intimacy.threshold import get_threshold_prompt
     from app.intimacy.event import get_event
+    from app.relationship.engine import get_relationship_description
     
     sections = []
     
@@ -54,7 +56,13 @@ def build_intimacy_prompt(state, now: datetime) -> str:
     if consistency:
         sections.append(f"【身心一致性】\n{consistency}")
     
-    # 4. V2: 當前事件
+    # 4. V3: 關係狀態
+    if hasattr(state, 'relationship'):
+        relationship_desc = get_relationship_description(state.relationship)
+        if relationship_desc:
+            sections.append(f"【關係狀態】\n{relationship_desc}")
+    
+    # 5. V2: 當前事件
     if hasattr(state, 'active_event_key') and state.active_event_key:
         event = get_event(state.active_event_key)
         if event and state.active_event_expires_at:
@@ -65,7 +73,7 @@ def build_intimacy_prompt(state, now: datetime) -> str:
                 f"{event.prompt}"
             )
     
-    # 5. V2: 事件餘波
+    # 6. V2: 事件餘波
     if hasattr(state, 'active_after_effects') and state.active_after_effects:
         after_effect_lines = []
         for effect in state.active_after_effects:
@@ -76,7 +84,7 @@ def build_intimacy_prompt(state, now: datetime) -> str:
         if after_effect_lines:
             sections.append(f"【事件餘波】\n" + "\n".join(after_effect_lines))
     
-    # 6. 周期資訊（僅在非平穩期時顯示）
+    # 7. 周期資訊（僅在非平穩期時顯示）
     cycle = get_current_cycle(state)
     if cycle.key != "stable":
         progress = get_cycle_progress(state, now)

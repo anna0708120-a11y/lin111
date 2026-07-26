@@ -49,9 +49,11 @@ def format_context_for_prompt(context_dict):
     """
     lines = []
     
-    # 當前真實時間（伺服器時間，UTC+0 或系統時區）
+    # 當前真實時間（伺服器時間，明確標註是當下這一刻）
     now = datetime.now()
-    lines.append(f"當前真實時間：{now.strftime('%Y-%m-%d %H:%M:%S')}（24小時制）")
+    hour = now.hour
+    time_period = "凌晨" if 0 <= hour < 6 else "早上" if 6 <= hour < 12 else "下午" if 12 <= hour < 18 else "晚上"
+    lines.append(f"現在是 {now.strftime('%Y年%m月%d日')} {time_period} {now.strftime('%H:%M')}（24小時制，這是伺服器當前真實時間）")
     
     if "weather" in context_dict:
         w = context_dict["weather"]

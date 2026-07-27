@@ -626,7 +626,7 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
           <div class="intimacy-hero-content">
             <div class="intimacy-hero-top">
               <div class="intimacy-hero-cycle">
-                <div class="intimacy-hero-cycle-label">當前周期</div>
+                <div class="intimacy-hero-cycle-label">當前狀態</div>
                 <div class="intimacy-hero-cycle-value" id="cycleStage">平穩期</div>
               </div>
               <button class="intimacy-hero-upload-btn" onclick="document.getElementById('intimacyBgUpload').click()">

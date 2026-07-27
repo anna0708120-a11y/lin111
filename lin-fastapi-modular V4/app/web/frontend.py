@@ -187,16 +187,20 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 .intimacy-auto-change-text{font-size:11px;line-height:1.5;color:var(--rose-deep);opacity:.85;white-space:pre-line;}
 
 /* 身體狀態進度條 */
-/* 親密引擎：Hero 卡片 */
+/* 親密引擎：Hero 卡片（整张可点击） */
 .intimacy-hero-card{
   position:relative;
-  height:140px;
+  height:100px;
   border-radius:20px;
   overflow:hidden;
-  margin-bottom:24px;
+  margin-bottom:16px;
   background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);
   cursor:pointer;
   box-shadow:0 4px 20px rgba(0,0,0,0.15);
+  transition:all .2s;
+}
+.intimacy-hero-card:hover{
+  box-shadow:0 6px 24px rgba(0,0,0,0.2);
 }
 .intimacy-hero-bg{
   position:absolute;
@@ -214,14 +218,9 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
   height:100%;
   display:flex;
   flex-direction:column;
-  justify-content:space-between;
+  justify-content:center;
 }
-.intimacy-hero-top{
-  display:flex;
-  justify-content:space-between;
-  align-items:flex-start;
-}
-.intimacy-hero-cycle-label{
+.intimacy-hero-label{
   font-size:12px;
   font-weight:500;
   color:rgba(255,255,255,0.8);
@@ -229,37 +228,14 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
   letter-spacing:0.5px;
   margin-bottom:4px;
 }
-.intimacy-hero-cycle-value{
+.intimacy-hero-value{
   font-size:28px;
   font-weight:700;
   color:#fff;
   font-family:'DM Serif Display',serif;
 }
-.intimacy-hero-duration{
-  font-size:14px;
-  font-weight:500;
-  color:rgba(255,255,255,0.9);
-}
-.intimacy-hero-upload-btn{
-  width:36px;
-  height:36px;
-  border-radius:50%;
-  background:rgba(255,255,255,0.25);
-  backdrop-filter:blur(10px);
-  border:1px solid rgba(255,255,255,0.3);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  cursor:pointer;
-  transition:all .2s;
-  color:#fff;
-}
-.intimacy-hero-upload-btn:hover{
-  background:rgba(255,255,255,0.35);
-  transform:scale(1.05);
-}
 
-/* 親密引擎：進度條組 */
+/* 親密引擎：進度條組 - 背景透明度 30%，宽度缩窄 */
 .intimacy-bars{display:flex;flex-direction:column;gap:20px;padding:4px;}
 .intimacy-bar{
   border-radius:18px;
@@ -270,23 +246,23 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 .intimacy-bar:active{transform:scale(0.98);}
 .intimacy-bar:hover{box-shadow:0 4px 16px rgba(0,0,0,0.12);}
 
-/* 配色方案 - 透明度降低 65% */
-.intimacy-bar[data-color="purple"]{background:#c8a8de;}
+/* 配色方案 - 背景透明度 30%，前景进度条保持原色 */
+.intimacy-bar[data-color="purple"]{background:rgba(200,168,222,0.3);}
 .intimacy-bar[data-color="purple"] .intimacy-bar-icon{color:#6b3d8c;}
 .intimacy-bar[data-color="purple"] .intimacy-bar-label,.intimacy-bar[data-color="purple"] .intimacy-bar-value,.intimacy-bar[data-color="purple"] .intimacy-bar-desc{color:#4a2861;}
 .intimacy-bar[data-color="purple"] .intimacy-bar-fill{background:linear-gradient(90deg,#8b4fbe,#a86dd6);}
 
-.intimacy-bar[data-color="red"]{background:#f5b8b8;}
+.intimacy-bar[data-color="red"]{background:rgba(245,184,184,0.3);}
 .intimacy-bar[data-color="red"] .intimacy-bar-icon{color:#d63838;}
 .intimacy-bar[data-color="red"] .intimacy-bar-label,.intimacy-bar[data-color="red"] .intimacy-bar-value,.intimacy-bar[data-color="red"] .intimacy-bar-desc{color:#a82424;}
 .intimacy-bar[data-color="red"] .intimacy-bar-fill{background:linear-gradient(90deg,#ff5252,#ff7070);}
 
-.intimacy-bar[data-color="pink"]{background:#e8b4f5;}
+.intimacy-bar[data-color="pink"]{background:rgba(232,180,245,0.3);}
 .intimacy-bar[data-color="pink"] .intimacy-bar-icon{color:#a43dcc;}
 .intimacy-bar[data-color="pink"] .intimacy-bar-label,.intimacy-bar[data-color="pink"] .intimacy-bar-value,.intimacy-bar[data-color="pink"] .intimacy-bar-desc{color:#7a2b99;}
 .intimacy-bar[data-color="pink"] .intimacy-bar-fill{background:linear-gradient(90deg,#b76bd9,#d493f0);}
 
-.intimacy-bar[data-color="blue"]{background:#b0c8eb;}
+.intimacy-bar[data-color="blue"]{background:rgba(176,200,235,0.3);}
 .intimacy-bar[data-color="blue"] .intimacy-bar-icon{color:#4a6db8;}
 .intimacy-bar[data-color="blue"] .intimacy-bar-label,.intimacy-bar[data-color="blue"] .intimacy-bar-value,.intimacy-bar[data-color="blue"] .intimacy-bar-desc{color:#2d4470;}
 .intimacy-bar[data-color="blue"] .intimacy-bar-fill{background:linear-gradient(90deg,#5b7ecf,#7d9de6);}
@@ -322,6 +298,7 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
   overflow:hidden;
   margin-bottom:10px;
   box-shadow:inset 0 2px 4px rgba(0,0,0,0.12);
+  max-width:30%;
 }
 .intimacy-bar-fill{
   height:100%;
@@ -619,24 +596,34 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
       <!-- Tab: 身體狀態 -->
       <div class="intimacy-tab-content" id="content-body">
         
-        <!-- Hero 卡片：周期狀態 + 背景圖 -->
-        <div class="intimacy-hero-card" id="intimacyHeroCard">
+        <!-- Hero 卡片：當前狀態 + 背景圖（整張可點擊） -->
+        <div class="intimacy-hero-card" id="intimacyHeroCard" onclick="document.getElementById('intimacyBgUpload').click()">
           <input type="file" id="intimacyBgUpload" accept="image/*" style="display:none;">
           <div class="intimacy-hero-bg" id="intimacyHeroBg"></div>
           <div class="intimacy-hero-content">
-            <div class="intimacy-hero-top">
-              <div class="intimacy-hero-cycle">
-                <div class="intimacy-hero-cycle-label">當前狀態</div>
-                <div class="intimacy-hero-cycle-value" id="cycleStage">平穩期</div>
-              </div>
-              <button class="intimacy-hero-upload-btn" onclick="document.getElementById('intimacyBgUpload').click()">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
-                </svg>
-              </button>
-            </div>
-            <div class="intimacy-hero-duration" id="cycleDuration">持續 68 小時</div>
+            <div class="intimacy-hero-label">當前狀態</div>
+            <div class="intimacy-hero-value" id="heroStatus">平穩期</div>
           </div>
+        </div>
+        
+        <!-- 周期 60% + 事件 40% -->
+        <div class="intimacy-status-grid">
+          <div class="intimacy-status-card" style="flex:0 0 calc(60% - 5px);">
+            <div class="intimacy-status-label">周期</div>
+            <div class="intimacy-status-value" id="cycleStage">平穩期</div>
+            <div class="intimacy-status-time" id="cycleDuration">68h 11m</div>
+          </div>
+          <div class="intimacy-status-card" style="flex:0 0 calc(40% - 5px);cursor:pointer;" onclick="document.getElementById('intimacyBgUpload').click()">
+            <div class="intimacy-status-label">事件</div>
+            <div class="intimacy-status-value" id="eventName">等待焦躁</div>
+            <div class="intimacy-status-time" id="eventDuration">2h 32m</div>
+          </div>
+        </div>
+        
+        <!-- 自動變化 -->
+        <div class="intimacy-auto-change">
+          <div class="intimacy-auto-change-title">自動變化</div>
+          <div class="intimacy-auto-change-text" id="autoChangeDesc">平穩期基線：熱度 30 -1.4/h，壓抑 25 -1.7/h，控制 75 +1/h，敏感 35 -1.7/h，蓄積 +0.4/h，占有 42 -3.7/h，疲惫 16 -1.2/h</div>
         </div>
 
         <!-- 數值區塊 -->
@@ -1084,12 +1071,25 @@ function renderIntimacy(d){
     if(descEl) descEl.textContent = desc;
   });
   
-  // 周期資訊
+  // 周期資訊 - 時間格式改為 68h 11m
   if(d.cycle){
     const cycleEl = document.getElementById('cycleStage');
+    const heroEl = document.getElementById('heroStatus');
     const durationEl = document.getElementById('cycleDuration');
     if(cycleEl) cycleEl.textContent = d.cycle.label || '平穩期';
-    if(durationEl) durationEl.textContent = '持續 ' + (d.cycle.hours_elapsed || 0) + ' 小時';
+    if(heroEl) heroEl.textContent = d.cycle.label || '平穩期';
+    if(durationEl){
+      const hours = d.cycle.hours_elapsed || 0;
+      const h = Math.floor(hours);
+      const m = Math.floor((hours % 1) * 60);
+      durationEl.textContent = h + 'h ' + m + 'm';
+    }
+  }
+  
+  // 自動變化描述
+  if(d.auto_change_desc){
+    const autoEl = document.getElementById('autoChangeDesc');
+    if(autoEl) autoEl.textContent = d.auto_change_desc;
   }
   
   // 載入已保存的背景圖

@@ -225,7 +225,9 @@ def get_consent_dynamics():
     
     # 計算 Consent
     body_values = getattr(state, 'body_values', {})
-    relationship = getattr(state, 'relationship', {"safety": 50, "rapport": 50, "temperature": 50})
+    relationship = getattr(state, 'relationship', None)
+    if relationship is None:
+        relationship = {"safety": 50, "rapport": 50, "temperature": 50}
     consent_dynamics = getattr(state, 'consent_dynamics', None)
     
     base_consent = calculate_consent(state.mood, body_values, relationship)

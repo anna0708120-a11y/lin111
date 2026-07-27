@@ -39,10 +39,19 @@ def calculate_consent(
     base += body_values.get("heat", 30) * 0.2  # 熱度高 → 意願高
     base -= body_values.get("control", 80) * 0.15  # 控制力高 → 意願低（還在克制）
     
-    # 從 Relationship 影響
-    base += relationship.get("safety", 50) * 0.25  # 安全感高 → 意願高
-    base += relationship.get("rapport", 50) * 0.15  # 默契高 → 意願高
-    base += relationship.get("temperature", 50) * 0.2  # 互動溫度高 → 意願高
+    # 從 Relationship 影響（支援 dict 和 dataclass）
+    if isinstance(relationship, dict):
+        safety = relationship.get("safety", 50)
+        rapport = relationship.get("rapport", 50)
+        temperature = relationship.get("temperature", 50)
+    else:
+        safety = getattr(relationship, 'safety', 50)
+        rapport = getattr(relationship, 'rapport', 50)
+        temperature = getattr(relationship, 'temperature', 50)
+    
+    base += safety * 0.25  # 安全感高 → 意願高
+    base += rapport * 0.15  # 默契高 → 意願高
+    base += temperature * 0.2  # 互動溫度高 → 意願高
     
     # 從最近情境影響（如果有提供）
     if recent_context:
@@ -69,7 +78,7 @@ def get_consent_level(value: float) -> str:
         return "高"
 
 
-def get_consent_description(value: float, mood: dict, body_values: dict, relationship: dict) -> str:
+def get_consent_description(value: float, mood: dict, body_values: dict, relationship) -> str:
     """
     生成 consent 的自然語言描述
     
@@ -82,7 +91,12 @@ def get_consent_description(value: float, mood: dict, body_values: dict, relatio
     attachment = mood.get("attachment", 0.5)
     tension = body_values.get("tension", 20)
     control = body_values.get("control", 80)
-    safety = relationship.get("safety", 50)
+    
+    # 支援 dict 和 dataclass
+    if isinstance(relationship, dict):
+        safety = relationship.get("safety", 50)
+    else:
+        safety = getattr(relationship, 'safety', 50)
     
     if value < 30:
         # 低意願：可能因為疲憊、壓力、安全感不足

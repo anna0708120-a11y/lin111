@@ -93,7 +93,9 @@ def build_intimacy_prompt(state, now: datetime) -> str:
     
     # 8. V4 + V4.1: 互動意願（含動態調整）
     from app.intimacy.consent import calculate_consent, get_consent_description
-    relationship = getattr(state, 'relationship', {"safety": 50, "rapport": 50, "temperature": 50})
+    relationship = getattr(state, 'relationship', None)
+    if relationship is None:
+        relationship = {"safety": 50, "rapport": 50, "temperature": 50}
     consent_dynamics = getattr(state, 'consent_dynamics', None)
     consent = calculate_consent(state.mood, body_values, relationship, consent_dynamics=consent_dynamics)
     

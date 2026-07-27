@@ -213,3 +213,75 @@ app/
 **最後更新**: 2026-01-27  
 **作者**: Anna & Kiro  
 **項目**: Lin Intimacy Engine
+
+
+完成！✅ V4.3 Mood Natural Decay 已成功部署到 GitHub。
+
+---
+
+## 已完成的工作：
+
+### 1. **新增模块**：`app/mood/`
+- **`decay.py`** (130 行)：核心衰减逻辑
+  - 7 个 Mood 基线配置（attachment 0.7, stress 0.2, fatigue 0.3...）
+  - 衰减速率配置（0.01~0.02/小时）
+  - 纯函数 `apply_mood_decay()`：渐近回归公式
+  - Debug 辅助函数 `get_decay_summary()`
+- **`__init__.py`**：模块导出
+
+### 2. **修改文件**：`app/intimacy/tick.py`
+- 新增 import：`from app.mood.decay import apply_mood_decay`
+- 在 Body State Influence 之后应用：
+  ```python
+  # V4.3: 應用 Mood 自然衰減
+  state.mood = apply_mood_decay(state.mood, elapsed_hours, enabled=True)
+  ```
+
+### 3. **Git 提交**：
+- Commit: `c894ef2`
+- 已推送到 `main` 分支
+
+---
+
+## 设计确认：
+
+### ✅ 衰减机制（已实现）
+- **渐近回归公式**：`delta = (baseline - current) * rate * elapsed_hours`
+- **特点**：
+  - 离基线越远，回归越快
+  - 接近基线时自动减速
+  - 不会越过基线
+
+### ✅ 示例效果
+- **Attachment**: 0.9 → 每小时 -0.01 → 慢慢回到 0.7
+- **Stress**: 0.8 → 每小时 -0.02 → 慢慢回到 0.2
+- **Fatigue**: 0.7 → 每小时 -0.015 → 慢慢回到 0.3
+
+### ⏸️ Mood Influence（暂不实现）
+- 仅保留 1~2 条规则的可能性
+- 例如：`Stress 很高 → Social 微降` 或 `Fatigue 很高 → Social 微降`
+- **等测试结果后再决定**
+
+---
+
+## 架构总结：
+
+```
+Mood Engine (情绪引擎)
+├── attachment (依恋) ─────┐
+├── curiosity (好奇)       │
+├── social (社交欲)        ├─ V4.3: 自然衰减 ✅
+├── fatigue (疲惫感)       │   (回归基线)
+├── stress (压力)          │
+└── libido (性欲)  ────────┘
+    ↓
+Body State (身体状态)
+├── tension (蓄积感) ──────┐
+├── heat (热度)            ├─ V4.2: 相互影响 ✅
+├── sensitivity (敏感度)   │   (Influence)
+└── control (控制力) ──────┘
+```
+
+---
+
+2026.7.27

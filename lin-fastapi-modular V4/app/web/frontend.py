@@ -187,48 +187,155 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 .intimacy-auto-change-text{font-size:11px;line-height:1.5;color:var(--rose-deep);opacity:.85;white-space:pre-line;}
 
 /* 身體狀態進度條 */
-/* 親密引擎卡片組 */
-.intimacy-bars{display:flex;flex-direction:column;gap:16px;padding:4px;}
+/* 親密引擎：Hero 卡片 */
+.intimacy-hero-card{
+  position:relative;
+  height:140px;
+  border-radius:20px;
+  overflow:hidden;
+  margin-bottom:24px;
+  background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+  cursor:pointer;
+  box-shadow:0 4px 20px rgba(0,0,0,0.15);
+}
+.intimacy-hero-bg{
+  position:absolute;
+  top:0;left:0;right:0;bottom:0;
+  background-size:cover;
+  background-position:center;
+  opacity:0.4;
+  transition:opacity .3s;
+}
+.intimacy-hero-card:hover .intimacy-hero-bg{opacity:0.5;}
+.intimacy-hero-content{
+  position:relative;
+  z-index:1;
+  padding:20px 24px;
+  height:100%;
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+}
+.intimacy-hero-top{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+}
+.intimacy-hero-cycle-label{
+  font-size:12px;
+  font-weight:500;
+  color:rgba(255,255,255,0.8);
+  text-transform:uppercase;
+  letter-spacing:0.5px;
+  margin-bottom:4px;
+}
+.intimacy-hero-cycle-value{
+  font-size:28px;
+  font-weight:700;
+  color:#fff;
+  font-family:'DM Serif Display',serif;
+}
+.intimacy-hero-duration{
+  font-size:14px;
+  font-weight:500;
+  color:rgba(255,255,255,0.9);
+}
+.intimacy-hero-upload-btn{
+  width:36px;
+  height:36px;
+  border-radius:50%;
+  background:rgba(255,255,255,0.25);
+  backdrop-filter:blur(10px);
+  border:1px solid rgba(255,255,255,0.3);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  transition:all .2s;
+  color:#fff;
+}
+.intimacy-hero-upload-btn:hover{
+  background:rgba(255,255,255,0.35);
+  transform:scale(1.05);
+}
+
+/* 親密引擎：進度條組 */
+.intimacy-bars{display:flex;flex-direction:column;gap:20px;padding:4px;}
 .intimacy-bar{
-  border-radius:16px;
-  padding:16px;
+  border-radius:18px;
+  padding:20px;
   transition:transform .2s, box-shadow .2s;
-  box-shadow:0 2px 8px rgba(0,0,0,0.06);
+  box-shadow:0 2px 12px rgba(0,0,0,0.08);
 }
 .intimacy-bar:active{transform:scale(0.98);}
-.intimacy-bar:hover{box-shadow:0 4px 12px rgba(0,0,0,0.1);}
+.intimacy-bar:hover{box-shadow:0 4px 16px rgba(0,0,0,0.12);}
 
-/* 配色方案 - 降低透明度 20% */
-.intimacy-bar[data-color="purple"]{background:linear-gradient(135deg,#ebe0f5 0%,#dcc8ea 100%);}
-.intimacy-bar[data-color="purple"] .intimacy-bar-icon{color:#9b59b6;}
-.intimacy-bar[data-color="purple"] .intimacy-bar-label,.intimacy-bar[data-color="purple"] .intimacy-bar-value,.intimacy-bar[data-color="purple"] .intimacy-bar-desc{color:#6d3d7f;}
-.intimacy-bar[data-color="purple"] .intimacy-bar-fill{background:linear-gradient(90deg,#9b59b6,#b168d6);}
+/* 配色方案 - 透明度降低 65% */
+.intimacy-bar[data-color="purple"]{background:#c8a8de;}
+.intimacy-bar[data-color="purple"] .intimacy-bar-icon{color:#6b3d8c;}
+.intimacy-bar[data-color="purple"] .intimacy-bar-label,.intimacy-bar[data-color="purple"] .intimacy-bar-value,.intimacy-bar[data-color="purple"] .intimacy-bar-desc{color:#4a2861;}
+.intimacy-bar[data-color="purple"] .intimacy-bar-fill{background:linear-gradient(90deg,#8b4fbe,#a86dd6);}
 
-.intimacy-bar[data-color="red"]{background:linear-gradient(135deg,#fdd8d8 0%,#fcbcbc 100%);}
-.intimacy-bar[data-color="red"] .intimacy-bar-icon{color:#ff6b6b;}
-.intimacy-bar[data-color="red"] .intimacy-bar-label,.intimacy-bar[data-color="red"] .intimacy-bar-value,.intimacy-bar[data-color="red"] .intimacy-bar-desc{color:#c23636;}
-.intimacy-bar[data-color="red"] .intimacy-bar-fill{background:linear-gradient(90deg,#ff6b6b,#ff8787);}
+.intimacy-bar[data-color="red"]{background:#f5b8b8;}
+.intimacy-bar[data-color="red"] .intimacy-bar-icon{color:#d63838;}
+.intimacy-bar[data-color="red"] .intimacy-bar-label,.intimacy-bar[data-color="red"] .intimacy-bar-value,.intimacy-bar[data-color="red"] .intimacy-bar-desc{color:#a82424;}
+.intimacy-bar[data-color="red"] .intimacy-bar-fill{background:linear-gradient(90deg,#ff5252,#ff7070);}
 
-.intimacy-bar[data-color="pink"]{background:linear-gradient(135deg,#f8e0fc 0%,#edc8f7 100%);}
-.intimacy-bar[data-color="pink"] .intimacy-bar-icon{color:#c084fc;}
-.intimacy-bar[data-color="pink"] .intimacy-bar-label,.intimacy-bar[data-color="pink"] .intimacy-bar-value,.intimacy-bar[data-color="pink"] .intimacy-bar-desc{color:#8b3fcc;}
-.intimacy-bar[data-color="pink"] .intimacy-bar-fill{background:linear-gradient(90deg,#c084fc,#d8b4fe);}
+.intimacy-bar[data-color="pink"]{background:#e8b4f5;}
+.intimacy-bar[data-color="pink"] .intimacy-bar-icon{color:#a43dcc;}
+.intimacy-bar[data-color="pink"] .intimacy-bar-label,.intimacy-bar[data-color="pink"] .intimacy-bar-value,.intimacy-bar[data-color="pink"] .intimacy-bar-desc{color:#7a2b99;}
+.intimacy-bar[data-color="pink"] .intimacy-bar-fill{background:linear-gradient(90deg,#b76bd9,#d493f0);}
 
-.intimacy-bar[data-color="blue"]{background:linear-gradient(135deg,#d8e4f9 0%,#c0d4f5 100%);}
-.intimacy-bar[data-color="blue"] .intimacy-bar-icon{color:#667eea;}
-.intimacy-bar[data-color="blue"] .intimacy-bar-label,.intimacy-bar[data-color="blue"] .intimacy-bar-value,.intimacy-bar[data-color="blue"] .intimacy-bar-desc{color:#3a5a8f;}
-.intimacy-bar[data-color="blue"] .intimacy-bar-fill{background:linear-gradient(90deg,#667eea,#8ba4f9);}
+.intimacy-bar[data-color="blue"]{background:#b0c8eb;}
+.intimacy-bar[data-color="blue"] .intimacy-bar-icon{color:#4a6db8;}
+.intimacy-bar[data-color="blue"] .intimacy-bar-label,.intimacy-bar[data-color="blue"] .intimacy-bar-value,.intimacy-bar[data-color="blue"] .intimacy-bar-desc{color:#2d4470;}
+.intimacy-bar[data-color="blue"] .intimacy-bar-fill{background:linear-gradient(90deg,#5b7ecf,#7d9de6);}
 
-/* 進度條元件 */
-.intimacy-bar-header{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
-.intimacy-bar-icon{width:22px;height:22px;flex-shrink:0;}
+/* 進度條元件 - 優化字體 */
+.intimacy-bar-header{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
+.intimacy-bar-icon{width:24px;height:24px;flex-shrink:0;}
 .intimacy-bar-icon svg{width:100%;height:100%;}
-.intimacy-bar-label{font-size:14px;font-weight:600;flex:1;letter-spacing:0.3px;}
-.intimacy-bar-value{font-size:14px;font-weight:700;display:flex;align-items:center;gap:4px;}
-.intimacy-bar-level{font-size:11px;font-weight:500;opacity:.8;}
-.intimacy-bar-track{height:10px;background:rgba(255,255,255,.6);border-radius:5px;overflow:hidden;margin-bottom:8px;box-shadow:inset 0 1px 3px rgba(0,0,0,0.1);}
-.intimacy-bar-fill{height:100%;border-radius:5px;transition:width .5s cubic-bezier(0.4, 0, 0.2, 1);box-shadow:0 1px 3px rgba(0,0,0,0.15);}
-.intimacy-bar-desc{font-size:12px;line-height:1.5;opacity:.85;font-weight:400;}
+.intimacy-bar-label{
+  font-size:15px;
+  font-weight:700;
+  flex:1;
+  letter-spacing:0.3px;
+  font-family:'DM Sans',sans-serif;
+}
+.intimacy-bar-value{
+  font-size:18px;
+  font-weight:800;
+  display:flex;
+  align-items:center;
+  gap:6px;
+  font-family:'DM Sans',sans-serif;
+}
+.intimacy-bar-level{
+  font-size:12px;
+  font-weight:600;
+  opacity:.85;
+}
+.intimacy-bar-track{
+  height:12px;
+  background:rgba(255,255,255,.7);
+  border-radius:6px;
+  overflow:hidden;
+  margin-bottom:10px;
+  box-shadow:inset 0 2px 4px rgba(0,0,0,0.12);
+}
+.intimacy-bar-fill{
+  height:100%;
+  border-radius:6px;
+  transition:width .6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow:0 2px 6px rgba(0,0,0,0.2);
+}
+.intimacy-bar-desc{
+  font-size:13px;
+  line-height:1.6;
+  opacity:.9;
+  font-weight:500;
+  font-family:'DM Sans',sans-serif;
+}
 
 /* Tab 內容區 */
 .intimacy-tab-content{}
@@ -511,42 +618,25 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
       
       <!-- Tab: 身體狀態 -->
       <div class="intimacy-tab-content" id="content-body">
-        <!-- 當前狀態：周期 + 事件（V3 架構預留，假資料） -->
-        <div class="intimacy-status-grid">
-          <div class="intimacy-status-card">
-            <div class="intimacy-status-label">周期</div>
-            <div class="intimacy-status-value" id="cycleStage">平穩期</div>
-            <div class="intimacy-status-time" id="cycleDuration">68h 11m</div>
+        
+        <!-- Hero 卡片：周期狀態 + 背景圖 -->
+        <div class="intimacy-hero-card" id="intimacyHeroCard">
+          <input type="file" id="intimacyBgUpload" accept="image/*" style="display:none;">
+          <div class="intimacy-hero-bg" id="intimacyHeroBg"></div>
+          <div class="intimacy-hero-content">
+            <div class="intimacy-hero-top">
+              <div class="intimacy-hero-cycle">
+                <div class="intimacy-hero-cycle-label">當前周期</div>
+                <div class="intimacy-hero-cycle-value" id="cycleStage">平穩期</div>
+              </div>
+              <button class="intimacy-hero-upload-btn" onclick="document.getElementById('intimacyBgUpload').click()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+                </svg>
+              </button>
+            </div>
+            <div class="intimacy-hero-duration" id="cycleDuration">持續 68 小時</div>
           </div>
-          <div class="intimacy-status-card">
-            <div class="intimacy-status-label">事件</div>
-            <div class="intimacy-status-value" id="eventName">等待焦躁</div>
-            <div class="intimacy-status-time" id="eventDuration">2h 32m</div>
-          </div>
-        </div>
-
-        <!-- 互動意願 + 目前狀態（並排） -->
-        <div class="intimacy-summary">
-          <div class="intimacy-summary-item">
-            <div class="intimacy-summary-label">互動意願</div>
-            <div class="intimacy-summary-value" id="intimacyWillingness">中</div>
-          </div>
-          <div class="intimacy-summary-item">
-            <div class="intimacy-summary-label">目前狀態</div>
-            <div class="intimacy-summary-value" id="intimacyAtmosphere">慢慢靠近</div>
-          </div>
-        </div>
-
-        <!-- 臨時狀態（V3/V4 架構預留：此刻短暫的心理/身體狀態，暫不顯示） -->
-        <div class="intimacy-ephemeral" id="ephemeralState" style="display:none;">
-          <div class="intimacy-ephemeral-icon">💭</div>
-          <div class="intimacy-ephemeral-text" id="ephemeralText">有點害羞</div>
-        </div>
-
-        <!-- 自動變化說明（V3 架構預留，假資料） -->
-        <div class="intimacy-auto-change">
-          <div class="intimacy-auto-change-title">自動變化</div>
-          <div class="intimacy-auto-change-text" id="autoChangeDesc">平穩期基線：熱度 30 -1.4/h，壓抑 25 -1.7/h，控制 75 +1/h，敏感 35 -1.7/h，蓄積 +0.4/h，占有 42 -3.7/h，疲惫 16 -1.2/h</div>
         </div>
 
         <!-- 數值區塊 -->
@@ -993,7 +1083,37 @@ function renderIntimacy(d){
     if(barEl) barEl.style.width = val+'%';
     if(descEl) descEl.textContent = desc;
   });
+  
+  // 周期資訊
+  if(d.cycle){
+    const cycleEl = document.getElementById('cycleStage');
+    const durationEl = document.getElementById('cycleDuration');
+    if(cycleEl) cycleEl.textContent = d.cycle.label || '平穩期';
+    if(durationEl) durationEl.textContent = '持續 ' + (d.cycle.hours_elapsed || 0) + ' 小時';
+  }
+  
+  // 載入已保存的背景圖
+  const savedBg = localStorage.getItem('intimacy_hero_bg');
+  if(savedBg){
+    const bgEl = document.getElementById('intimacyHeroBg');
+    if(bgEl) bgEl.style.backgroundImage = 'url('+savedBg+')';
+  }
 }
+
+// 背景圖上傳
+document.getElementById('intimacyBgUpload').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  try{
+    const dataUrl = await resizeImage(file, 800);
+    localStorage.setItem('intimacy_hero_bg', dataUrl);
+    const bgEl = document.getElementById('intimacyHeroBg');
+    if(bgEl) bgEl.style.backgroundImage = 'url('+dataUrl+')';
+  }catch(err){
+    console.error('背景圖上傳失敗', err);
+  }
+  e.target.value = '';
+});
 
 function renderMood(mood){
   if(!mood)return;

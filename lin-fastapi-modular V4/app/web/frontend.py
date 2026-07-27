@@ -187,52 +187,15 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 .intimacy-auto-change-text{font-size:11px;line-height:1.5;color:var(--rose-deep);opacity:.85;white-space:pre-line;}
 
 /* 身體狀態進度條 */
-/* 親密引擎：Hero 卡片（整张可点击） */
-.intimacy-hero-card{
-  position:relative;
-  height:100px;
-  border-radius:20px;
-  overflow:hidden;
-  margin-bottom:16px;
-  background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);
-  cursor:pointer;
-  box-shadow:0 4px 20px rgba(0,0,0,0.15);
-  transition:all .2s;
-}
-.intimacy-hero-card:hover{
-  box-shadow:0 6px 24px rgba(0,0,0,0.2);
-}
+/* 周期卡背景圖層（點擊周期卡上傳背景圖時使用） */
 .intimacy-hero-bg{
   position:absolute;
   top:0;left:0;right:0;bottom:0;
   background-size:cover;
   background-position:center;
-  opacity:0.4;
+  opacity:0.35;
   transition:opacity .3s;
-}
-.intimacy-hero-card:hover .intimacy-hero-bg{opacity:0.5;}
-.intimacy-hero-content{
-  position:relative;
-  z-index:1;
-  padding:20px 24px;
-  height:100%;
-  display:flex;
-  flex-direction:column;
-  justify-content:center;
-}
-.intimacy-hero-label{
-  font-size:12px;
-  font-weight:500;
-  color:rgba(255,255,255,0.8);
-  text-transform:uppercase;
-  letter-spacing:0.5px;
-  margin-bottom:4px;
-}
-.intimacy-hero-value{
-  font-size:28px;
-  font-weight:700;
-  color:#fff;
-  font-family:'DM Serif Display',serif;
+  border-radius:12px;
 }
 
 /* 親密引擎：進度條組 - 背景透明度 30%，宽度缩窄 */
@@ -596,22 +559,17 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
       <!-- Tab: 身體狀態 -->
       <div class="intimacy-tab-content" id="content-body">
         
-        <!-- Hero 卡片：當前狀態 + 背景圖（整張可點擊） -->
-        <div class="intimacy-hero-card" id="intimacyHeroCard" onclick="document.getElementById('intimacyBgUpload').click()">
-          <input type="file" id="intimacyBgUpload" accept="image/*" style="display:none;">
-          <div class="intimacy-hero-bg" id="intimacyHeroBg"></div>
-          <div class="intimacy-hero-content">
-            <div class="intimacy-hero-label">當前狀態</div>
-            <div class="intimacy-hero-value" id="heroStatus">平穩期</div>
-          </div>
-        </div>
+        <input type="file" id="intimacyBgUpload" accept="image/*" style="display:none;">
         
         <!-- 周期 60% + 事件 40% -->
         <div class="intimacy-status-grid">
-          <div class="intimacy-status-card" style="flex:0 0 calc(60% - 5px);">
-            <div class="intimacy-status-label">周期</div>
-            <div class="intimacy-status-value" id="cycleStage">平穩期</div>
-            <div class="intimacy-status-time" id="cycleDuration">68h 11m</div>
+          <div class="intimacy-status-card" style="flex:0 0 calc(60% - 5px);cursor:pointer;position:relative;overflow:hidden;" onclick="document.getElementById('intimacyBgUpload').click()">
+            <div class="intimacy-hero-bg" id="intimacyHeroBg"></div>
+            <div style="position:relative;">
+              <div class="intimacy-status-label">周期</div>
+              <div class="intimacy-status-value" id="cycleStage">平穩期</div>
+              <div class="intimacy-status-time" id="cycleDuration">68h 11m</div>
+            </div>
           </div>
           <div class="intimacy-status-card" style="flex:0 0 calc(40% - 5px);cursor:pointer;" onclick="document.getElementById('intimacyBgUpload').click()">
             <div class="intimacy-status-label">事件</div>
@@ -1074,10 +1032,8 @@ function renderIntimacy(d){
   // 周期資訊 - 時間格式改為 68h 11m
   if(d.cycle){
     const cycleEl = document.getElementById('cycleStage');
-    const heroEl = document.getElementById('heroStatus');
     const durationEl = document.getElementById('cycleDuration');
     if(cycleEl) cycleEl.textContent = d.cycle.label || '平穩期';
-    if(heroEl) heroEl.textContent = d.cycle.label || '平穩期';
     if(durationEl){
       const hours = d.cycle.hours_elapsed || 0;
       const h = Math.floor(hours);

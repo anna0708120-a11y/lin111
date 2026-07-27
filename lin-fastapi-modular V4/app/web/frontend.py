@@ -156,6 +156,7 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 .intimacy-toggle{font-size:11px;color:var(--muted);transition:transform .25s ease;}
 .intimacy-toggle.open{transform:rotate(180deg);}
 .intimacy-content{margin-top:14px;animation:intimacyFadeIn .25s ease;}
+.intimacy-collapsed-atmosphere{margin-top:8px;font-size:20px;font-weight:600;color:var(--rose-deep);}
 @keyframes intimacyFadeIn{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:translateY(0);}}
 
 /* Tab 切換 */
@@ -549,6 +550,7 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
       <div class="cl">身體狀態</div>
       <div class="intimacy-toggle" id="intimacyToggle">▼</div>
     </div>
+    <div class="intimacy-collapsed-atmosphere" id="intimacyCollapsedAtmosphere"></div>
     <div class="intimacy-content" id="intimacyContent" style="display:none;">
       <!-- Tab 切換 -->
       <div class="intimacy-tabs">
@@ -905,9 +907,20 @@ function toggleIntimacy(){
   intimacyOpen=!intimacyOpen;
   const content=document.getElementById('intimacyContent');
   const toggle=document.getElementById('intimacyToggle');
+  const collapsedEl=document.getElementById('intimacyCollapsedAtmosphere');
   if(content) content.style.display = intimacyOpen ? 'block' : 'none';
   if(toggle) toggle.classList.toggle('open', intimacyOpen);
+  if(collapsedEl) collapsedEl.style.display = intimacyOpen ? 'none' : 'block';
   if(intimacyOpen && !intimacyLoaded){ loadIntimacy(); intimacyLoaded=true; }
+}
+
+async function loadCollapsedAtmosphere(){
+  try{
+    const r=await fetch(AU+'/intimacy');
+    const d=await r.json();
+    const collapsedEl=document.getElementById('intimacyCollapsedAtmosphere');
+    if(collapsedEl) collapsedEl.textContent = d.atmosphere || '慢慢靠近';
+  }catch(e){console.error('[loadCollapsedAtmosphere]',e);}
 }
 
 function switchIntimacyTab(tab){
@@ -1134,6 +1147,7 @@ function updateCatExpression(mood){
   if(bubble && !pokeTimeoutId && !bubble.classList.contains('thinking')) bubble.textContent = icon;
 }
 loadMood();
+loadCollapsedAtmosphere();
 
 // ---------- PWA ----------
 if('serviceWorker' in navigator){

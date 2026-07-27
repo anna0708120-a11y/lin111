@@ -851,7 +851,11 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 <script src="/static/js/chat_view.js"></script>
 <script>
 const AU = window.location.origin;
-const CK = 'lin_chat_v1';
+
+// 当前 Session 的聊天记录内存缓存（取代 localStorage 的 lin_chat_v1）。
+// Database（Supabase）是唯一真相来源；这里只是当前会话渲染用的内存副本，
+// 刷新页面/关闭浏览器后会消失，下次加载时由 renderOnly() 从数据库重新灌入。
+let chatMemoryCache = [];
 
 function ts(){const n=new Date();return n.getHours().toString().padStart(2,'0')+':'+n.getMinutes().toString().padStart(2,'0');}
 function utime(){document.getElementById('ctime').textContent=ts();}
@@ -1307,33 +1311,55 @@ function renderMessages(history){
 }
 
 function lchat(){
-  renderMessages(JSON.parse(localStorage.getItem(CK)||'[]'));
+  // 不再读 localStorage，直接用当前 Session 的内存缓存重画。
+  // 换头像等场景会调用这个函数，只需要重新渲染已经在内存里的消息。
+  renderMessages(chatMemoryCache);
+}
+
+function renderOnly(history){
+  // 把資料庫回來的歷史畫到畫面上，並整批寫入內存快取（取代 localStorage）。
+  // 專門給 Session 切換 / 新建 / 頁面初次載入時的 replay 用。
+  const mapped = (history || []).map(m => {
+    const iso = m.iso || m.time || new Date().toISOString();
+    let display = '';
+    try {
+      const d = new Date(iso);
+      display = d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+    } catch(e) {}
+    return {
+      r: m.role || m.r,
+      t: m.content != null ? m.content : m.t,
+      iso: iso,
+      time: display,
+      think: m.thinking || m.think
+    };
+  });
+  chatMemoryCache = mapped;
+  renderMessages(chatMemoryCache);
 }
 
 async function syncChat(){
-  // 跨装置同步：从 Supabase 共享的聊天记录覆盖本地 localStorage，
-  // 这样手机 dock / 电脑 dock / 网页版打开时看到的是同一份对话，不是各自锁死的本地缓存。
-  // 失败（离线/后端没起来）就安静地退回原本的 localStorage 内容，不影响原有体验。
+  // 跨装置同步：直接从 Supabase 拉当前 session 的聊天记录渲染，
+  // 数据库是唯一真相来源，不写入 localStorage，只更新内存缓存。
   try{
     const r = await fetch(AU+'/conversation');
     const d = await r.json();
     if(d && Array.isArray(d.messages)){
-      localStorage.setItem(CK, JSON.stringify(d.messages));
+      renderOnly(d.messages);
     }
   }catch(e){
-    console.error('[syncChat] 同步聊天记录失败，先显示本地缓存:', e);
+    console.error('[syncChat] 同步聊天记录失败:', e);
   }
-  lchat();
 }
 
 function smsg(role,text,think){
-  const h=JSON.parse(localStorage.getItem(CK)||'[]');
+  // 只负责把新消息追加到当前 Session 的内存缓存并触发渲染，不写 localStorage。
+  // 真正的持久化由 send()/SSE 流程已经在写的后端 API 负责（数据库才是唯一来源）。
   const entry = {r:role,t:text,time:ts(),iso:new Date().toISOString()};
   if(think) entry.think = think;
-  h.push(entry);
-  if(h.length>200)h.splice(0,h.length-200);
-  localStorage.setItem(CK,JSON.stringify(h));
-  return h;
+  chatMemoryCache.push(entry);
+  if(chatMemoryCache.length>200) chatMemoryCache = chatMemoryCache.slice(-200);
+  return chatMemoryCache;
 }
 
 
@@ -2125,11 +2151,11 @@ async function renderActiveSession(sessionId, { fresh = false } = {}) {
   await new Promise(r => setTimeout(r, 120));
 
   if (fresh) {
+    chatMemoryCache = [];
     chatView.clear();
   } else {
     const messages = await sessionManager.getMessages(sessionId);
-    chatView.clear();
-    messages.forEach(msg => chatView.addMessage(msg.role, msg.content, msg.thinking, false));
+    chatView.renderHistory(messages);
   }
 
   const session = sessionManager.getCurrentSession();
@@ -2150,6 +2176,12 @@ async function initChatExperience() {
 
   const session = sessionManager.getCurrentSession();
   chatView.updateHeader(session ? session.title : '新对话');
+  
+  // 首次加载时渲染当前 session 的历史记录
+  if (session && session.id) {
+    const messages = await sessionManager.getMessages(session.id);
+    chatView.renderHistory(messages);
+  }
 }
 
 document.addEventListener('DOMContentLoaded', initChatExperience);

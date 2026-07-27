@@ -732,3 +732,101 @@ def delete_session(session_id: str):
     session_module.delete_session(session_id)
     return {"status": "Success", "message": "聊天室已删除"}
 
+# ========== 前端侧边栏使用的会话 API ==========
+@router.get("/chat-sessions")
+def get_chat_sessions():
+    """获取所有聊天会话列表（侧边栏用）"""
+    from app import session as session_module
+    
+    sessions = session_module.get_session_list()
+    # 格式化为前端需要的格式
+    formatted_sessions = []
+    for s in sessions:
+        # 从数据库加载该 session 的第一条消息作为标题
+        title = s.get("title", "新对话")
+        
+        # 如果标题还是默认的，尝试从第一条消息生成
+        if title == "新对话":
+            conversations = db.load_conversations(limit=1, session_id=s["id"])
+            if conversations and len(conversations) > 0:
+                first_msg = conversations[0]
+                content = first_msg.get("content", "")
+                if content:
+                    title = content[:30] + ("..." if len(content) > 30 else "")
+        
+        # 格式化时间显示
+        created_at = s.get("created_at", "")
+        time_display = ""
+        if created_at:
+            try:
+                from datetime import datetime
+                dt = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+                now = datetime.now()
+                diff = now - dt
+                
+                if diff.days == 0:
+                    time_display = dt.strftime("%H:%M")
+                elif diff.days == 1:
+                    time_display = "昨天"
+                elif diff.days < 7:
+                    time_display = f"{diff.days}天前"
+                else:
+                    time_display = dt.strftime("%m/%d")
+            except:
+                time_display = created_at[:10]
+        
+        formatted_sessions.append({
+            "id": s["id"],
+            "title": title,
+            "time": time_display,
+            "message_count": s.get("message_count", 0)
+        })
+    
+    return {"sessions": formatted_sessions}
+
+@router.post("/chat-sessions")
+def create_chat_session(payload: dict):
+    """创建新的聊天会话"""
+    new_session = state.create_new_session()
+    return {
+        "status": "Success",
+        "session_id": new_session["id"],
+        "session": new_session
+    }
+
+@router.get("/chat-sessions/{session_id}")
+def get_chat_session(session_id: str):
+    """获取指定会话的消息"""
+    try:
+        # 从数据库加载该 session 的所有消息
+        conversations = db.load_conversations(limit=1000, session_id=session_id)
+        
+        # 格式化消息
+        messages = []
+        for conv in conversations:
+            messages.append({
+                "role": conv.get("role", ""),
+                "content": conv.get("content", ""),
+                "thinking": conv.get("thinking"),
+                "time": conv.get("time") or conv.get("created_at", "")
+            })
+        
+        return {
+            "status": "Success",
+            "messages": messages
+        }
+    except Exception as e:
+        print(f"[get_chat_session] Error: {e}")
+        return {"status": "Error", "message": "加载会话失败"}
+
+@router.delete("/chat-sessions/{session_id}")
+def delete_chat_session(session_id: str):
+    """删除聊天会话（侧边栏用）"""
+    from app import session as session_module
+    
+    if session_id == state.current_session_id:
+        return {"status": "Error", "message": "无法删除当前正在使用的聊天室"}
+    
+    session_module.delete_session(session_id)
+    return {"status": "Success"}
+

@@ -150,6 +150,33 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 .qt{flex:1;height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
 .qf{height:100%;background:var(--rose);border-radius:2px;transition:width .3s;}
 
+/* 侧边栏 (Claude 风格) */
+.sidebar-btn{width:40px;height:40px;border:none;background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--dark);border-radius:8px;transition:background .2s;}
+.sidebar-btn:hover{background:var(--blush);}
+.sidebar-btn svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;}
+.sidebar-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.4);z-index:300;opacity:0;pointer-events:none;transition:opacity .25s ease;}
+.sidebar-overlay.active{opacity:1;pointer-events:auto;}
+.sidebar{position:fixed;top:0;left:-280px;bottom:0;width:280px;background:var(--white);z-index:301;transition:left .25s ease;display:flex;flex-direction:column;box-shadow:2px 0 12px var(--shadow);}
+.sidebar.active{left:0;}
+.sidebar-header{padding:20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.sidebar-title{font-size:16px;font-weight:600;color:var(--dark);}
+.sidebar-close{width:32px;height:32px;border:none;background:none;cursor:pointer;color:var(--muted);font-size:20px;border-radius:6px;transition:background .2s;}
+.sidebar-close:hover{background:var(--blush);}
+.sidebar-content{flex:1;overflow-y:auto;padding:12px;}
+.sidebar-section{margin-bottom:24px;}
+.sidebar-section-title{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:8px;padding:0 12px;}
+.sidebar-new-btn{width:100%;padding:12px 16px;background:var(--rose);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;margin-bottom:16px;transition:background .2s;}
+.sidebar-new-btn:hover{background:var(--rose-deep);}
+.sidebar-session{padding:12px 16px;border-radius:8px;cursor:pointer;margin-bottom:4px;transition:background .2s;display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.sidebar-session:hover{background:var(--blush);}
+.sidebar-session.active{background:var(--blush);border-left:3px solid var(--rose);}
+.sidebar-session-info{flex:1;min-width:0;}
+.sidebar-session-title{font-size:13px;color:var(--dark);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sidebar-session-time{font-size:10px;color:var(--muted);margin-top:2px;}
+.sidebar-session-delete{width:24px;height:24px;border:none;background:none;color:var(--muted);cursor:pointer;border-radius:4px;opacity:0;transition:opacity .2s,background .2s;}
+.sidebar-session:hover .sidebar-session-delete{opacity:1;}
+.sidebar-session-delete:hover{background:var(--rose);color:#fff;}
+
 /* 親密狀態卡片 */
 .intimacy-card{cursor:default;}
 .intimacy-header{display:flex;align-items:center;justify-content:space-between;cursor:pointer;margin-bottom:0;}
@@ -693,6 +720,31 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 </div>
 
 <div class="pg" id="pg-chat">
+  <!-- 侧边栏按钮 -->
+  <button class="sidebar-btn" onclick="toggleSidebar()" style="position:absolute;top:8px;left:8px;z-index:100;">
+    <svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+  </button>
+  
+  <!-- 侧边栏遮罩 -->
+  <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+  
+  <!-- 侧边栏 -->
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-title">聊天室</div>
+      <button class="sidebar-close" onclick="toggleSidebar()">×</button>
+    </div>
+    <div class="sidebar-content">
+      <button class="sidebar-new-btn" onclick="createNewSession()">+ New chat</button>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Recent</div>
+        <div id="sessionList">
+          <div class="es" style="padding:20px;">加载中...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
   <div class="cms" id="cm"><div class="clabel">with Lin</div></div>
   <div class="img-preview-bar" id="imgPreviewBar" style="display:none">
     <img id="imgPreviewThumb" class="img-preview-thumb">
@@ -1161,8 +1213,12 @@ function stab(tab){
   document.getElementById('tb-'+tab).classList.add('active');
   document.querySelectorAll('.pg').forEach(e=>{e.style.display='none';e.classList.remove('active');});
   const pg=document.getElementById('pg-'+tab);
-  if(tab==='chat'){pg.style.display='flex';pg.classList.add('active');setTimeout(()=>{const c=document.getElementById('cm');c.scrollTop=c.scrollHeight;},50);}
-  else{pg.style.display='block';pg.classList.add('active');if(tab==='memory')rmem();if(tab==='monitor')loadMood();if(tab==='mine'){loadPeriod();loadChatConfig();}}
+  if(tab==='chat'){
+    pg.style.display='flex';pg.classList.add('active');
+    setTimeout(()=>{const c=document.getElementById('cm');c.scrollTop=c.scrollHeight;},50);
+    if(!currentSessionId && chatSessions.length === 0){createNewSession();}
+  }
+  else{pg.style.display='block';pg.classList.add('active');if(tab==='memory')rmem();if(tab==='monitor')loadMood();if(tab==='mine'){loadPeriod();loadChatConfig();loadTogetherDays();}}
 }
 // 页面加载时如果是Mine tab,立即展开
 if(document.getElementById('pg-mine')?.classList.contains('active')){loadPeriod();loadChatConfig();}
@@ -2044,6 +2100,124 @@ function uploadTogetherBg() {
   };
   input.click();
 }
+
+// ========== 侧边栏 (Claude 风格) ==========
+let currentSessionId = null;
+let chatSessions = [];
+
+function toggleSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebarOverlay');
+  const isActive = sidebar.classList.contains('active');
+  
+  if (isActive) {
+    sidebar.classList.remove('active');
+    overlay.classList.remove('active');
+  } else {
+    sidebar.classList.add('active');
+    overlay.classList.add('active');
+    loadSessions();
+  }
+}
+
+async function loadSessions() {
+  try {
+    const res = await fetch(AU + '/chat-sessions');
+    const data = await res.json();
+    chatSessions = data.sessions || [];
+    renderSessions();
+  } catch (err) {
+    console.error('Failed to load sessions:', err);
+    document.getElementById('sessionList').innerHTML = '<div class="es">加载失败</div>';
+  }
+}
+
+function renderSessions() {
+  const list = document.getElementById('sessionList');
+  if (chatSessions.length === 0) {
+    list.innerHTML = '<div class="es">暂无聊天记录</div>';
+    return;
+  }
+  
+  let html = '';
+  chatSessions.forEach(session => {
+    const isActive = session.id === currentSessionId;
+    const title = session.title || '新对话';
+    const time = session.time || '';
+    html += `
+      <div class="sidebar-session ${isActive ? 'active' : ''}" onclick="switchSession('${session.id}')">
+        <div class="sidebar-session-info">
+          <div class="sidebar-session-title">${title}</div>
+          <div class="sidebar-session-time">${time}</div>
+        </div>
+        <button class="sidebar-session-delete" onclick="event.stopPropagation();deleteSession('${session.id}')">✕</button>
+      </div>
+    `;
+  });
+  list.innerHTML = html;
+}
+
+async function createNewSession() {
+  try {
+    const res = await fetch(AU + '/chat-sessions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: '新对话' })
+    });
+    const data = await res.json();
+    if (data.session_id) {
+      currentSessionId = data.session_id;
+      await loadSessions();
+      await switchSession(data.session_id);
+      toggleSidebar();
+    }
+  } catch (err) {
+    console.error('Failed to create session:', err);
+  }
+}
+
+async function switchSession(sessionId) {
+  try {
+    currentSessionId = sessionId;
+    const res = await fetch(AU + '/chat-sessions/' + sessionId);
+    const data = await res.json();
+    
+    // 清空当前聊天区域并加载该 session 的消息
+    const cm = document.getElementById('cm');
+    cm.innerHTML = '<div class="clabel">with Lin</div>';
+    
+    if (data.messages && data.messages.length > 0) {
+      data.messages.forEach(msg => {
+        addMsg(msg.role, msg.content, false);
+      });
+    }
+    
+    scrollDown();
+    renderSessions();
+  } catch (err) {
+    console.error('Failed to switch session:', err);
+  }
+}
+
+async function deleteSession(sessionId) {
+  if (!confirm('确定要删除这个对话吗？')) return;
+  
+  try {
+    await fetch(AU + '/chat-sessions/' + sessionId, { method: 'DELETE' });
+    
+    if (currentSessionId === sessionId) {
+      currentSessionId = null;
+      const cm = document.getElementById('cm');
+      cm.innerHTML = '<div class="clabel">with Lin</div>';
+    }
+    
+    await loadSessions();
+  } catch (err) {
+    console.error('Failed to delete session:', err);
+  }
+}
+
+
 
 </script>
 </body>

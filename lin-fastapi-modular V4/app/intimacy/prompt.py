@@ -91,13 +91,33 @@ def build_intimacy_prompt(state, now: datetime) -> str:
         hours_elapsed = (now - state.cycle_started_at).total_seconds() / 3600.0
         sections.append(f"【周期】\n目前處於{cycle.label}（已持續約 {int(hours_elapsed)} 小時）")
     
-    # 8. V4: 互動意願
+    # 8. V4 + V4.1: 互動意願（含動態調整）
     from app.intimacy.consent import calculate_consent, get_consent_description
     relationship = getattr(state, 'relationship', {"safety": 50, "rapport": 50, "temperature": 50})
-    consent = calculate_consent(state.mood, body_values, relationship)
+    consent_dynamics = getattr(state, 'consent_dynamics', None)
+    consent = calculate_consent(state.mood, body_values, relationship, consent_dynamics=consent_dynamics)
+    
+    consent_lines = []
     if consent < 40 or consent > 70:  # 只在明顯偏離時顯示
         consent_desc = get_consent_description(consent, state.mood, body_values, relationship)
-        sections.append(f"【互動意願】\n{consent_desc}")
+        consent_lines.append(consent_desc)
+    
+    # V4.1: 如果有動態調整，顯示最近的調整原因
+    if consent_dynamics:
+        active_adjustments = consent_dynamics.get_active_adjustments(now)
+        if active_adjustments:
+            # 只顯示最近 3 個
+            recent = sorted(active_adjustments, key=lambda x: x.timestamp, reverse=True)[:3]
+            if recent:
+                consent_lines.append("\n最近的互動影響:")
+                for adj in recent:
+                    effect = adj.get_current_effect(now)
+                    if abs(effect) > 1:  # 只顯示影響還有意義的
+                        sign = "+" if effect > 0 else ""
+                        consent_lines.append(f"  • {adj.reason} ({sign}{effect:.1f})")
+    
+    if consent_lines:
+        sections.append(f"【互動意願】\n{chr(10).join(consent_lines)}")
     
     # 9. V4: 夢境回響
     if hasattr(state, 'last_dream_at') and state.last_dream_at:
@@ -106,6 +126,12 @@ def build_intimacy_prompt(state, now: datetime) -> str:
             seed = getattr(state, 'last_dream_seed', None)
             if seed:
                 sections.append(f"【夢境回響】\n你剛從一個夢中醒來：{seed.theme}\n這個夢會影響你接下來的語氣和情緒。")
+    
+    # 10. V4.1: 過往夢境摘要（如果有 7 天內的夢境記錄）
+    if hasattr(state, 'dream_history'):
+        dream_summary = state.dream_history.get_dream_summary_for_prompt(days=7)
+        if dream_summary:
+            sections.append(f"【過往夢境】\n{dream_summary}")
     
     return "\n\n".join(sections)
 

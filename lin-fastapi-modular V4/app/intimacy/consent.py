@@ -1,12 +1,18 @@
 """
-互動意願計算（V4）
+互動意願計算（V4 + V4.1）
 
 計算 Lin 此刻對親密互動的意願程度（0-100）
-受 Mood + Body + Relationship 共同影響
+受 Mood + Body + Relationship + ConsentDynamics 共同影響
 """
 
 
-def calculate_consent(mood: dict, body_values: dict, relationship: dict, recent_context: dict = None) -> float:
+def calculate_consent(
+    mood: dict, 
+    body_values: dict, 
+    relationship: dict, 
+    recent_context: dict = None,
+    consent_dynamics=None
+) -> float:
     """
     計算當前互動意願
     
@@ -15,6 +21,7 @@ def calculate_consent(mood: dict, body_values: dict, relationship: dict, recent_
         body_values: Body State 的數值
         relationship: Relationship 的數值
         recent_context: 最近對話情境（可選）
+        consent_dynamics: ConsentDynamics 實例（V4.1，可選）
     
     Returns:
         互動意願分數 (0-100)
@@ -43,6 +50,11 @@ def calculate_consent(mood: dict, body_values: dict, relationship: dict, recent_
             base += 15
         if recent_context.get("user_initiated_intimacy"):
             base += 10
+    
+    # V4.1: 應用動態調整
+    if consent_dynamics:
+        from app.intimacy.consent_dynamics import get_consent_with_dynamics
+        return get_consent_with_dynamics(base, consent_dynamics)
     
     return max(0, min(100, base))
 

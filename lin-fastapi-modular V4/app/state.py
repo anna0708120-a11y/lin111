@@ -146,6 +146,14 @@ class AppState:
         # V4 新增：Dream
         self.last_dream_at = None
         self.last_dream_seed = None
+        
+        # V4.1 新增：Dream History
+        from app.intimacy.dream_history import DreamHistory
+        self.dream_history = DreamHistory(max_records=10)
+        
+        # V4.1 新增：Consent Dynamics
+        from app.intimacy.consent_dynamics import ConsentDynamics
+        self.consent_dynamics = ConsentDynamics()
 
     # ---------- 日志 ----------
     # ---------- 聊天记录配置 ----------

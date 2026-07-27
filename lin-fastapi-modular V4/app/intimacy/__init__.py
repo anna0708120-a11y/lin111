@@ -1,5 +1,5 @@
 """
-Intimacy Engine 入口（V1-V4 完整版）
+Intimacy Engine 入口（V1-V4.1 完整版）
 """
 
 from app.intimacy.cycle import (
@@ -35,6 +35,11 @@ from app.intimacy.dream import (
     apply_dream_after_effect
 )
 
+from app.intimacy.dream_history import (
+    DreamHistory,
+    DreamRecord
+)
+
 __all__ = [
     'CYCLES',
     'get_current_cycle',
@@ -53,5 +58,7 @@ __all__ = [
     'DreamSettings',
     'maybe_create_dream_trigger',
     'extract_dream_seed',
-    'apply_dream_after_effect'
+    'apply_dream_after_effect',
+    'DreamHistory',
+    'DreamRecord'
 ]

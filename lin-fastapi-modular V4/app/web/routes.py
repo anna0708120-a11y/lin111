@@ -118,6 +118,16 @@ def observe_anna(activity: Activity):
         state.update_app_cooldown(activity.app_name)
         context = f"Anna刚打开了{activity.app_name}"
     else:
+        # V4.1: 檢測用戶行為並動態調整 Consent
+        if hasattr(state, 'consent_dynamics') and activity.activity:
+            from app.intimacy.consent_dynamics import detect_behavior_and_adjust
+            detected_behavior = detect_behavior_and_adjust(
+                activity.activity,
+                state.consent_dynamics
+            )
+            if detected_behavior:
+                state.add_log("consent", f"行為檢測: {detected_behavior}")
+        
         # 处理图片消息
         if activity.image:
             context = f"Anna发了一张图片"
@@ -198,6 +208,61 @@ def get_intimacy_status():
             f"sensitivity(敏感度) → {cycle.targets['sensitivity']:.0f} ({cycle.growth_rates['sensitivity']:+.1f}/h)\n"
             f"control(控制力) → {cycle.targets['control']:.0f} ({cycle.growth_rates['control']:+.1f}/h)"
         )
+    }
+
+@router.get("/intimacy/consent")
+def get_consent_dynamics():
+    """
+    V4.1: Consent 動態調整查詢
+    返回當前互動意願及其影響因素
+    """
+    from datetime import datetime
+    from app.intimacy.consent import calculate_consent, get_consent_level, get_consent_description
+    from app.intimacy.tick import tick_and_update
+    
+    # 先 tick 確保數值最新
+    tick_and_update(state, datetime.now())
+    
+    # 計算 Consent
+    body_values = getattr(state, 'body_values', {})
+    relationship = getattr(state, 'relationship', {"safety": 50, "rapport": 50, "temperature": 50})
+    consent_dynamics = getattr(state, 'consent_dynamics', None)
+    
+    base_consent = calculate_consent(state.mood, body_values, relationship)
+    
+    # 獲取動態調整
+    adjustments_list = []
+    total_adjustment = 0
+    final_consent = base_consent
+    
+    if consent_dynamics:
+        from app.intimacy.consent_dynamics import get_consent_with_dynamics
+        final_consent = get_consent_with_dynamics(base_consent, consent_dynamics)
+        total_adjustment = consent_dynamics.get_total_adjustment()
+        
+        # 獲取有效調整列表
+        active = consent_dynamics.get_active_adjustments(datetime.now())
+        for adj in sorted(active, key=lambda x: x.timestamp, reverse=True):
+            effect = adj.get_current_effect(datetime.now())
+            if abs(effect) > 0.5:  # 只顯示有明顯效果的
+                hours_ago = (datetime.now() - adj.timestamp).total_seconds() / 3600.0
+                adjustments_list.append({
+                    "reason": adj.reason,
+                    "effect": round(effect, 1),
+                    "hours_ago": round(hours_ago, 1),
+                    "decay_progress": round((hours_ago / adj.decay_hours) * 100, 1) if adj.decay_hours > 0 else 100
+                })
+    
+    consent_level = get_consent_level(final_consent)
+    consent_desc = get_consent_description(final_consent, state.mood, body_values, relationship)
+    
+    return {
+        "base_consent": round(base_consent, 1),
+        "total_adjustment": round(total_adjustment, 1),
+        "final_consent": round(final_consent, 1),
+        "level": consent_level,
+        "description": consent_desc,
+        "adjustments": adjustments_list
     }
 
 @router.get("/intimacy/events")

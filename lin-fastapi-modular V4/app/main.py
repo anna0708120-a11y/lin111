@@ -63,7 +63,16 @@ def intimacy_tick_job():
     # 2. 檢查夢境觸發
     last_message_at = getattr(state, 'last_anchor_at', None)
     if maybe_create_dream_trigger(state, now, last_message_at):
-        state.add_log("dream", f"夢境觸發：{getattr(state, 'last_dream_seed', None)}")
+        seed = getattr(state, 'last_dream_seed', None)
+        if seed:
+            # V4.1: 記錄到夢境歷史
+            from app.intimacy.dream import apply_dream_after_effect
+            deltas = apply_dream_after_effect(state, seed.tags)
+            
+            if hasattr(state, 'dream_history'):
+                state.dream_history.add_dream(seed, now, deltas)
+            
+            state.add_log("dream", f"夢境觸發：{seed.theme}")
 
 scheduler.add_job(
     intimacy_tick_job,

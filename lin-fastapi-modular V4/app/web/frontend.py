@@ -168,6 +168,9 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 .sidebar-new-btn{width:100%;padding:10px 14px;background:var(--rose);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;margin-bottom:12px;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:6px;}
 .sidebar-new-btn:hover{background:var(--rose-deep);transform:translateY(-1px);}
 .sidebar-new-btn:active{transform:translateY(0);}
+.sidebar-new-btn-fixed{width:calc(100% - 24px);margin:12px;padding:10px 14px;background:var(--rose);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;transition:all .2s;flex-shrink:0;}
+.sidebar-new-btn-fixed:hover{background:var(--rose-deep);transform:translateY(-1px);}
+.sidebar-new-btn-fixed:active{transform:translateY(0);}
 .sidebar-session{padding:10px 12px;border-radius:6px;cursor:pointer;margin-bottom:2px;transition:background .15s;display:flex;align-items:center;justify-content:space-between;gap:8px;position:relative;}
 .sidebar-session:hover{background:var(--blush);}
 .sidebar-session.active{background:var(--blush);}
@@ -736,7 +739,6 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
       <button class="sidebar-close" id="sidebarClose">×</button>
     </div>
     <div class="sidebar-content">
-      <button class="sidebar-new-btn" id="sidebarNewBtn">+ New chat</button>
       <div class="sidebar-section">
         <div class="sidebar-section-title">Recent</div>
         <div id="sessionList">

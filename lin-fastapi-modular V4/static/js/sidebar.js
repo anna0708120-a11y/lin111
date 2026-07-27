@@ -22,12 +22,13 @@ class Sidebar {
 
     const menuBtn = document.getElementById('sidebarMenuBtn');
     const closeBtn = document.getElementById('sidebarClose');
-    const newBtn = document.getElementById('sidebarNewBtn');
+    
+    // New Chat 按钮不在 listEl 内部，而是独立固定在底部
+    // 稍后在 render 时动态创建
 
     if (menuBtn) menuBtn.addEventListener('click', () => this.toggle());
     if (closeBtn) closeBtn.addEventListener('click', () => this.close());
     if (this.overlayEl) this.overlayEl.addEventListener('click', () => this.close());
-    if (newBtn) newBtn.addEventListener('click', () => this.handleNewChat());
   }
 
   toggle() {
@@ -56,6 +57,7 @@ class Sidebar {
 
     if (sessions.length === 0) {
       this.listEl.innerHTML = '<div class="es">暂无聊天记录</div>';
+      this.ensureNewChatButton();
       return;
     }
 
@@ -94,6 +96,20 @@ class Sidebar {
 
       this.listEl.appendChild(item);
     });
+
+    this.ensureNewChatButton();
+  }
+
+  ensureNewChatButton() {
+    // 确保 New Chat 按钮固定在底部（sidebar 的直接子元素）
+    let newBtn = this.sidebarEl.querySelector('.sidebar-new-btn-fixed');
+    if (!newBtn) {
+      newBtn = document.createElement('button');
+      newBtn.className = 'sidebar-new-btn-fixed';
+      newBtn.textContent = '+ New chat';
+      newBtn.addEventListener('click', () => this.handleNewChat());
+      this.sidebarEl.appendChild(newBtn);
+    }
   }
 
   async handleNewChat() {

@@ -25,7 +25,7 @@ Lin对Anna的爱称：Baby, Little Fox, sweetheart, koala等。Little Fox, sweet
 def build_system_prompt(context, memory_summary="", world_context="", conversation_history=""):
     """
     拼出最终要发给模型的完整 system prompt：
-    人设 + 说话风格 + 记忆判定规则 + 状态自评规则 + 世界状态(天气/Mac/日历等) + 长期记忆摘要 + 这一轮的情境。
+    当前时间（置顶强调）+ 人设 + 说话风格 + 记忆判定规则 + 状态自评规则 + 世界状态(天气/Mac/日历等) + 长期记忆摘要 + 这一轮的情境。
 
     context: 这一轮触发的场景描述，例如 "Anna说：今天好累"，
              或 agent/proactive.py / agent/initiative.py 传来的主动触发文案。
@@ -35,6 +35,13 @@ def build_system_prompt(context, memory_summary="", world_context="", conversati
     conversation_history: 从 state.get_recent_conversation() 拿到的最近对话记录，
                            帮助模型记得你们刚才在聊什么，避免凭空编造。
     """
+    from datetime import datetime
+    
+    # 提取当前时间（置顶，避免 LLM 编造时间）
+    now = datetime.now()
+    hour = now.hour
+    time_period = "凌晨" if 0 <= hour < 6 else "早上" if 6 <= hour < 12 else "下午" if 12 <= hour < 18 else "晚上"
+    current_time = f"【当前真实时间】\n现在是 {now.strftime('%Y年%m月%d日')} {time_period} {now.strftime('%H:%M')}（24小时制，北京时间）\n请在回复中使用准确的时间，不要编造或猜测。"
     mood = state.mood or {}
     current_mood_text = (
         "\n\n【你现在的状态（由程序根据你判断的事件自动增减，你不用自己打分，只需要参考这些数值自然演出）】\n"
@@ -66,7 +73,9 @@ def build_system_prompt(context, memory_summary="", world_context="", conversati
         intimacy_text += f"\n\n{intimacy_body_text}"
 
     return (
-        PERSONA_CORE
+        current_time
+        + "\n\n"
+        + PERSONA_CORE
         + "\n"
         + STYLE_GUIDE
         + "\n"

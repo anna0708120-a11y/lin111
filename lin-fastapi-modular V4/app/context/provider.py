@@ -46,14 +46,10 @@ def format_context_for_prompt(context_dict):
     """
     把 get_context() 的结果转成一段给 persona.build_system_prompt 用的文字。
     只在有值时才组装对应那一行，不会出现"天气：无"这种废话占 token。
+    
+    注意：时间信息已由 persona.py 在 prompt 开头单独强调，此处不再重复显示。
     """
     lines = []
-    
-    # 當前真實時間（伺服器時間，明確標註是當下這一刻）
-    now = datetime.now()
-    hour = now.hour
-    time_period = "凌晨" if 0 <= hour < 6 else "早上" if 6 <= hour < 12 else "下午" if 12 <= hour < 18 else "晚上"
-    lines.append(f"現在是 {now.strftime('%Y年%m月%d日')} {time_period} {now.strftime('%H:%M')}（24小時制，這是伺服器當前真實時間）")
     
     if "weather" in context_dict:
         w = context_dict["weather"]

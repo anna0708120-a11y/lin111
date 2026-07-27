@@ -12,9 +12,16 @@ class SessionManager {
 
   async init() {
     await this.loadSessions();
-    if (this.sessions.length > 0) {
-      this.currentSessionId = this.sessions[0].id;
-    }
+    if (this.sessions.length === 0) return;
+
+    // 恢復上次的 session（UI 狀態存在 localStorage.lin_current_session）
+    // 如果找不到（session 已刪除），退回最近一條
+    const saved = localStorage.getItem('lin_current_session');
+    const exists = saved && this.sessions.find(s => s.id === saved);
+    this.currentSessionId = exists ? saved : this.sessions[0].id;
+
+    // 立即通知後端同步 current_session_id，確保前後端一致
+    await this._notifySwitch(this.currentSessionId);
   }
 
   async loadSessions() {
@@ -55,6 +62,7 @@ class SessionManager {
       const data = await res.json();
       if (data.session_id) {
         this.currentSessionId = data.session_id;
+        localStorage.setItem('lin_current_session', data.session_id); // 持久化 UI 狀態
         await this._notifySwitch(data.session_id);
         await this.loadSessions();
         return data.session_id;
@@ -69,6 +77,7 @@ class SessionManager {
   async switchTo(sessionId) {
     try {
       this.currentSessionId = sessionId;
+      localStorage.setItem('lin_current_session', sessionId); // 持久化 UI 狀態
       await this._notifySwitch(sessionId);
       return true;
     } catch (err) {

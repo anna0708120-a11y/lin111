@@ -1827,7 +1827,8 @@ async function delmem(id){
   rmem();
 }
 
-syncChat();llogs();setInterval(()=>{llogs();if(document.getElementById('tb-monitor').classList.contains('active')){loadMood();if(intimacyOpen)loadIntimacy();}},10000);
+// syncChat() 已從啟動流程移除。初始化唯一入口：DOMContentLoaded → initChatExperience()
+llogs();setInterval(()=>{llogs();if(document.getElementById('tb-monitor').classList.contains('active')){loadMood();if(intimacyOpen)loadIntimacy();}},10000);
 
 // ========== 经期记录功能 ==========
 let periodData = { records: [], cycle: 28 };
@@ -2115,7 +2116,7 @@ const sessionManager = new SessionManager(AU);
 const sidebar = new Sidebar(sessionManager);
 const chatView = new ChatView();
 
-async function renderActiveSession(sessionId, { fresh = false } = {}) {
+async function renderActiveSession(sessionId, { fresh = false, skipFeedback = false } = {}) {
   const cm = document.getElementById('cm');
   cm.classList.add('fading');
 
@@ -2134,7 +2135,10 @@ async function renderActiveSession(sessionId, { fresh = false } = {}) {
   chatView.scrollToBottom();
 
   cm.classList.remove('fading');
-  chatView.showFeedback(fresh ? '已建立新聊天' : '已切換聊天');
+  // 頁面初始化時不顯示「已切換聊天」提示
+  if (!skipFeedback) {
+    chatView.showFeedback(fresh ? '已建立新聊天' : '已切換聊天');
+  }
 }
 
 sidebar.onNewChat = (sessionId) => renderActiveSession(sessionId, { fresh: true });
@@ -2145,13 +2149,14 @@ async function initChatExperience() {
   sidebar.init();
   await sessionManager.init();
 
+  // 唯一初始化入口：統一走 renderActiveSession()，與切換 Session、New Chat 共用同一條流程。
+  // sessionManager.init() 已恢復 localStorage 記錄的 session 並通知後端同步，
+  // 這裡直接渲染該 session 的歷史（從 Supabase，不依賴 cache）。
   const session = sessionManager.getCurrentSession();
-  chatView.updateHeader(session ? session.title : '新对话');
-  
-  // 首次加载时渲染当前 session 的历史记录
   if (session && session.id) {
-    const messages = await sessionManager.getMessages(session.id);
-    chatView.renderHistory(messages);
+    await renderActiveSession(session.id, { fresh: false, skipFeedback: true });
+  } else {
+    chatView.updateHeader('新对话');
   }
 }
 

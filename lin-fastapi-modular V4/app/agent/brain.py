@@ -251,13 +251,15 @@ def write_daily_journal():
         state.add_note(content)
     state.mark_journal_written()
 
-def generate_reply_stream(context, app_name=None, use_cache=True):
+def generate_reply_stream(context, app_name=None, use_cache=True, session_id=None):
     """
     流式生成回覆，yield SSE 格式的事件。
     """
     from app.llm.deepseek_client import call_deepseek_stream
     from app.memory_rules import parse_memory_decision, parse_mood_event, strip_hidden_blocks
     from app import mood_engine
+    
+    target_session = session_id or state.current_session_id
     
     if not state.check_rate_limit():
         err_msg = "今天额度用完了，或者刚刚问太快了，ata: {}\n\n"
@@ -322,7 +324,7 @@ def generate_reply_stream(context, app_name=None, use_cache=True):
                 
                 if full_content and full_content not in ("信号不好。", "今天额度用完了，或者刚刚问太快了，等一下再说。"):
                     thinking_display = strip_hidden_blocks(full_reasoning) if full_reasoning else None
-                    state.add_conversation_turn("lin", full_content, thinking=thinking_display)
+                    state.add_conversation_turn("lin", full_content, thinking=thinking_display, session_id=target_session)
                     
                     from app.notify.bark import send_to_bark
                     send_to_bark(full_content)

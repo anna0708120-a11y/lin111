@@ -322,12 +322,14 @@ class AppState:
         return f"\n\n【Lin对Anna的记忆】\n{lines}"
 
     # ---------- 对话历史 ----------
-    def add_conversation_turn(self, role, content, thinking=None, image_data=None):
+    def add_conversation_turn(self, role, content, thinking=None, image_data=None, session_id=None):
         """
         记录一轮对话：role 是 'anna' 或 'lin'，content 是说的话。
         用 deque(maxlen=config.CHAT_HISTORY_LIMIT) 自动保留最近N条，超过自动丢弃最旧的。
         同时写回 Supabase，让手机/电脑/网页三端下次打开能读到同一份记录。
         """
+        target_session = session_id or self.current_session_id
+        
         turn = {
             "role": role,
             "content": content,
@@ -337,17 +339,14 @@ class AppState:
         }
         self.conversation_history.append(turn)
         
-        # 写入数据库时带上 session_id
-        db.insert_conversation_turn(role, content, thinking=thinking, image_data=image_data, session_id=self.current_session_id)
+        db.insert_conversation_turn(role, content, thinking=thinking, image_data=image_data, session_id=target_session)
         
-        # 更新 session 活跃时间
         from app import session as session_module
-        session_module.update_session_activity(self.current_session_id)
+        session_module.update_session_activity(target_session)
         
-        # 如果是第一条消息，自动生成标题
         if len(self.conversation_history) == 1 and role == "anna":
             title = content[:30] + "..." if len(content) > 30 else content
-            session_module.update_session_title(self.current_session_id, title)
+            session_module.update_session_title(target_session, title)
 
     def get_recent_conversation(self, n=20):
         """取最近 n 条对话，按时间正序返回，给 DeepSeek 当 messages 历史用。"""

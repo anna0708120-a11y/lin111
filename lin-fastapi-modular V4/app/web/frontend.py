@@ -1440,7 +1440,6 @@ async function confirmImageSend() {
   const txt = inp.value.trim();
   inp.value = '';
   
-  // 隱藏預覽列
   document.getElementById('imgPreviewBar').style.display = 'none';
   document.getElementById('chatImageUpload').value = '';
   
@@ -1448,10 +1447,11 @@ async function confirmImageSend() {
   typing(true);
   
   try {
+    const currentSessionId = sessionManager.currentSessionId;
     const response = await fetch(AU + '/watch', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({activity: txt || '看圖片', image: base64})
+      body: JSON.stringify({activity: txt || '看圖片', image: base64, session_id: currentSessionId})
     });
     
     if (!response.ok) throw new Error('Upload failed');
@@ -1587,10 +1587,11 @@ async function send(){
   typing(true);
   
   try{
+    const currentSessionId = sessionManager.currentSessionId;
     const response = await fetch(AU+'/watch', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({activity: txt})
+      body: JSON.stringify({activity: txt, session_id: currentSessionId})
     });
     
     if(!response.ok) throw new Error('Network error');

@@ -24,7 +24,8 @@ router = APIRouter()
 class Activity(BaseModel):
     activity: str
     app_name: Optional[str] = None
-    image: Optional[str] = None  # base64 图片数据
+    image: Optional[str] = None
+    session_id: Optional[str] = None
 
 class MemoryItem(BaseModel):
     category: str
@@ -107,18 +108,18 @@ def observe_anna(activity: Activity):
     """
     🔥 Streaming 版本：返回 SSE 流式回應
     """
+    target_session_id = activity.session_id or state.current_session_id
+    
     if activity.app_name and activity.app_name != "聊天界面":
         if not state.check_app_cooldown(activity.app_name):
-            # Cooldown 時返回空 stream
             def empty_stream():
-                yield "event: content\ndata: {\"delta\": \"\"}\n\n"
-                yield "event: done\ndata: {}\n\n"
+                yield "event: conten{\"delta\": \"\"}\n\n"
+                yield "event: done\n {}\n\n"
             return StreamingResponse(empty_stream(), media_type="text/event-stream")
         
         state.update_app_cooldown(activity.app_name)
         context = f"Anna刚打开了{activity.app_name}"
     else:
-        # V4.1: 檢測用戶行為並動態調整 Consent
         if hasattr(state, 'consent_dynamics') and activity.activity:
             from app.intimacy.consent_dynamics import detect_behavior_and_adjust
             detected_behavior = detect_behavior_and_adjust(
@@ -128,23 +129,21 @@ def observe_anna(activity: Activity):
             if detected_behavior:
                 state.add_log("consent", f"行為檢測: {detected_behavior}")
         
-        # 处理图片消息
         if activity.image:
             context = f"Anna发了一张图片"
             if activity.activity and activity.activity != '[图片]':
                 context += f"，并说: {activity.activity}"
-            state.add_conversation_turn("anna", context, image_data=activity.image)
+            state.add_conversation_turn("anna", context, image_data=activity.image, session_id=target_session_id)
         else:
             context = f"Anna说：{activity.activity}"
-            state.add_conversation_turn("anna", activity.activity)
+            state.add_conversation_turn("anna", activity.activity, session_id=target_session_id)
     
-    # 返回 StreamingResponse
     return StreamingResponse(
-        generate_reply_stream(context, app_name=activity.app_name, use_cache=False),
+        generate_reply_stream(context, app_name=activity.app_name, use_cache=False, session_id=target_session_id),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no"  # 防止 Nginx 緩衝
+            "X-Accel-Buffering": "no"
         }
     )
 

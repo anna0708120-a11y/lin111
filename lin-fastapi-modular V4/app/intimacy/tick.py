@@ -1,7 +1,7 @@
 """
-時間推進系統（V1 + V2）
+時間推進系統（V1 + V2 + V4.2）
 
-讓身體狀態隨時間自動變化，V2 新增事件疊加與餘波處理
+讓身體狀態隨時間自動變化，V2 新增事件疊加與餘波處理，V4.2 新增相互影響
 """
 
 from datetime import datetime, timedelta
@@ -18,12 +18,16 @@ def tick_and_update(state, now: datetime):
     - 疊加事件 tick_deltas
     - 疊加餘波 deltas
     - 檢測等待焦躁觸發
+    
+    V4.2 新增：
+    - 應用身體狀態相互影響（influence）
     """
     from app.intimacy.cycle import advance_cycle, get_current_cycle
     from app.intimacy.body_state import calculate_body_state
     from app.intimacy.event import get_event
     from app.intimacy.after_effect import apply_after_effects, cleanup_expired_effects
     from app.intimacy.silence import detect_silence, calculate_silence_pressure
+    from app.intimacy.influence import apply_influence
     
     # 初始化（第一次使用）
     if not hasattr(state, 'last_tick_at') or state.last_tick_at is None:
@@ -109,6 +113,9 @@ def tick_and_update(state, now: datetime):
                 silence_deltas = calculate_silence_pressure(silence_info["silence_minutes"])
                 for field, delta in silence_deltas.items():
                     state.body_values[field] = state.body_values.get(field, 0) + delta * elapsed_hours
+            
+            # V4.2: 應用身體狀態相互影響
+            state.body_values = apply_influence(state.body_values, enabled=True)
             
             # clamp 到 0-100
             for key in state.body_values:

@@ -151,31 +151,34 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 .qf{height:100%;background:var(--rose);border-radius:2px;transition:width .3s;}
 
 /* 侧边栏 (Claude 风格) */
-.sidebar-btn{width:40px;height:40px;border:none;background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--dark);border-radius:8px;transition:background .2s;}
+.sidebar-btn{width:36px;height:36px;border:none;background:var(--white);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--dark);border-radius:6px;transition:background .2s;box-shadow:0 1px 3px var(--shadow);}
 .sidebar-btn:hover{background:var(--blush);}
-.sidebar-btn svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;}
-.sidebar-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.4);z-index:300;opacity:0;pointer-events:none;transition:opacity .25s ease;}
+.sidebar-btn svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;}
+.sidebar-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.3);z-index:300;opacity:0;pointer-events:none;transition:opacity .3s cubic-bezier(0.4, 0, 0.2, 1);}
 .sidebar-overlay.active{opacity:1;pointer-events:auto;}
-.sidebar{position:fixed;top:0;left:-280px;bottom:0;width:280px;background:var(--white);z-index:301;transition:left .25s ease;display:flex;flex-direction:column;box-shadow:2px 0 12px var(--shadow);}
-.sidebar.active{left:0;}
-.sidebar-header{padding:20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
-.sidebar-title{font-size:16px;font-weight:600;color:var(--dark);}
-.sidebar-close{width:32px;height:32px;border:none;background:none;cursor:pointer;color:var(--muted);font-size:20px;border-radius:6px;transition:background .2s;}
+.sidebar{position:fixed;top:0;left:0;bottom:0;width:260px;background:var(--white);z-index:301;transform:translateX(-100%);transition:transform .3s cubic-bezier(0.4, 0, 0.2, 1);display:flex;flex-direction:column;box-shadow:4px 0 24px rgba(0,0,0,.15);}
+.sidebar.active{transform:translateX(0);}
+.sidebar-header{padding:16px 16px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.sidebar-title{font-size:15px;font-weight:600;color:var(--dark);}
+.sidebar-close{width:28px;height:28px;border:none;background:none;cursor:pointer;color:var(--muted);font-size:18px;border-radius:4px;transition:background .2s;display:flex;align-items:center;justify-content:center;}
 .sidebar-close:hover{background:var(--blush);}
-.sidebar-content{flex:1;overflow-y:auto;padding:12px;}
-.sidebar-section{margin-bottom:24px;}
-.sidebar-section-title{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:8px;padding:0 12px;}
-.sidebar-new-btn{width:100%;padding:12px 16px;background:var(--rose);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;margin-bottom:16px;transition:background .2s;}
-.sidebar-new-btn:hover{background:var(--rose-deep);}
-.sidebar-session{padding:12px 16px;border-radius:8px;cursor:pointer;margin-bottom:4px;transition:background .2s;display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.sidebar-content{flex:1;overflow-y:auto;padding:8px;}
+.sidebar-section{margin-bottom:20px;}
+.sidebar-section-title{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:6px;padding:0 10px;font-weight:500;}
+.sidebar-new-btn{width:100%;padding:10px 14px;background:var(--rose);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;margin-bottom:12px;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:6px;}
+.sidebar-new-btn:hover{background:var(--rose-deep);transform:translateY(-1px);}
+.sidebar-new-btn:active{transform:translateY(0);}
+.sidebar-session{padding:10px 12px;border-radius:6px;cursor:pointer;margin-bottom:2px;transition:background .15s;display:flex;align-items:center;justify-content:space-between;gap:8px;position:relative;}
 .sidebar-session:hover{background:var(--blush);}
-.sidebar-session.active{background:var(--blush);border-left:3px solid var(--rose);}
-.sidebar-session-info{flex:1;min-width:0;}
-.sidebar-session-title{font-size:13px;color:var(--dark);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.sidebar-session-time{font-size:10px;color:var(--muted);margin-top:2px;}
-.sidebar-session-delete{width:24px;height:24px;border:none;background:none;color:var(--muted);cursor:pointer;border-radius:4px;opacity:0;transition:opacity .2s,background .2s;}
+.sidebar-session.active{background:var(--blush);}
+.sidebar-session.active::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:20px;background:var(--rose);border-radius:0 2px 2px 0;}
+.sidebar-session-info{flex:1;min-width:0;padding-left:4px;}
+.sidebar-session.active .sidebar-session-info{padding-left:8px;}
+.sidebar-session-title{font-size:13px;color:var(--dark);font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.4;}
+.sidebar-session-time{font-size:11px;color:var(--muted);margin-top:1px;}
+.sidebar-session-delete{width:22px;height:22px;border:none;background:none;color:var(--muted);cursor:pointer;border-radius:4px;opacity:0;transition:opacity .2s,background .15s;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:14px;}
 .sidebar-session:hover .sidebar-session-delete{opacity:1;}
-.sidebar-session-delete:hover{background:var(--rose);color:#fff;}
+.sidebar-session-delete:hover{background:rgba(200,60,60,.1);color:#c83c3c;}
 
 /* 親密狀態卡片 */
 .intimacy-card{cursor:default;}
@@ -344,7 +347,8 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 .minp{resize:none;min-height:72px;}
 .msel:focus,.minp:focus{border-color:var(--rose);}
 .msave{background:var(--rose);color:white;border:none;border-radius:10px;padding:10px;font-size:13px;font-weight:600;cursor:pointer;}
-.cms{flex:1;overflow-y:auto;padding:16px 16px 8px;-webkit-overflow-scrolling:touch;}
+.cms{flex:1;overflow-y:auto;padding:16px 16px 8px;-webkit-overflow-scrolling:touch;position:relative;}
+.cms .sidebar-btn{position:absolute;top:8px;left:8px;}
 .ciw{padding:10px 16px;background:var(--white);border-top:1px solid var(--border);display:flex;gap:10px;align-items:center;}
 .ci{flex:1;border:1.5px solid var(--border);border-radius:22px;padding:9px 16px;font-size:14px;font-family:'DM Sans',sans-serif;background:var(--cream);outline:none;color:var(--dark);}
 .ci:focus{border-color:var(--rose);}
@@ -720,11 +724,6 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 </div>
 
 <div class="pg" id="pg-chat">
-  <!-- 侧边栏按钮 -->
-  <button class="sidebar-btn" onclick="toggleSidebar()" style="position:absolute;top:8px;left:8px;z-index:100;">
-    <svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-  </button>
-  
   <!-- 侧边栏遮罩 -->
   <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
   
@@ -745,7 +744,12 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
     </div>
   </div>
   
-  <div class="cms" id="cm"><div class="clabel">with Lin</div></div>
+  <div class="cms" id="cm">
+    <button class="sidebar-btn" onclick="toggleSidebar()">
+      <svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+    <div class="clabel">with Lin</div>
+  </div>
   <div class="img-preview-bar" id="imgPreviewBar" style="display:none">
     <img id="imgPreviewThumb" class="img-preview-thumb">
     <span class="img-preview-label">已選擇圖片</span>
@@ -2167,9 +2171,21 @@ async function createNewSession() {
     const data = await res.json();
     if (data.session_id) {
       currentSessionId = data.session_id;
+      
+      // 通知后端切换到新 session
+      await fetch(AU + '/sessions/switch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: data.session_id })
+      });
+      
+      // 清空当前聊天区域
+      const cm = document.getElementById('cm');
+      cm.innerHTML = '<div class="clabel">with Lin</div>';
+      
       await loadSessions();
-      await switchSession(data.session_id);
       toggleSidebar();
+      scrollDown();
     }
   } catch (err) {
     console.error('Failed to create session:', err);
@@ -2179,6 +2195,14 @@ async function createNewSession() {
 async function switchSession(sessionId) {
   try {
     currentSessionId = sessionId;
+    
+    // 通知后端切换 session
+    await fetch(AU + '/sessions/switch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: sessionId })
+    });
+    
     const res = await fetch(AU + '/chat-sessions/' + sessionId);
     const data = await res.json();
     

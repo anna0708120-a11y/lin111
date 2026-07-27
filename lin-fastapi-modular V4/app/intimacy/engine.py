@@ -84,11 +84,11 @@ def get_intimacy_state(mood):
     注意：這裡不包含「關係階段」——已依需求移除，
     因為目前設定 Lin 與 Anna 一律是戀人關係，不需要再判斷陌生/熟悉/親近。
     """
-    from app.intimacy.body_state import get_body_state
-
     willingness = compute_willingness(mood)
     atmosphere = get_atmosphere(willingness, mood)
-    body_state = get_body_state()
+    
+    # V4: body_state 已移至 /intimacy/status，這裡只保留兼容性
+    body_state = {"note": "已遷移至 /intimacy/status"}
 
     return {
         "willingness": willingness,

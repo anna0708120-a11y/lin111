@@ -1,0 +1,480 @@
+## Architecture Plan (Revised)
+
+### 核心定位
+
+**聊天框未来定位为 Conversation Timeline，而不是单纯的 Message List。**
+
+所有内容（文字、思考、工具、系统事件、GitHub、Codex、MCP）都统一作为 Timeline Item 渲染，不同类型交由对应 Renderer 处理。数据库仍作为唯一真实来源，前端仅保留当前会话的内存缓存以提升体验。
+
+---
+
+### Timeline Item 类型系统
+
+```typescript
+type TimelineItem = 
+  | MessageItem        // 用户/AI 文字消息
+  | ThinkingItem       // AI 思考过程
+  | ToolStatusItem     // 工具调用状态（GitHub/Codex/MCP/Search）
+  | SystemItem         // 系统通知（Session 创建/切换/Render 部署）
+  | ErrorItem          // 错误提示
+
+interface MessageItem {
+  type: 'message';
+  role: 'anna' | 'lin';
+  content: string;
+  time: string;
+  read?: boolean;
+}
+
+interface ThinkingItem {
+  type: 'thinking';
+  content: string;
+  collapsed: boolean;
+}
+
+interface ToolStatusItem {
+  type: 'tool';
+  tool: 'github' | 'codex' | 'mcp' | 'search' | 'supabase' | 'render';
+  status: 'running' | 'success' | 'error';
+  message: string;
+  details?: string[];
+}
+
+interface SystemItem {
+  type: 'system';
+  level: 'info' | 'warning';
+  message: string;
+}
+```
+
+---
+
+### 数据流架构
+
+```
+Database (Single Source of Truth)
+         ↓
+SessionManager.getMessages(sessionId)
+         ↓
+Memory Cache (当前 Session)
+         ↓
+Event Bus (SessionChanged / MessageReceived / ToolUpdated)
+         ↓
+ChatView (判断 Item 类型)
+         ↓
+Renderer 分发
+    ├─ MessageRenderer
+    ├─ ThinkingRenderer
+    ├─ ToolRenderer
+    └─ SystemRenderer
+```
+
+**关键原则：**
+- **Database** 是唯一真实来源
+- **Memory Cache** 仅缓存当前 Session，切换时优先用缓存，失效时重新请求
+- **Event Bus** 解耦模块，GitHub/Codex/Memory 等工具只发事件，不直接调用 ChatView
+- **Renderer** 职责单一，每种 Item 类型独立渲染逻辑
+
+---
+
+## 实施顺序（修订版）
+
+### 阶段 0：建立基础架构（新增）
+
+**目标：** 搭建 Timeline 数据结构 + Event Bus + Renderer 分发框架
+
+**变更：**
+1. **创建 `timeline_item.js`（类型定义 + 工厂函数）：**
+   ```js
+   class TimelineItem {
+     constructor(type, data) {
+       this.type = type;
+       this.data = data;
+       this.id = Date.now() + Math.random();
+     }
+   }
+   
+   function createMessage(role, content, time) {
+     return new TimelineItem('message', { role, content, time });
+   }
+   
+   function createToolStatus(tool, status, message) {
+     return new TimelineItem('tool', { tool, status, message });
+   }
+   // ...
+   ```
+
+2. **创建 `event_bus.js`（简单发布订阅）：**
+   ```js
+   class EventBus {
+     constructor() {
+       this.listeners = {};
+     }
+     
+     on(event, callback) {
+       if (!this.listeners[event]) this.listeners[event] = [];
+       this.listeners[event].push(callback);
+     }
+     
+     emit(event, data) {
+       if (!this.listeners[event]) return;
+       this.listeners[event].forEach(cb => cb(data));
+     }
+   }
+   
+   const eventBus = new EventBus();
+   ```
+
+3. **创建 Renderer 基础结构：**
+   - `message_renderer.js` — 渲染文字消息（含头像、时间、已读）
+   - `thinking_renderer.js` — 渲染思考过程（折叠/展开）
+   - `tool_renderer.js` — 渲染工具状态（进度条、✓/✗ 图标）
+   - `system_renderer.js` — 渲染系统通知（分隔线样式）
+
+4. **`ChatView` 改为 Timeline 协调器：**
+   ```js
+   class ChatView {
+     renderTimeline(items) {
+       this.clear();
+       items.forEach(item => {
+         const element = this.renderItem(item);
+         this.container.appendChild(element);
+       });
+     }
+     
+     renderItem(item) {
+       switch(item.type) {
+         case 'message': return MessageRenderer.render(item.data);
+         case 'thinking': return ThinkingRenderer.render(item.data);
+         case 'tool': return ToolRenderer.render(item.data);
+         case 'system': return SystemRenderer.render(item.data);
+         default: return document.createElement('div');
+       }
+     }
+   }
+   ```
+
+**影响文件：** 新增 `timeline_item.js`、`event_bus.js`、`message_renderer.js`、`thinking_renderer.js`、`tool_renderer.js`、`system_renderer.js`，修改 `chat_view.js`
+
+**验证方式：** 创建测试数据 `[createMessage('anna', 'test'), createToolStatus('github', 'running', '正在读取...')]` → 调用 `chatView.renderTimeline()` → 确认两种类型正确渲染
+
+---
+
+### 阶段 1：统一数据源 + Memory Cache
+
+**目标：** 消除 localStorage 聊天缓存，数据库成为唯一真相，前端保留内存缓存
+
+**变更：**
+1. **移除 `localStorage.lin_chat_v1`：**
+   - 保留 `lin_current_session`（当前 Session ID）
+   - 保留 `lin_theme`（主题）
+   - 删除 `lchat()` 函数（不再写 localStorage）
+
+2. **`SessionManager` 增加内存缓存：**
+   ```js
+   class SessionManager {
+     constructor(apiBase) {
+       this.apiBase = apiBase;
+       this.sessions = [];
+       this.currentSessionId = null;
+       this.messageCache = {}; // { sessionId: [TimelineItem, ...] }
+     }
+     
+     async getMessages(sessionId) {
+       // 优先用缓存
+       if (this.messageCache[sessionId]) {
+         return this.messageCache[sessionId];
+       }
+       
+       // 缓存未命中，从数据库加载
+       const res = await fetch(this.apiBase + '/chat-sessions/' + sessionId);
+       const data = await res.json();
+       const items = data.messages.map(msg => createMessage(msg.role, msg.content, msg.time));
+       
+       // 写入缓存
+       this.messageCache[sessionId] = items;
+       return items;
+     }
+     
+     invalidateCache(sessionId) {
+       delete this.messageCache[sessionId];
+     }
+   }
+   ```
+
+3. **发送消息时更新缓存：**
+   ```js
+   async function send() {
+     const input = document.getElementById('ci').value;
+     const item = createMessage('anna', input, new Date().toISOString());
+     
+     // 立即更新缓存
+     sessionManager.messageCache[sessionManager.currentSessionId].push(item);
+     chatView.appendItem(item);
+     
+     // 异步写入数据库
+     await fetch(AU + '/chat', {
+       method: 'POST',
+       body: JSON.stringify({ message: input, session_id: sessionManager.currentSessionId })
+     });
+   }
+   ```
+
+**影响文件：** `session_manager.js`、`frontend.py`（删除 `lchat()`、`syncChat()`）
+
+**验证方式：** 发送消息 → 切换 Session → 切回原 Session → 确认消息仍在（缓存命中）→ 刷新页面 → 消息完整恢复（数据库加载）→ 检查 localStorage → 确认无 `lin_chat_v1` 键
+
+---
+
+### 阶段 2：重构消息渲染为 Timeline
+
+**目标：** 所有消息通过 Timeline Item 渲染，移除旧的 `smsg()`/`renderMessages()`
+
+**变更：**
+1. **`MessageRenderer.render(data)`：**
+   - 输入：`{ role, content, time, read }`
+   - 输出：DOM 元素（含头像、气泡、时间戳、已读状态）
+   - 支持时间分隔线（根据前一条消息时间间隔判断）
+
+2. **`ThinkingRenderer.render(data)`：**
+   - 输入：`{ content, collapsed }`
+   - 输出：折叠/展开的思考过程 UI
+
+3. **`ChatView.renderTimeline(items)` 替代 `renderMessages()`：**
+   - 遍历 `items`，根据 `type` 分发给对应 Renderer
+   - 保留时间分隔线逻辑（30 分钟以上插入 `<div class="tdiv">`）
+
+4. **删除旧的全局函数：**
+   - `smsg()` → 改为 `chatView.appendItem(createMessage(...))`
+   - `renderMessages()` → 改为 `chatView.renderTimeline(items)`
+
+**影响文件：** `message_renderer.js`、`thinking_renderer.js`、`chat_view.js`、`frontend.py`（删除旧函数）
+
+**验证方式：** 切换 Session → 确认历史消息正确渲染 → 发送新消息 → 确认追加到 Timeline 末尾 → 刷新页面 → Timeline 完整恢复
+
+---
+
+### 阶段 3：Event Bus 集成
+
+**目标：** 模块间通过事件通信，解耦 SessionManager/ChatView
+
+**变更：**
+1. **SessionManager 发事件：**
+   ```js
+   async switchTo(sessionId) {
+     this.currentSessionId = sessionId;
+     await this._notifySwitch(sessionId);
+     eventBus.emit('SessionChanged', { sessionId });
+     return true;
+   }
+   ```
+
+2. **ChatView 监听事件：**
+   ```js
+   init() {
+     this.cmEl = document.getElementById('cm');
+     this.headerEl = document.getElementById('chatHeader');
+     
+     eventBus.on('SessionChanged', async ({ sessionId }) => {
+       const items = await sessionManager.getMessages(sessionId);
+       this.renderTimeline(items);
+       this.updateHeader(sessionManager.getCurrentSession()?.title);
+     });
+     
+     eventBus.on('MessageReceived', ({ item }) => {
+       this.appendItem(item);
+     });
+   }
+   ```
+
+3. **发送消息通过事件：**
+   ```js
+   async function send() {
+     const input = document.getElementById('ci').value;
+     const item = createMessage('anna', input, new Date().toISOString());
+     eventBus.emit('MessageReceived', { item });
+     // ...
+   }
+   ```
+
+**影响文件：** `session_manager.js`、`chat_view.js`、`frontend.py`
+
+**验证方式：** 打开 Console → 切换 Session → 确认看到 `SessionChanged` 事件 → 发送消息 → 确认看到 `MessageReceived` 事件 → UI 正常更新
+
+---
+
+### 阶段 4：修复 Sidebar 生命周期
+
+**目标：** New Chat 按钮固定在 HTML，不动态创建，Sidebar 打开不触发页面刷新
+
+**变更：**
+1. **HTML 结构固定（与之前方案一致）：**
+   ```html
+   <div class="sidebar" id="sidebar">
+     <div class="sidebar-header">...</div>
+     <div class="sidebar-content">
+       <div class="sidebar-section">
+         <div class="sidebar-section-title">Recent</div>
+         <div id="sessionList">...</div>
+       </div>
+     </div>
+     <button class="sidebar-new-btn-fixed" id="sidebarNewBtn">+ New chat</button>
+   </div>
+   ```
+
+2. **删除 `ensureNewChatButton()`：**
+   - `sidebar.init()` 时直接 `document.getElementById('sidebarNewBtn').addEventListener('click', ...)`
+   - `render()` 只更新 `sessionList` 内容
+
+3. **添加刷新检测日志：**
+   ```js
+   window.addEventListener('beforeunload', () => console.warn('❌ Page unload detected'));
+   console.log('✅ Sidebar module loaded');
+   ```
+
+**影响文件：** `frontend.py`（HTML）、`sidebar.js`
+
+**验证方式：** 打开 Console → 点击三条线 → 确认只看到 `✅ sidebar.toggle()`，无 `❌ Page unload` → Sidebar 滑出 → New Chat 按钮始终可见 → 刷新页面 → Sidebar 状态正确恢复
+
+---
+
+### 阶段 5：New Chat 流程优化
+
+**目标：** 创建新 Session 清空 Timeline，标题更新，输入框聚焦
+
+**变更：**
+1. **`Sidebar.handleNewChat()`：**
+   ```js
+   async handleNewChat() {
+     const sessionId = await this.sessionManager.createNew();
+     if (sessionId) {
+       this.close();
+       eventBus.emit('SessionChanged', { sessionId });
+       document.getElementById('ci')?.focus();
+     }
+   }
+   ```
+
+2. **`ChatView` 监听 `SessionChanged` 时判断是否为空 Session：**
+   ```js
+   eventBus.on('SessionChanged', async ({ sessionId }) => {
+     const items = await sessionManager.getMessages(sessionId);
+     if (items.length === 0) {
+       this.renderTimeline([createSystem('info', '开始新对话')]);
+     } else {
+       this.renderTimeline(items);
+     }
+     this.updateHeader(sessionManager.getCurrentSession()?.title || '新对话');
+     this.scrollToBottom();
+   });
+   ```
+
+**影响文件：** `sidebar.js`、`chat_view.js`、`system_renderer.js`
+
+**验证方式：** 点击 New Chat → Timeline 清空 → 标题显示"新对话" → 输入框自动聚焦 → 发送消息 → 消息保存到新 Session → 切换回旧 Session → Timeline 完整恢复
+
+---
+
+### 阶段 6：Tool UI 框架预留
+
+**目标：** 实现 `ToolRenderer`，为 GitHub/Codex/MCP 预留接口
+
+**变更：**
+1. **`tool_renderer.js` 实现：**
+   ```js
+   class ToolRenderer {
+     static render(data) {
+       const { tool, status, message, details } = data;
+       const div = document.createElement('div');
+       div.className = 'timeline-tool';
+       
+       const icon = status === 'running' ? '⏳' : status === 'success' ? '✓' : '✗';
+       const statusClass = `tool-${status}`;
+       
+       div.innerHTML = `
+         <div class="tool-header ${statusClass}">
+           <span class="tool-icon">${icon}</span>
+           <span class="tool-name">${tool}</span>
+           <span class="tool-message">${message}</span>
+         </div>
+         ${details ? `<div class="tool-details">${details.join('<br>')}</div>` : ''}
+       `;
+       
+       return div;
+     }
+   }
+   ```
+
+2. **测试数据发送：**
+   ```js
+   // 测试 GitHub Reader
+   eventBus.emit('ToolStarted', { tool: 'github', message: '正在读取 app/state.py' });
+   setTimeout(() => {
+     eventBus.emit('ToolFinished', { tool: 'github', status: 'success', message: '已读取' });
+   }, 2000);
+   ```
+
+3. **`ChatView` 监听工具事件：**
+   ```js
+   eventBus.on('ToolStarted', ({ tool, message }) => {
+     const item = createToolStatus(tool, 'running', message);
+     this.appendItem(item);
+   });
+   
+   eventBus.on('ToolFinished', ({ tool, status, message }) => {
+     // 更新最后一个 tool item 的状态
+     const lastItem = this.getLastToolItem(tool);
+     if (lastItem) {
+       lastItem.data.status = status;
+       lastItem.data.message = message;
+       this.updateItem(lastItem);
+     }
+   });
+   ```
+
+**影响文件：** `tool_renderer.js`、`chat_view.js`、`event_bus.js`
+
+**验证方式：** 在 Console 手动发送 `eventBus.emit('ToolStarted', ...)` → 确认 Timeline 出现工具状态 UI → 发送 `ToolFinished` → 确认状态更新为 ✓
+
+---
+
+## 文件组织结构（最终）
+
+```
+static/js/
+├── timeline_item.js       # Timeline Item 类型定义
+├── event_bus.js           # 事件总线
+├── session_manager.js     # Session CRUD + Memory Cache
+├── sidebar.js             # Sidebar 交互
+├── chat_view.js           # Timeline 协调器
+├── message_renderer.js    # 文字消息渲染
+├── thinking_renderer.js   # 思考过程渲染
+├── tool_renderer.js       # 工具状态渲染
+├── system_renderer.js     # 系统通知渲染
+└── (future)
+    ├── github_reader.js   # GitHub 工具（发 ToolStarted/ToolFinished 事件）
+    ├── codex_runner.js    # Codex 工具
+    └── mcp_client.js      # MCP 工具
+```
+
+---
+
+## 实施顺序总结
+
+0. **阶段 0** — 建立基础架构（Timeline + Event Bus + Renderer 框架）
+1. **阶段 1** — 统一数据源 + Memory Cache
+2. **阶段 2** — 重构消息渲染为 Timeline
+3. **阶段 3** — Event Bus 集成
+4. **阶段 4** — 修复 Sidebar 生命周期
+5. **阶段 5** — New Chat 流程优化
+6. **阶段 6** — Tool UI 框架预留
+
+**每完成一个阶段：**
+- 语法检查 + 括号配对
+- 提交一次 commit（不 push，等你确认）
+- 等待你测试
+- 确认无误后进入下一阶段
+
+---
+
+请确认此修订方案是否可行。确认后我将开始**阶段 0：建立基础架构**。

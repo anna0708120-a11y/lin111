@@ -1273,51 +1273,21 @@ function avatarHtml(role){
 }
 
 function renderMessages(history){
-  console.log('[DEBUG] 🔄 renderMessages called, history.length:', history ? history.length : 0);
-  if(history && history.length > 0){
-    const lastMsg = history[history.length - 1];
-    console.log('[DEBUG] Last message:', lastMsg);
+  // Wrapper: 委托给 ChatView，保持旧代码调用兼容性
+  if (typeof chatView !== 'undefined' && chatView.renderMessages) {
+    chatView.renderMessages(history);
   }
-  const cm=document.getElementById('cm');
-  if(!history||history.length===0){
-    cm.innerHTML='<div class="clabel">with Lin</div><div class="msg lin"><div class="msg-row">'+avatarHtml('lin')+'<div class="bub">打開了？</div></div><div class="mtime2">'+ts()+'</div></div>';
-    cm.scrollTop=cm.scrollHeight;
-    return;
-  }
-  let html='<div class="clabel">with Lin</div>';
-  history.forEach((m,i)=>{
-    const cur=m.iso?new Date(m.iso):new Date();
-    const prev=i>0?history[i-1]:null;
-    const prevTime=prev&&prev.iso?new Date(prev.iso):null;
-    if(!prevTime||(cur-prevTime)>30*60*1000){html+='<div class="tdiv">'+fmtDivider(cur)+'</div>';}
-    const next=i<history.length-1?history[i+1]:null;
-    const nextTime=next&&next.iso?new Date(next.iso):null;
-    const showMeta = !next || next.r!==m.r || (nextTime && (nextTime-cur)>5*60*1000);
-    let meta='';
-    if(showMeta){
-      const read = m.r==='anna' && history.slice(i+1).some(x=>x.r==='lin');
-      meta='<div class="mtime2">'+m.time+(read?' · 已讀':'')+'</div>';
-    }
-    let thinkHtml='';
-    if(m.r==='lin' && m.think){
-      thinkHtml='<div class="think-toggle" onclick="toggleThink(this)">💭 查看思考過程</div><div class="think-box" style="display:none">'+m.think+'</div>';
-    }
-    html+='<div class="msg '+m.r+(showMeta?'':' grouped')+'">'+thinkHtml+'<div class="msg-row">'+avatarHtml(m.r)+'<div class="bub">'+m.t+'</div></div>'+meta+'</div>';
-  });
-  cm.innerHTML=html;
-  cm.scrollTop=cm.scrollHeight;
-  const msgDivs = cm.querySelectorAll('.msg.lin');
-  console.log('[DEBUG] After renderMessages, .msg.lin count:', msgDivs.length);
 }
 
 function lchat(){
-  // 不再读 localStorage，直接用当前 Session 的内存缓存重画。
-  // 换头像等场景会调用这个函数，只需要重新渲染已经在内存里的消息。
-  renderMessages(chatMemoryCache);
+  // Wrapper: 委托给 ChatView.refresh()，换头像等场景调用
+  if (typeof chatView !== 'undefined' && chatView.refresh) {
+    chatView.refresh();
+  }
 }
 
 function renderOnly(history){
-  // 把資料庫回來的歷史畫到畫面上，並整批寫入內存快取（取代 localStorage）。
+  // 把資料庫回來的歷史畫到畫面上，並整批寫入內存快取。
   // 專門給 Session 切換 / 新建 / 頁面初次載入時的 replay 用。
   const mapped = (history || []).map(m => {
     const iso = m.iso || m.time || new Date().toISOString();
@@ -1335,7 +1305,10 @@ function renderOnly(history){
     };
   });
   chatMemoryCache = mapped;
-  renderMessages(chatMemoryCache);
+  // 委托给 ChatView.renderMessages()
+  if (typeof chatView !== 'undefined' && chatView.renderMessages) {
+    chatView.renderMessages(chatMemoryCache);
+  }
 }
 
 async function syncChat(){
@@ -1353,20 +1326,18 @@ async function syncChat(){
 }
 
 function smsg(role,text,think){
-  // 只负责把新消息追加到当前 Session 的内存缓存并触发渲染，不写 localStorage。
-  // 真正的持久化由 send()/SSE 流程已经在写的后端 API 负责（数据库才是唯一来源）。
-  const entry = {r:role,t:text,time:ts(),iso:new Date().toISOString()};
-  if(think) entry.think = think;
-  chatMemoryCache.push(entry);
-  if(chatMemoryCache.length>200) chatMemoryCache = chatMemoryCache.slice(-200);
+  // Wrapper: 委托给 ChatView.appendLiveMessage()，保持旧代码调用兼容性
+  if (typeof chatView !== 'undefined' && chatView.appendLiveMessage) {
+    chatView.appendLiveMessage(role, text, think);
+  }
   return chatMemoryCache;
 }
 
 
 
 function addMsg(role, text, think) {
+  // Wrapper: 保持旧接口，内部调用 smsg (已委托给 ChatView)
   smsg(role, text, think);
-  lchat();
 }
 
 function typing(show) {

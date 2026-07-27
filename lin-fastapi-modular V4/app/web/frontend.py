@@ -193,7 +193,7 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
   top:0;left:0;right:0;bottom:0;
   background-size:cover;
   background-position:center;
-  opacity:0.2;
+  opacity:0.8;
   transition:opacity .3s;
   border-radius:12px;
 }

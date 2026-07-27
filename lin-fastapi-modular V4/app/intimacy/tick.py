@@ -1,7 +1,7 @@
 """
-時間推進系統（V1 + V2 + V4.2）
+時間推進系統（V1 + V2 + V4.2 + V4.3）
 
-讓身體狀態隨時間自動變化，V2 新增事件疊加與餘波處理，V4.2 新增相互影響
+讓身體狀態隨時間自動變化，V2 新增事件疊加與餘波處理，V4.2 新增相互影響，V4.3 新增 Mood 自然衰減
 """
 
 from datetime import datetime, timedelta
@@ -21,6 +21,9 @@ def tick_and_update(state, now: datetime):
     
     V4.2 新增：
     - 應用身體狀態相互影響（influence）
+    
+    V4.3 新增：
+    - 應用 Mood 自然衰減（decay）
     """
     from app.intimacy.cycle import advance_cycle, get_current_cycle
     from app.intimacy.body_state import calculate_body_state
@@ -28,6 +31,7 @@ def tick_and_update(state, now: datetime):
     from app.intimacy.after_effect import apply_after_effects, cleanup_expired_effects
     from app.intimacy.silence import detect_silence, calculate_silence_pressure
     from app.intimacy.influence import apply_influence
+    from app.mood.decay import apply_mood_decay
     
     # 初始化（第一次使用）
     if not hasattr(state, 'last_tick_at') or state.last_tick_at is None:
@@ -116,6 +120,9 @@ def tick_and_update(state, now: datetime):
             
             # V4.2: 應用身體狀態相互影響
             state.body_values = apply_influence(state.body_values, enabled=True)
+            
+            # V4.3: 應用 Mood 自然衰減
+            state.mood = apply_mood_decay(state.mood, elapsed_hours, enabled=True)
             
             # clamp 到 0-100
             for key in state.body_values:

@@ -56,7 +56,7 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 .together-camera:hover{background:rgba(255,255,255,1);transform:scale(1.1);}
 .together-camera svg{color:var(--rose-deep);}
 
-.hdr{background:var(--white);padding:16px 20px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:fixed;top:var(--safe-top);left:0;right:0;z-index:200;height:70px;}
+.hdr{background:var(--white);padding:16px 20px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:fixed;top:top:50px;left:0;right:0;z-index:200;height:53px;}
 .cat-wrap{display:flex;align-items:center;gap:12px;}
 .pet-container{position:absolute;top:calc(140px + var(--safe-top));right:30px;z-index:10;}
 .pet-container-chat{position:absolute;bottom:30px;left:20px;z-index:10;transform:scale(0.6);}

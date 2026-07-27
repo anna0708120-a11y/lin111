@@ -187,13 +187,13 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 .intimacy-auto-change-text{font-size:11px;line-height:1.5;color:var(--rose-deep);opacity:.85;white-space:pre-line;}
 
 /* 身體狀態進度條 */
-/* 周期卡背景圖層（點擊周期卡上傳背景圖時使用） */
+/* 周期卡 / 事件卡 背景圖層（各自獨立點擊上傳背景圖時使用） */
 .intimacy-hero-bg{
   position:absolute;
   top:0;left:0;right:0;bottom:0;
   background-size:cover;
   background-position:center;
-  opacity:0.35;
+  opacity:0.2;
   transition:opacity .3s;
   border-radius:12px;
 }
@@ -559,22 +559,26 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
       <!-- Tab: 身體狀態 -->
       <div class="intimacy-tab-content" id="content-body">
         
-        <input type="file" id="intimacyBgUpload" accept="image/*" style="display:none;">
-        
+        <input type="file" id="intimacyCycleBgUpload" accept="image/*" style="display:none;">
+        <input type="file" id="intimacyEventBgUpload" accept="image/*" style="display:none;">
+
         <!-- 周期 60% + 事件 40% -->
         <div class="intimacy-status-grid">
-          <div class="intimacy-status-card" style="flex:0 0 calc(60% - 5px);cursor:pointer;position:relative;overflow:hidden;" onclick="document.getElementById('intimacyBgUpload').click()">
-            <div class="intimacy-hero-bg" id="intimacyHeroBg"></div>
+          <div class="intimacy-status-card" style="flex:0 0 calc(60% - 5px);cursor:pointer;position:relative;overflow:hidden;" onclick="document.getElementById('intimacyCycleBgUpload').click()">
+            <div class="intimacy-hero-bg" id="intimacyCycleBg"></div>
             <div style="position:relative;">
               <div class="intimacy-status-label">周期</div>
               <div class="intimacy-status-value" id="cycleStage">平穩期</div>
               <div class="intimacy-status-time" id="cycleDuration">68h 11m</div>
             </div>
           </div>
-          <div class="intimacy-status-card" style="flex:0 0 calc(40% - 5px);cursor:pointer;" onclick="document.getElementById('intimacyBgUpload').click()">
-            <div class="intimacy-status-label">事件</div>
-            <div class="intimacy-status-value" id="eventName">等待焦躁</div>
-            <div class="intimacy-status-time" id="eventDuration">2h 32m</div>
+          <div class="intimacy-status-card" style="flex:0 0 calc(40% - 5px);cursor:pointer;position:relative;overflow:hidden;" onclick="document.getElementById('intimacyEventBgUpload').click()">
+            <div class="intimacy-hero-bg" id="intimacyEventBg"></div>
+            <div style="position:relative;">
+              <div class="intimacy-status-label">事件</div>
+              <div class="intimacy-status-value" id="eventName">等待焦躁</div>
+              <div class="intimacy-status-time" id="eventDuration">2h 32m</div>
+            </div>
           </div>
         </div>
         
@@ -1048,25 +1052,45 @@ function renderIntimacy(d){
     if(autoEl) autoEl.textContent = d.auto_change_desc;
   }
   
-  // 載入已保存的背景圖
-  const savedBg = localStorage.getItem('intimacy_hero_bg');
-  if(savedBg){
-    const bgEl = document.getElementById('intimacyHeroBg');
-    if(bgEl) bgEl.style.backgroundImage = 'url('+savedBg+')';
+  // 載入已保存的背景圖（周期卡 / 事件卡 各自獨立）
+  const savedCycleBg = localStorage.getItem('intimacy_cycle_bg');
+  if(savedCycleBg){
+    const cycleBgEl = document.getElementById('intimacyCycleBg');
+    if(cycleBgEl) cycleBgEl.style.backgroundImage = 'url('+savedCycleBg+')';
+  }
+  const savedEventBg = localStorage.getItem('intimacy_event_bg');
+  if(savedEventBg){
+    const eventBgEl = document.getElementById('intimacyEventBg');
+    if(eventBgEl) eventBgEl.style.backgroundImage = 'url('+savedEventBg+')';
   }
 }
 
-// 背景圖上傳
-document.getElementById('intimacyBgUpload').addEventListener('change', async (e)=>{
+// 背景圖上傳（周期卡）
+document.getElementById('intimacyCycleBgUpload').addEventListener('change', async (e)=>{
   const file = e.target.files[0];
   if(!file) return;
   try{
     const dataUrl = await resizeImage(file, 800);
-    localStorage.setItem('intimacy_hero_bg', dataUrl);
-    const bgEl = document.getElementById('intimacyHeroBg');
+    localStorage.setItem('intimacy_cycle_bg', dataUrl);
+    const bgEl = document.getElementById('intimacyCycleBg');
     if(bgEl) bgEl.style.backgroundImage = 'url('+dataUrl+')';
   }catch(err){
-    console.error('背景圖上傳失敗', err);
+    console.error('周期背景圖上傳失敗', err);
+  }
+  e.target.value = '';
+});
+
+// 背景圖上傳（事件卡）
+document.getElementById('intimacyEventBgUpload').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  try{
+    const dataUrl = await resizeImage(file, 800);
+    localStorage.setItem('intimacy_event_bg', dataUrl);
+    const bgEl = document.getElementById('intimacyEventBg');
+    if(bgEl) bgEl.style.backgroundImage = 'url('+dataUrl+')';
+  }catch(err){
+    console.error('事件背景圖上傳失敗', err);
   }
   e.target.value = '';
 });

@@ -113,3 +113,57 @@ def get_body_level(value: float) -> str:
         return "中高"
     else:
         return "高"
+
+
+def get_body_description(key: str, value: float) -> str:
+    """根據數值生成動態描述"""
+    
+    if key == "tension":
+        if value < 20:
+            return "幾乎感覺不到累積，輕鬆自在"
+        elif value < 40:
+            return "有一點累積感，但還很淡"
+        elif value < 60:
+            return "開始有明顯的累積，偶爾會浮現念頭"
+        elif value < 80:
+            return "累積感變得明顯，時不時會想起"
+        else:
+            return "累積到頂，普通克制已經很難壓住"
+    
+    elif key == "heat":
+        if value < 20:
+            return "身體很冷靜，幾乎沒有熱意"
+        elif value < 40:
+            return "身體有一點熱意，但還能很快冷住"
+        elif value < 60:
+            return "體溫開始上升，需要稍微注意"
+        elif value < 80:
+            return "身體明顯發熱，很難完全冷靜下來"
+        else:
+            return "熱度很高，整個人都在燒"
+    
+    elif key == "sensitivity":
+        if value < 20:
+            return "感覺很鈍，對刺激沒什麼反應"
+        elif value < 40:
+            return "有一點敏感，但還不明顯"
+        elif value < 60:
+            return "敏感度提升，開始注意到平常不會在意的細節"
+        elif value < 80:
+            return "變得很敏感，一點小刺激就會有反應"
+        else:
+            return "極度敏感，連輕微的觸碰都會有強烈感受"
+    
+    elif key == "control":
+        if value < 20:
+            return "控制力幾乎失效，很難壓住衝動"
+        elif value < 40:
+            return "控制力很弱，需要很用力才能維持表面正常"
+        elif value < 60:
+            return "控制力中等，可以壓住大部分衝動"
+        elif value < 80:
+            return "還能維持表面正常，但需要刻意壓直接的衝動"
+        else:
+            return "控制力很強，可以輕鬆維持理性"
+    
+    return ""

@@ -187,41 +187,48 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 .intimacy-auto-change-text{font-size:11px;line-height:1.5;color:var(--rose-deep);opacity:.85;white-space:pre-line;}
 
 /* 身體狀態進度條 */
-.intimacy-bars{display:flex;flex-direction:column;gap:12px;}
-.intimacy-bar{border-radius:12px;padding:12px;transition:transform .2s;}
+/* 親密引擎卡片組 */
+.intimacy-bars{display:flex;flex-direction:column;gap:16px;padding:4px;}
+.intimacy-bar{
+  border-radius:16px;
+  padding:16px;
+  transition:transform .2s, box-shadow .2s;
+  box-shadow:0 2px 8px rgba(0,0,0,0.06);
+}
 .intimacy-bar:active{transform:scale(0.98);}
+.intimacy-bar:hover{box-shadow:0 4px 12px rgba(0,0,0,0.1);}
 
-/* 配色方案 */
-.intimacy-bar[data-color="purple"]{background:linear-gradient(135deg,#f3e7f9 0%,#e8d4f2 100%);}
+/* 配色方案 - 降低透明度 20% */
+.intimacy-bar[data-color="purple"]{background:linear-gradient(135deg,#ebe0f5 0%,#dcc8ea 100%);}
 .intimacy-bar[data-color="purple"] .intimacy-bar-icon{color:#9b59b6;}
-.intimacy-bar[data-color="purple"] .intimacy-bar-label,.intimacy-bar[data-color="purple"] .intimacy-bar-value,.intimacy-bar[data-color="purple"] .intimacy-bar-desc{color:#7b4397;}
+.intimacy-bar[data-color="purple"] .intimacy-bar-label,.intimacy-bar[data-color="purple"] .intimacy-bar-value,.intimacy-bar[data-color="purple"] .intimacy-bar-desc{color:#6d3d7f;}
 .intimacy-bar[data-color="purple"] .intimacy-bar-fill{background:linear-gradient(90deg,#9b59b6,#b168d6);}
 
-.intimacy-bar[data-color="red"]{background:linear-gradient(135deg,#ffe8e8 0%,#ffd4d4 100%);}
+.intimacy-bar[data-color="red"]{background:linear-gradient(135deg,#fdd8d8 0%,#fcbcbc 100%);}
 .intimacy-bar[data-color="red"] .intimacy-bar-icon{color:#ff6b6b;}
-.intimacy-bar[data-color="red"] .intimacy-bar-label,.intimacy-bar[data-color="red"] .intimacy-bar-value,.intimacy-bar[data-color="red"] .intimacy-bar-desc{color:#d64545;}
+.intimacy-bar[data-color="red"] .intimacy-bar-label,.intimacy-bar[data-color="red"] .intimacy-bar-value,.intimacy-bar[data-color="red"] .intimacy-bar-desc{color:#c23636;}
 .intimacy-bar[data-color="red"] .intimacy-bar-fill{background:linear-gradient(90deg,#ff6b6b,#ff8787);}
 
-.intimacy-bar[data-color="pink"]{background:linear-gradient(135deg,#fef0ff 0%,#f9e0ff 100%);}
+.intimacy-bar[data-color="pink"]{background:linear-gradient(135deg,#f8e0fc 0%,#edc8f7 100%);}
 .intimacy-bar[data-color="pink"] .intimacy-bar-icon{color:#c084fc;}
-.intimacy-bar[data-color="pink"] .intimacy-bar-label,.intimacy-bar[data-color="pink"] .intimacy-bar-value,.intimacy-bar[data-color="pink"] .intimacy-bar-desc{color:#a855f7;}
+.intimacy-bar[data-color="pink"] .intimacy-bar-label,.intimacy-bar[data-color="pink"] .intimacy-bar-value,.intimacy-bar[data-color="pink"] .intimacy-bar-desc{color:#8b3fcc;}
 .intimacy-bar[data-color="pink"] .intimacy-bar-fill{background:linear-gradient(90deg,#c084fc,#d8b4fe);}
 
-.intimacy-bar[data-color="blue"]{background:linear-gradient(135deg,#e8f0fe 0%,#d4e4fc 100%);}
+.intimacy-bar[data-color="blue"]{background:linear-gradient(135deg,#d8e4f9 0%,#c0d4f5 100%);}
 .intimacy-bar[data-color="blue"] .intimacy-bar-icon{color:#667eea;}
-.intimacy-bar[data-color="blue"] .intimacy-bar-label,.intimacy-bar[data-color="blue"] .intimacy-bar-value,.intimacy-bar[data-color="blue"] .intimacy-bar-desc{color:#4a6fa5;}
+.intimacy-bar[data-color="blue"] .intimacy-bar-label,.intimacy-bar[data-color="blue"] .intimacy-bar-value,.intimacy-bar[data-color="blue"] .intimacy-bar-desc{color:#3a5a8f;}
 .intimacy-bar[data-color="blue"] .intimacy-bar-fill{background:linear-gradient(90deg,#667eea,#8ba4f9);}
 
 /* 進度條元件 */
-.intimacy-bar-header{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
-.intimacy-bar-icon{width:20px;height:20px;flex-shrink:0;}
+.intimacy-bar-header{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.intimacy-bar-icon{width:22px;height:22px;flex-shrink:0;}
 .intimacy-bar-icon svg{width:100%;height:100%;}
-.intimacy-bar-label{font-size:13px;font-weight:500;flex:1;}
-.intimacy-bar-value{font-size:13px;font-weight:600;display:flex;align-items:center;gap:4px;}
-.intimacy-bar-level{font-size:11px;font-weight:400;opacity:.7;}
-.intimacy-bar-track{height:8px;background:rgba(255,255,255,.5);border-radius:4px;overflow:hidden;margin-bottom:6px;}
-.intimacy-bar-fill{height:100%;border-radius:4px;transition:width .4s ease;}
-.intimacy-bar-desc{font-size:11px;line-height:1.4;opacity:.75;}
+.intimacy-bar-label{font-size:14px;font-weight:600;flex:1;letter-spacing:0.3px;}
+.intimacy-bar-value{font-size:14px;font-weight:700;display:flex;align-items:center;gap:4px;}
+.intimacy-bar-level{font-size:11px;font-weight:500;opacity:.8;}
+.intimacy-bar-track{height:10px;background:rgba(255,255,255,.6);border-radius:5px;overflow:hidden;margin-bottom:8px;box-shadow:inset 0 1px 3px rgba(0,0,0,0.1);}
+.intimacy-bar-fill{height:100%;border-radius:5px;transition:width .5s cubic-bezier(0.4, 0, 0.2, 1);box-shadow:0 1px 3px rgba(0,0,0,0.15);}
+.intimacy-bar-desc{font-size:12px;line-height:1.5;opacity:.85;font-weight:400;}
 
 /* Tab 內容區 */
 .intimacy-tab-content{}
@@ -946,7 +953,7 @@ function intimacyLevel(val){
 
 async function loadIntimacy(){
   try{
-    const r=await fetch(AU+'/intimacy');
+    const r=await fetch(AU+'/intimacy/status');
     const d=await r.json();
     renderIntimacy(d);
   }catch(e){console.error('[loadIntimacy]',e);}
@@ -961,8 +968,8 @@ function renderIntimacy(d){
   if(willEl) willEl.textContent = d.willingness || '中';
   if(atmoEl) atmoEl.textContent = d.atmosphere || '慢慢靠近';
   
-  // 身體狀態（V1 階段為假資料）
-  const bs = d.body_state || {};
+  // 身體狀態（從 /intimacy/status 讀取）
+  const bs = d.body_values || {};
   const items = [
     {key:'tension', data:bs.tension},
     {key:'heat', data:bs.heat},

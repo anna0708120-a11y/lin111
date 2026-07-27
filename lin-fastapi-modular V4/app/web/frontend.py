@@ -347,8 +347,10 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 .minp{resize:none;min-height:72px;}
 .msel:focus,.minp:focus{border-color:var(--rose);}
 .msave{background:var(--rose);color:white;border:none;border-radius:10px;padding:10px;font-size:13px;font-weight:600;cursor:pointer;}
-.cms{flex:1;overflow-y:auto;padding:16px 16px 8px;-webkit-overflow-scrolling:touch;position:relative;}
-.cms .sidebar-btn{position:absolute;top:8px;left:8px;}
+.cms{flex:1;overflow-y:auto;padding:16px 16px 8px;-webkit-overflow-scrolling:touch;position:relative;transition:opacity .15s ease;}
+.cms.fading{opacity:0;}
+.chat-topbar{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.chat-topbar-title{font-size:14px;font-weight:600;color:var(--dark);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:opacity .2s;}
 .ciw{padding:10px 16px;background:var(--white);border-top:1px solid var(--border);display:flex;gap:10px;align-items:center;}
 .ci{flex:1;border:1.5px solid var(--border);border-radius:22px;padding:9px 16px;font-size:14px;font-family:'DM Sans',sans-serif;background:var(--cream);outline:none;color:var(--dark);}
 .ci:focus{border-color:var(--rose);}
@@ -725,16 +727,16 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 
 <div class="pg" id="pg-chat">
   <!-- 侧边栏遮罩 -->
-  <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
   
   <!-- 侧边栏 -->
   <div class="sidebar" id="sidebar">
     <div class="sidebar-header">
       <div class="sidebar-title">聊天室</div>
-      <button class="sidebar-close" onclick="toggleSidebar()">×</button>
+      <button class="sidebar-close" id="sidebarClose">×</button>
     </div>
     <div class="sidebar-content">
-      <button class="sidebar-new-btn" onclick="createNewSession()">+ New chat</button>
+      <button class="sidebar-new-btn" id="sidebarNewBtn">+ New chat</button>
       <div class="sidebar-section">
         <div class="sidebar-section-title">Recent</div>
         <div id="sessionList">
@@ -744,12 +746,13 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
     </div>
   </div>
   
-  <div class="cms" id="cm">
-    <button class="sidebar-btn" onclick="toggleSidebar()">
+  <div class="chat-topbar">
+    <button class="sidebar-btn" id="sidebarMenuBtn">
       <svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
     </button>
-    <div class="clabel">with Lin</div>
+    <div class="chat-topbar-title" id="chatHeader">新对话</div>
   </div>
+  <div class="cms" id="cm"><div class="clabel">with Lin</div></div>
   <div class="img-preview-bar" id="imgPreviewBar" style="display:none">
     <img id="imgPreviewThumb" class="img-preview-thumb">
     <span class="img-preview-label">已選擇圖片</span>
@@ -841,6 +844,9 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
   <button class="tb" id="tb-mine" onclick="stab('mine')"><span class="ti">🌙</span>Mine</button>
 </div>
 
+<script src="/static/js/session_manager.js"></script>
+<script src="/static/js/sidebar.js"></script>
+<script src="/static/js/chat_view.js"></script>
 <script>
 const AU = window.location.origin;
 const CK = 'lin_chat_v1';
@@ -1220,7 +1226,7 @@ function stab(tab){
   if(tab==='chat'){
     pg.style.display='flex';pg.classList.add('active');
     setTimeout(()=>{const c=document.getElementById('cm');c.scrollTop=c.scrollHeight;},50);
-    if(!currentSessionId && chatSessions.length === 0){createNewSession();}
+    if(!sessionManager.currentSessionId && sessionManager.sessions.length === 0){sidebar.handleNewChat();}
   }
   else{pg.style.display='block';pg.classList.add('active');if(tab==='memory')rmem();if(tab==='monitor')loadMood();if(tab==='mine'){loadPeriod();loadChatConfig();loadTogetherDays();}}
 }
@@ -2105,143 +2111,46 @@ function uploadTogetherBg() {
   input.click();
 }
 
-// ========== 侧边栏 (Claude 风格) ==========
-let currentSessionId = null;
-let chatSessions = [];
+// ========== 聊天体验编排 (Session Manager + Sidebar + Chat View) ==========
+const sessionManager = new SessionManager(AU);
+const sidebar = new Sidebar(sessionManager);
+const chatView = new ChatView();
 
-function toggleSidebar() {
-  const sidebar = document.getElementById('sidebar');
-  const overlay = document.getElementById('sidebarOverlay');
-  const isActive = sidebar.classList.contains('active');
-  
-  if (isActive) {
-    sidebar.classList.remove('active');
-    overlay.classList.remove('active');
+async function renderActiveSession(sessionId, { fresh = false } = {}) {
+  const cm = document.getElementById('cm');
+  cm.classList.add('fading');
+
+  await new Promise(r => setTimeout(r, 120));
+
+  if (fresh) {
+    chatView.clear();
   } else {
-    sidebar.classList.add('active');
-    overlay.classList.add('active');
-    loadSessions();
+    const messages = await sessionManager.getMessages(sessionId);
+    chatView.clear();
+    messages.forEach(msg => chatView.addMessage(msg.role, msg.content, msg.thinking, false));
   }
+
+  const session = sessionManager.getCurrentSession();
+  chatView.updateHeader(session ? session.title : '新对话');
+  chatView.scrollToBottom();
+
+  cm.classList.remove('fading');
+  chatView.showFeedback(fresh ? '已建立新聊天' : '已切換聊天');
 }
 
-async function loadSessions() {
-  try {
-    const res = await fetch(AU + '/chat-sessions');
-    const data = await res.json();
-    chatSessions = data.sessions || [];
-    renderSessions();
-  } catch (err) {
-    console.error('Failed to load sessions:', err);
-    document.getElementById('sessionList').innerHTML = '<div class="es">加载失败</div>';
-  }
+sidebar.onNewChat = (sessionId) => renderActiveSession(sessionId, { fresh: true });
+sidebar.onSwitchSession = (sessionId) => renderActiveSession(sessionId, { fresh: false });
+
+async function initChatExperience() {
+  chatView.init();
+  sidebar.init();
+  await sessionManager.init();
+
+  const session = sessionManager.getCurrentSession();
+  chatView.updateHeader(session ? session.title : '新对话');
 }
 
-function renderSessions() {
-  const list = document.getElementById('sessionList');
-  if (chatSessions.length === 0) {
-    list.innerHTML = '<div class="es">暂无聊天记录</div>';
-    return;
-  }
-  
-  let html = '';
-  chatSessions.forEach(session => {
-    const isActive = session.id === currentSessionId;
-    const title = session.title || '新对话';
-    const time = session.time || '';
-    html += `
-      <div class="sidebar-session ${isActive ? 'active' : ''}" onclick="switchSession('${session.id}')">
-        <div class="sidebar-session-info">
-          <div class="sidebar-session-title">${title}</div>
-          <div class="sidebar-session-time">${time}</div>
-        </div>
-        <button class="sidebar-session-delete" onclick="event.stopPropagation();deleteSession('${session.id}')">✕</button>
-      </div>
-    `;
-  });
-  list.innerHTML = html;
-}
-
-async function createNewSession() {
-  try {
-    const res = await fetch(AU + '/chat-sessions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: '新对话' })
-    });
-    const data = await res.json();
-    if (data.session_id) {
-      currentSessionId = data.session_id;
-      
-      // 通知后端切换到新 session
-      await fetch(AU + '/sessions/switch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session_id: data.session_id })
-      });
-      
-      // 清空当前聊天区域
-      const cm = document.getElementById('cm');
-      cm.innerHTML = '<div class="clabel">with Lin</div>';
-      
-      await loadSessions();
-      toggleSidebar();
-      scrollDown();
-    }
-  } catch (err) {
-    console.error('Failed to create session:', err);
-  }
-}
-
-async function switchSession(sessionId) {
-  try {
-    currentSessionId = sessionId;
-    
-    // 通知后端切换 session
-    await fetch(AU + '/sessions/switch', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ session_id: sessionId })
-    });
-    
-    const res = await fetch(AU + '/chat-sessions/' + sessionId);
-    const data = await res.json();
-    
-    // 清空当前聊天区域并加载该 session 的消息
-    const cm = document.getElementById('cm');
-    cm.innerHTML = '<div class="clabel">with Lin</div>';
-    
-    if (data.messages && data.messages.length > 0) {
-      data.messages.forEach(msg => {
-        addMsg(msg.role, msg.content, false);
-      });
-    }
-    
-    scrollDown();
-    renderSessions();
-  } catch (err) {
-    console.error('Failed to switch session:', err);
-  }
-}
-
-async function deleteSession(sessionId) {
-  if (!confirm('确定要删除这个对话吗？')) return;
-  
-  try {
-    await fetch(AU + '/chat-sessions/' + sessionId, { method: 'DELETE' });
-    
-    if (currentSessionId === sessionId) {
-      currentSessionId = null;
-      const cm = document.getElementById('cm');
-      cm.innerHTML = '<div class="clabel">with Lin</div>';
-    }
-    
-    await loadSessions();
-  } catch (err) {
-    console.error('Failed to delete session:', err);
-  }
-}
-
-
+document.addEventListener('DOMContentLoaded', initChatExperience);
 
 </script>
 </body>

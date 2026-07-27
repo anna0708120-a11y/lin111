@@ -154,7 +154,59 @@ class AppState:
         # V4.1 新增：Consent Dynamics
         from app.intimacy.consent_dynamics import ConsentDynamics
         self.consent_dynamics = ConsentDynamics()
+        
+        # 多聊天室支持（参考 Claude 界面）
+        from app import session as session_module
+        self.current_session_id = session_module.get_default_session()
+        # 每个 session 有自己的对话历史缓存
+        self.session_conversations = {}  # {session_id: deque([...])}
+        # 加载当前 session 的对话历史
+        self._load_session_conversations(self.current_session_id)
 
+    # ---------- 日志 ----------
+    # ---------- 多聊天室管理 ----------
+    def _load_session_conversations(self, session_id):
+        """加载指定 session 的对话历史到缓存"""
+        if session_id in self.session_conversations:
+            self.conversation_history = self.session_conversations[session_id]
+            return
+        
+        # 从数据库加载
+        cached_config = db.load_context("chat_config")
+        if cached_config and cached_config.get("payload") and cached_config["payload"].get("limit"):
+            chat_limit = cached_config["payload"]["limit"]
+        else:
+            chat_limit = config.CHAT_HISTORY_LIMIT
+        
+        conversations = deque(
+            (
+                {
+                    "role": r.get("role", ""),
+                    "content": r.get("content", ""),
+                    "thinking": r.get("thinking"),
+                    "image_data": r.get("image_data"),
+                    "time": r.get("time") or r.get("created_at", ""),
+                }
+                for r in db.load_conversations(limit=chat_limit, session_id=session_id)
+            ),
+            maxlen=chat_limit,
+        )
+        
+        self.session_conversations[session_id] = conversations
+        self.conversation_history = conversations
+    
+    def switch_session(self, session_id):
+        """切换到指定的聊天室"""
+        self.current_session_id = session_id
+        self._load_session_conversations(session_id)
+    
+    def create_new_session(self):
+        """创建新聊天室并切换过去"""
+        from app import session as session_module
+        new_session = session_module.create_new_session()
+        self.switch_session(new_session["id"])
+        return new_session
+    
     # ---------- 日志 ----------
     # ---------- 聊天记录配置 ----------
     def update_chat_history_limit(self, new_limit: int):
@@ -284,7 +336,18 @@ class AppState:
             "time": datetime.now().isoformat(),
         }
         self.conversation_history.append(turn)
-        db.insert_conversation_turn(role, content, thinking=thinking, image_data=image_data)
+        
+        # 写入数据库时带上 session_id
+        db.insert_conversation_turn(role, content, thinking=thinking, image_data=image_data, session_id=self.current_session_id)
+        
+        # 更新 session 活跃时间
+        from app import session as session_module
+        session_module.update_session_activity(self.current_session_id)
+        
+        # 如果是第一条消息，自动生成标题
+        if len(self.conversation_history) == 1 and role == "anna":
+            title = content[:30] + "..." if len(content) > 30 else content
+            session_module.update_session_title(self.current_session_id, title)
 
     def get_recent_conversation(self, n=20):
         """取最近 n 条对话，按时间正序返回，给 DeepSeek 当 messages 历史用。"""

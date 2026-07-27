@@ -692,3 +692,43 @@ def update_together_start_date(payload: TogetherStartDatePayload):
     except Exception as e:
         return {"status": "Error", "message": str(e)}
 
+
+# ========== Session Management (多聊天室管理) ==========
+
+@router.get("/sessions")
+def get_sessions():
+    """获取聊天室列表"""
+    from app import session as session_module
+    sessions = session_module.get_session_list()
+    return {
+        "sessions": sessions,
+        "current_session_id": state.current_session_id
+    }
+
+@router.post("/sessions")
+def create_session():
+    """创建新聊天室"""
+    new_session = state.create_new_session()
+    return {"status": "Success", "session": new_session}
+
+class SwitchSessionPayload(BaseModel):
+    session_id: str
+
+@router.post("/sessions/switch")
+def switch_session(payload: SwitchSessionPayload):
+    """切换到指定聊天室"""
+    state.switch_session(payload.session_id)
+    return {"status": "Success", "session_id": payload.session_id}
+
+@router.delete("/sessions/{session_id}")
+def delete_session(session_id: str):
+    """删除指定聊天室"""
+    from app import session as session_module
+    
+    # 不能删除当前正在使用的 session
+    if session_id == state.current_session_id:
+        return {"status": "Error", "message": "无法删除当前正在使用的聊天室"}
+    
+    session_module.delete_session(session_id)
+    return {"status": "Success", "message": "聊天室已删除"}
+

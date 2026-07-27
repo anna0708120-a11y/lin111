@@ -182,18 +182,23 @@ def insert_log(event_type, content):
 
 
 # ---------- 对话历史（跨装置同步：手机 dock / 电脑 dock / 网页版 共用一份） ----------
-def load_conversations(limit=500):
-    """启动时读一份最近的聊天记录进内存，让三端打开时看到同一份对话。"""
+def load_conversations(limit=500, session_id=None):
+    """启动时读一份最近的聊天记录进内存，让三端打开时看到同一份对话。
+    
+    Args:
+        limit: 最多读取多少条
+        session_id: 如果指定，只读取该 session 的对话；否则读取所有对话（向后兼容）
+    """
     if not _client:
         return []
     try:
-        res = (
-            _client.table("conversation_history")
-            .select("role, content, thinking, image_data, created_at")
-            .order("created_at", desc=True)
-            .limit(limit)
-            .execute()
-        )
+        query = _client.table("conversation_history").select("role, content, thinking, image_data, created_at, session_id")
+        
+        if session_id:
+            query = query.eq("session_id", session_id)
+        
+        res = query.order("created_at", desc=True).limit(limit).execute()
+        
         rows = res.data or []
         rows.reverse()  # 转回时间正序（旧->新），跟内存 deque 的顺序一致
         return rows
@@ -201,7 +206,7 @@ def load_conversations(limit=500):
         print(f"[db] 读取对话历史失败: {e}")
         return []
 
-def insert_conversation_turn(role, content, thinking=None, image_data=None):
+def insert_conversation_turn(role, content, thinking=None, image_data=None, session_id=None):
     if not _client:
         return
     try:
@@ -210,6 +215,7 @@ def insert_conversation_turn(role, content, thinking=None, image_data=None):
             "content": content,
             "thinking": thinking,
             "image_data": image_data,
+            "session_id": session_id,
         }).execute()
     except Exception as e:
         print(f"[db] 写入对话历史失败: {e}")

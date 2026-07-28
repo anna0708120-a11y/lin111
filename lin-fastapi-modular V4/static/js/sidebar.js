@@ -1,6 +1,6 @@
 /**
  * Sidebar
- * 负责：Toggle, Render list, New Chat, Session actions (Rename / Delete / Star-UI-only)
+ * 负责：Toggle, Render list, New Chat, Session actions (Rename / Delete / Star with pin-to-top)
  */
 
 class Sidebar {
@@ -62,7 +62,12 @@ class Sidebar {
 
   async render() {
     await this.sessionManager.loadSessions();
-    const sessions = this.sessionManager.sessions;
+    // 置顶（starred）排在最前，其余保持后端原有的 updated_at 倒序
+    const sessions = [...this.sessionManager.sessions].sort((a, b) => {
+      const aStar = a.starred ? 1 : 0;
+      const bStar = b.starred ? 1 : 0;
+      return bStar - aStar;
+    });
 
     this._closeCtxMenu();
     this.listEl.innerHTML = '';
@@ -151,10 +156,10 @@ class Sidebar {
       label: starred ? 'Unstar' : 'Star',
       svg: '<path d="M8 1.6l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.4 4.2 13.4l.7-4.3-3.1-3 4.3-.6z"/>',
       extraClass: starred ? 'starred' : '',
-      onClick: () => {
+      onClick: async () => {
         this._closeCtxMenu();
-        // Star 目前仅 UI 层，未接入持久化（后端/DB 未提供 starred 字段）
-        console.info('[sidebar] Star 功能尚未接入后端持久化，本次点击不产生数据变更。');
+        await this.sessionManager.toggleStar(session.id);
+        await this.render();
       }
     }));
 

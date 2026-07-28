@@ -128,6 +128,22 @@ class SessionManager {
     }
   }
 
+  async toggleStar(sessionId) {
+    try {
+      const res = await fetch(this.apiBase + '/chat-sessions/' + sessionId + '/star', { method: 'POST' });
+      const data = await res.json();
+      if (data.status === 'Success') {
+        const s = this.sessions.find(s => s.id === sessionId);
+        if (s) s.starred = data.starred;
+        return data.starred;
+      }
+      return null;
+    } catch (err) {
+      console.error('Failed to toggle star:', err);
+      return null;
+    }
+  }
+
   async _notifySwitch(sessionId) {
     await fetch(this.apiBase + '/sessions/switch', {
       method: 'POST',

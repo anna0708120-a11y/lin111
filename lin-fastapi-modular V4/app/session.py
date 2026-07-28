@@ -47,7 +47,7 @@ def get_session_list(limit: int = 20) -> list:
     try:
         res = (
             db._client.table("chat_sessions")
-            .select("id, title, created_at, updated_at, message_count")
+            .select("id, title, created_at, updated_at, message_count, starred")
             .order("updated_at", desc=True)
             .limit(limit)
             .execute()
@@ -56,6 +56,25 @@ def get_session_list(limit: int = 20) -> list:
     except Exception as e:
         print(f"[session] 读取 session 列表失败: {e}")
         return []
+
+def toggle_star_session(session_id: str) -> bool:
+    """切换聊天室的置顶（starred）状态，返回切换后的状态"""
+    if not db._client:
+        return False
+    
+    try:
+        res = db._client.table("chat_sessions").select("starred").eq("id", session_id).execute()
+        current = bool(res.data[0]["starred"]) if res.data else False
+        new_value = not current
+        
+        db._client.table("chat_sessions").update({
+            "starred": new_value
+        }).eq("id", session_id).execute()
+        
+        return new_value
+    except Exception as e:
+        print(f"[session] 切换 session 置顶状态失败: {e}")
+        return False
 
 def update_session_title(session_id: str, title: str):
     """更新聊天室标题（根据首条消息自动生成）"""

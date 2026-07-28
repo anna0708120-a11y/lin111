@@ -17,5 +17,9 @@ ON public.conversation_history(session_id);
 CREATE INDEX IF NOT EXISTS idx_chat_sessions_updated_at 
 ON public.chat_sessions(updated_at DESC);
 
+-- 为 chat_sessions 添加 starred 列（置顶功能）
+ALTER TABLE public.chat_sessions 
+ADD COLUMN IF NOT EXISTS starred BOOLEAN NOT NULL DEFAULT FALSE;
+
 -- 刷新 schema 缓存
 NOTIFY pgrst, 'reload schema';

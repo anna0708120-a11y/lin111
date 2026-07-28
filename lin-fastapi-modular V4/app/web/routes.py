@@ -784,7 +784,8 @@ def get_chat_sessions():
             "id": s["id"],
             "title": title,
             "time": time_display,
-            "message_count": s.get("message_count", 0)
+            "message_count": s.get("message_count", 0),
+            "starred": bool(s.get("starred", False))
         })
     
     return {"sessions": formatted_sessions}
@@ -850,3 +851,10 @@ def rename_chat_session(session_id: str, payload: RenameSessionPayload):
     session_module.update_session_title(session_id, title[:60])
     return {"status": "Success"}
 
+@router.post("/chat-sessions/{session_id}/star")
+def star_chat_session(session_id: str):
+    """切换聊天室置顶（starred）状态（侧边栏用）"""
+    from app import session as session_module
+
+    new_state = session_module.toggle_star_session(session_id)
+    return {"status": "Success", "starred": new_state}

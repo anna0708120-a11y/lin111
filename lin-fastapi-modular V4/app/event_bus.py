@@ -13,6 +13,11 @@ Rate limit：同類型 Activity 事件 30 秒內只保留最後一次。
 """
 
 from datetime import datetime
+from zoneinfo import ZoneInfo
+
+# System Event / Activity 顯示時間固定用香港時區，不依賴 server 系統時區
+# （Render 預設跑 UTC，naive datetime.now() 會慢 8 小時）
+DISPLAY_TZ = ZoneInfo("Asia/Hong_Kong")
 
 # 狀態型：新資料覆蓋，不堆疊
 PERSISTENT_TYPES = {"mac", "weather", "location", "screentime", "calendar", "app"}
@@ -44,7 +49,7 @@ class EventBus:
         message:    人類可讀的訊息文字
         level:      "info" / "warn" / "alert"
         """
-        now = datetime.now()
+        now = datetime.now(DISPLAY_TZ)
         event = {
             "type": event_type,
             "level": level,

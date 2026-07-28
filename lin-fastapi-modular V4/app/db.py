@@ -62,7 +62,8 @@ def load_memories(limit=200):
     try:
         res = (
             _client.table("memory_bank")
-            .select("id, tag, category, content, importance, keyword, expires_at, created_at")
+            .select("id, tag, category, content, importance, keyword, expires_at, created_at, created_by, archived")
+            .eq("archived", False)
             .order("created_at", desc=False)
             .limit(limit)
             .execute()
@@ -73,7 +74,7 @@ def load_memories(limit=200):
         return []
 
 
-def insert_memory(tag, content, category="长期记忆", importance=3, keyword="", expires_at=None):
+def insert_memory(tag, content, category="长期记忆", importance=3, keyword="", expires_at=None, created_by="user"):
     """插入一条记忆，成功的话回传 Supabase 分配的 id（前端删除要用），失败回传 None。"""
     if not _client:
         return None
@@ -87,6 +88,7 @@ def insert_memory(tag, content, category="长期记忆", importance=3, keyword="
                 "importance": importance,
                 "keyword": keyword,
                 "expires_at": expires_at,
+                "created_by": created_by,
             })
             .execute()
         )
@@ -97,22 +99,63 @@ def insert_memory(tag, content, category="长期记忆", importance=3, keyword="
     return None
 
 
-def find_memory_by_keyword(keyword):
-    """找同一件事有没有已经存过（用关键字精确比对，还没有语意搜索）。"""
+def find_memory_by_keyword(keyword, created_by=None):
+    """
+    找同一件事有没有已经存过（用关键字精确比对，还没有语意搜索）。
+    created_by=None：不限制来源，给 reinforce 用（现有逻辑不变）。
+    created_by="agent"：只找 Lin 自己建立的记忆，给 update/archive 用——
+      同一 keyword 如果命中的是 Anna 手动建的（created_by="user"），
+      这里会回传 None，调用端就不会去动那条记忆。
+    """
     if not _client or not keyword:
         return None
     try:
-        res = (
+        query = (
             _client.table("memory_bank")
-            .select("id, importance, content")
+            .select("id, importance, content, created_by")
             .eq("keyword", keyword)
-            .limit(1)
-            .execute()
+            .eq("archived", False)
         )
+        if created_by is not None:
+            query = query.eq("created_by", created_by)
+        res = query.limit(1).execute()
         return res.data[0] if res.data else None
     except Exception as e:
         print(f"[db] 比对记忆失败: {e}")
         return None
+
+
+def update_memory(memory_id, content=None, importance=None, expires_at=None):
+    """更新一条已存在的记忆（修正用），只更新有给值的字段。"""
+    if not _client or not memory_id:
+        return False
+    patch = {}
+    if content is not None:
+        patch["content"] = content
+    if importance is not None:
+        patch["importance"] = importance
+    if expires_at is not None:
+        patch["expires_at"] = expires_at
+    if not patch:
+        return False
+    try:
+        _client.table("memory_bank").update(patch).eq("id", memory_id).execute()
+        return True
+    except Exception as e:
+        print(f"[db] 更新记忆失败: {e}")
+        return False
+
+
+def archive_memory(memory_id):
+    """把记忆标记为已归档（逻辑删除，不物理删除），用于处理过期或被推翻的记忆。"""
+    if not _client or not memory_id:
+        return False
+    try:
+        _client.table("memory_bank").update({"archived": True}).eq("id", memory_id).execute()
+        return True
+    except Exception as e:
+        print(f"[db] 归档记忆失败: {e}")
+        return False
 
 
 def reinforce_memory(memory_id, importance, expires_at):
@@ -138,14 +181,15 @@ def delete_memory(memory_id):
 
 
 def delete_expired_memories(now_iso):
-    """每周整理用：把到期的记忆删掉，回传删了几条。"""
+    """每周整理用：把到期的记忆归档（软删除，不物理删除），回传归档了几条。"""
     if not _client:
         return 0
     try:
         res = (
             _client.table("memory_bank")
-            .delete()
+            .update({"archived": True})
             .lt("expires_at", now_iso)
+            .eq("archived", False)
             .execute()
         )
         return len(res.data or [])

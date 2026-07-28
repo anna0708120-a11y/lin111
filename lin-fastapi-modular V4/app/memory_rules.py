@@ -35,6 +35,12 @@ MEMORY_DECISION_INSTRUCTION = """
 
 [MEMORY_DECISION]
 worth_remembering: yes 或 no
+action: create 或 update 或 archive（不确定就写create，这是默认值）
+  create=一件新的事，之前没存过
+  update=之前存过的一件事，现在情况变了（比如"Anna正在做X"变成"Anna已经改成做Y"），
+    用同一个keyword去覆盖旧内容，不要让新旧两条互相矛盾地同时存在
+  archive=之前存过的一件事，现在明确失效/取消/被推翻了，应该封存不再使用
+    （只对你自己之前建立的记忆有效，Anna手动记的东西你不能封存）
 importance: 1-5 的整数
   5=永久重要（比如她的生日、重大承诺、深刻的告白）
   4=会影响接下来半年相处的事
@@ -48,7 +54,9 @@ category: 长期记忆 / 短期记忆 / Relationship / Reflection 其中一个
   Reflection=你自己的感悟、你自己学到的事，不是关于Anna的事实
 tag: 用几个字标注更细的子类，比如"喜好""今天发生""紀念日"，自己定义，不用照抄例子
 keyword: 三五个字关键字，方便以后比对是不是同一件事重复出现
+  action是update或archive时，这个keyword必须跟你要修改的那条旧记忆完全一样，才能对上
 summary: 用一句话写下要记住的内容本身（内容本体，不是"Anna说了什么"这种转述）
+  action是archive时，summary可以简单写这件事为什么失效
 [/MEMORY_DECISION]
 
 如果这轮没什么特别值得记的（寒暄、跟之前存过的事重复），worth_remembering写no，其他字段随便填。
@@ -139,7 +147,12 @@ def parse_memory_decision(reasoning_text):
     if category not in MEMORY_CATEGORIES:
         category = "长期记忆"
 
+    action = _field(block, "action", "create").lower()
+    if action not in ("create", "update", "archive"):
+        action = "create"
+
     return {
+        "action": action,
         "importance": importance,
         "category": category,
         "tag": _field(block, "tag", category)[:30],

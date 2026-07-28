@@ -1,0 +1,204 @@
+# Architecture Roadmap
+
+## 第一部分：目前已完成（Done）
+
+### ✅ 核心架構
+- **模块化重构**：从单文件 580 行拆分为 `app/` 多模块结构
+- **Supabase 持久化**：对话历史、记忆库、日志、状态全部持久化
+- **多聊天室（Session）**：Claude 风格侧边栏 + 独立 session 管理
+- **DeepSeek V4 集成**：LLM 从 Groq 迁移到 DeepSeek，支持 flash/pro 切换
+
+### ✅ Phase 1 & 2（已合并到 main）
+- **Phase 1**：移除 localStorage 聊天缓存，DB 作为唯一数据源
+- **Phase 2**：ChatView 接管所有消息渲染（时间分隔线、已读状态、思考过程、头像）
+- **Bug 修复**：
+  - Session 生命周期竞态条件
+  - 重复的 `renderHistory()` 定义
+  - Supabase schema 缓存问题（`chat_sessions` 表 + `message_count` 列）
+
+### ✅ V4 情感引擎
+- **Consent System**：基于身体/情绪/关系的互动意愿计算
+- **Consent Dynamics (V4.1)**：行为检测 + 线性衰减（温柔回应 +8、冷淡回应 -10）
+- **Dream System**：离线时段自动生成梦境 + 8 小时余波
+- **Body State**：tension/heat/sensitivity/control 四维身体状态 + 自然衰减
+- **Mood Decay**：情绪自然衰减机制
+- **Relationship Engine**：safety/rapport/temperature 三维关系追踪
+
+### ✅ 主动消息系统
+- **Proactive Nudge**：基于静默时长 + 时间窗口的智能主动消息
+- **Memory Review**：每周定期记忆回顾
+
+### ✅ 淘汰的旧代码
+- **Wrapper 层**：无多余封装，直接调用 DeepSeek API
+- **localStorage 聊天缓存**：已移除，DB 是唯一数据源
+- **Groq API**：已废弃，未定义的 `GROQ_API_KEY`/`GROQ_URL` 已清理
+
+---
+
+## 第二部分：下一步（Next Phase）
+
+按重要程度排序：
+
+### 🎯 Phase 3：Tool UI（当前任务）
+**优先级：高**  
+**依赖：无**
+
+- 在对话界面显示工具调用状态（调用中/结果/错误）
+- 先用假数据测试 UI 渲染
+- 不接真实工具（GitHub/Codex/MCP），只验证前端显示逻辑
+- **影响文件**：
+  - `static/js/chat_view.js`（新增 tool UI 渲染逻辑）
+  - 可能需要新增 `static/css/tool_ui.css`
+  - 假数据可内嵌在 JS 或通过新增测试端点注入
+
+### 🔧 Supabase RLS 配置
+**优先级：中**  
+**依赖：无**
+
+- 当前用 service_role key 绕过 RLS，生产环境不安全
+- 需配置 anon 角色的读写策略
+- **影响文件**：Supabase SQL Editor（不涉及代码修改）
+
+### 📊 Context State 持久化
+**优先级：中**  
+**依赖：无**
+
+- `context_state` 表已存在但未完全集成到 State
+- 天气、位置、屏幕时间等上下文需持久化
+- **影响文件**：
+  - `app/context/provider.py`
+  - `app/state.py`
+
+### 🧪 单元测试覆盖
+**优先级：中**  
+**依赖：无**
+
+- V4.1 已有 Consent Dynamics 测试（7 个全通过）
+- 需补充 Session、ChatView、Dream、Body State 的测试
+- **影响文件**：新增 `tests/test_session.py`、`tests/test_chatview.py` 等
+
+---
+
+## 第三部分：长期架构（Future）
+
+### 🛠 Tool Integration（依赖 Phase 3 UI）
+**前置：Phase 3 Tool UI**
+
+1. **GitHub Reader**
+   - 依赖：Tool UI 基础架构
+   - 功能：读取 GitHub 仓库、Issue、PR
+   - 需新增：`app/tools/github.py`
+
+2. **Codex Integration**
+   - 依赖：Tool UI 基础架构
+   - 功能：代码执行、文件操作
+   - 需新增：`app/tools/codex.py`
+
+3. **MCP (Model Context Protocol)**
+   - 依赖：Tool UI + GitHub Reader + Codex
+   - 功能：统一工具协议，支持第三方工具接入
+   - 需新增：`app/tools/mcp_adapter.py`
+
+### 🧠 Memory System Enhancement（独立）
+**前置：无**
+
+- 当前 `memory_bank` 是简单列表
+- 升级为向量数据库（Supabase pgvector）
+- 支持语义搜索、记忆聚类、遗忘曲线
+- **影响文件**：
+  - `app/state.py`（memory 接口重构）
+  - `app/db.py`（新增向量查询）
+  - 新增 `app/memory/vector.py`
+
+### 👀 Watch Activity（依赖 Context Provider）
+**前置：Context State 持久化**
+
+- 监控 Anna 的 Mac 活动（前台 App、窗口标题）
+- 需 macOS 权限 + Flutter 集成
+- **影响文件**：
+  - 新增 `app/context/mac_activity.py`
+  - Flutter 需新增 macOS 权限请求
+
+### 🎭 Mood Engine Refactor（独立）
+**前置：无**
+
+- 当前 `mood_engine.py` 是顶层文件，未集成到 `app/mood/` 模块
+- 需整合到 `app/mood/engine.py`，与 `decay.py` 统一管理
+- **影响文件**：
+  - 移除 `app/mood_engine.py`
+  - 新增 `app/mood/engine.py`
+  - 更新所有 import 路径
+
+### 💪 Body State Enhancement（独立）
+**前置：无**
+
+- 当前只有 4 维（tension/heat/sensitivity/control）
+- 扩展为生理周期、饥饿、疼痛等
+- **影响文件**：
+  - `app/intimacy/body_state.py`（新增维度）
+  - `app/intimacy/influence.py`（新增影响因子）
+
+### 🔌 Plugin System（依赖 MCP）
+**前置：MCP + Tool UI**
+
+- 支持第三方插件动态加载
+- 插件市场 + 版本管理
+- **影响文件**：
+  - 新增 `app/plugins/loader.py`
+  - 新增 `app/plugins/registry.py`
+
+### 📜 Timeline Conversation（依赖 Memory Enhancement）
+**前置：Memory System Enhancement**
+
+- 时间轴展示历史对话 + 情感曲线
+- 需向量检索支持相似对话聚合
+- **影响文件**：
+  - 新增 `static/js/timeline_view.js`
+  - 新增 `app/web/timeline_routes.py`
+
+### 🎨 Renderer 拆分（依赖 Tool UI）
+**前置：Phase 3 Tool UI**
+
+- 当前 ChatView 职责过重
+- 拆分为 MessageRenderer / ToolRenderer / ThinkRenderer
+- **影响文件**：
+  - `static/js/chat_view.js` 拆分为多个 Renderer 类
+
+### 🚌 EventBus 全局化（独立）
+**前置：无**
+
+- 当前 `event_bus.py` 已存在但未全面使用
+- 需统一所有模块间通信（Proactive / Bark / Weather / Dream）
+- **影响文件**：
+  - `app/event_bus.py`（扩展事件类型）
+  - 所有模块改用 EventBus 而非直接调用
+
+---
+
+## 依赖关系图
+
+```
+Phase 3 Tool UI (假数据测试)
+  ↓
+GitHub Reader / Codex Integration
+  ↓
+MCP
+  ↓
+Plugin System
+  ↓
+Timeline Conversation (需 Memory Enhancement)
+
+Memory Enhancement (独立)
+  ↓
+Timeline Conversation
+
+Context State 持久化
+  ↓
+Watch Activity
+
+Mood Engine Refactor (独立)
+Body State Enhancement (独立)
+EventBus 全局化 (独立)
+Renderer 拆分 (依赖 Phase 3)
+```
+e 3 Tool UI（假数据测试）。

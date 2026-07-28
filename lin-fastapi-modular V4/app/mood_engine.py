@@ -13,16 +13,30 @@ from collections import deque
 from datetime import datetime, timedelta
 
 
-# 重複事件追蹤（用於遞減效果）
-# 格式：deque of (event_name, timestamp)，保留最近 10 個事件
+# V2.1: 事件冷却机制（Phase 2）
+# 每个事件独立冷却时间（秒）；同一事件在冷却期内拒绝触发，不打折扣
+EVENT_COOLDOWNS = {
+    "PRAISE": 180,           # 3 分钟
+    "COMFORT": 240,          # 4 分钟
+    "THANKS": 120,           # 2 分钟
+    "JOKE": 180,             # 3 分钟
+    "APOLOGY": 300,          # 5 分钟
+    "IGNORE": 600,           # 10 分钟
+    "LONG_IGNORE": 1200,     # 20 分钟
+    "GOODBYE": 180,          # 3 分钟
+    "LONG_CHAT": 300,        # 5 分钟（高频事件，较长冷却）
+    "SHORT_REPLY": 180,      # 3 分钟
+    "LATE_NIGHT": 3600,      # 1 小时（低频事件）
+    "NONE": 60,              # 1 分钟
+}
+
+# 事件最近触发时间记录：{event_name: last_triggered_datetime}
+_event_last_triggered = {}
+
+# 重複事件追蹤（用於遞減效果 - Phase 1 遗留，Phase 2 后弃用）
 _recent_events = deque(maxlen=10)
-
-# 遞減係數：第 N 次重複事件的效果倍率
-# 第 1 次：100%，第 2 次：70%，第 3 次：40%，第 4+ 次：20%
 DIMINISHING_MULTIPLIERS = [1.0, 0.7, 0.4, 0.2]
-
-# 重複事件的時間窗口（秒）：只有在此時間內的重複才會遞減
-REPEAT_WINDOW_SECONDS = 300  # 5 分鐘
+REPEAT_WINDOW_SECONDS = 300
 
 
 # Event → 數值變化對照表（三級強度：LOW/MEDIUM/HIGH）
@@ -293,20 +307,18 @@ def apply_event(event, level="MEDIUM", line=None):
     if level not in ["LOW", "MEDIUM", "HIGH"]:
         level = "MEDIUM"
     
-    # 計算重複事件遞減係數
+    # V2.1: 事件冷却檢查（Phase 2）
+    # 同一事件在冷却期內直接拒絕觸發，不打折扣、不改動任何數值
     now = datetime.now()
-    # 清理超過時間窗口的舊事件
-    while _recent_events and (now - _recent_events[0][1]).total_seconds() > REPEAT_WINDOW_SECONDS:
-        _recent_events.popleft()
+    cooldown_seconds = EVENT_COOLDOWNS.get(event, 0)
+    last_triggered = _event_last_triggered.get(event)
+    if last_triggered and cooldown_seconds > 0:
+        if (now - last_triggered).total_seconds() < cooldown_seconds:
+            return  # 冷却中，跳過此次事件
     
-    # 計算此事件在時間窗口內出現的次數（不包括這次）
-    repeat_count = sum(1 for ev_name, _ in _recent_events if ev_name == event)
-    
-    # 根據重複次數選擇遞減係數（超過陣列長度就用最後一個）
-    multiplier = DIMINISHING_MULTIPLIERS[min(repeat_count, len(DIMINISHING_MULTIPLIERS) - 1)]
-    
-    # 記錄這次事件
-    _recent_events.append((event, now))
+    # 記錄這次觸發時間
+    _event_last_triggered[event] = now
+    multiplier = 1.0  # Phase 2: 冷却機制取代遞減係數，通過冷却的事件效果不打折
     
     # 取得當前 mood（深拷貝避免直接修改）
     current_mood = state.mood.copy()
@@ -347,6 +359,14 @@ def apply_event(event, level="MEDIUM", line=None):
                 # attachment 0.3 以下時傷害加重 20%
                 if current_value <= 0.3:
                     dynamic_multiplier = 1.2
+
+            # curiosity/social/libido/fatigue 的正向效果：數值越高，效果越小
+            # 補齊原本只套用在 attachment 身上的動態調整，避免這幾個欄位被高頻正向事件持續推滿
+            if key in ("curiosity", "social", "libido", "fatigue") and delta > 0:
+                if current_value >= 0.8:
+                    dynamic_multiplier = 0.7
+                elif current_value >= 0.6:
+                    dynamic_multiplier = 0.85
             
             # 套用動態係數
             adjusted_delta *= dynamic_multiplier

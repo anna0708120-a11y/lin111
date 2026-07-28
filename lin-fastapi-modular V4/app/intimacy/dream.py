@@ -130,8 +130,10 @@ def extract_dream_seed(state) -> Optional[DreamSeed]:
     if not memory_bank:
         return None
     
-    # 簡單搜尋：找到最近包含關鍵字的記憶
+    # 簡單搜尋：找到最近包含關鍵字的記憶（排除已封存的，失效的記憶不該再被拿去做夢）
     for memory in reversed(memory_bank):  # 從最近的開始找
+        if memory.get("archived"):
+            continue
         content = memory.get("content", "")
         if any(kw in content for kw in theme_keywords):
             theme = f"夢到{content[:50]}"  # 取前 50 字

@@ -202,7 +202,13 @@ def generate_reply(context, app_name=None, use_cache=True):
     if reasoning:
         decision = parse_memory_decision(reasoning)
         if decision:
-            state.remember_or_reinforce(decision)
+            action = decision.get("action", "create")
+            if action == "update":
+                state.update_memory(decision)
+            elif action == "archive":
+                state.archive_memory(decision)
+            else:
+                state.remember_or_reinforce(decision)
 
         mood_event = parse_mood_event(reasoning)
         if mood_event:
@@ -311,7 +317,13 @@ def generate_reply_stream(context, app_name=None, use_cache=True, session_id=Non
                 if parse_source:
                     decision = parse_memory_decision(parse_source)
                     if decision:
-                        state.remember_or_reinforce(decision)
+                        action = decision.get("action", "create")
+                        if action == "update":
+                            state.update_memory(decision)
+                        elif action == "archive":
+                            state.archive_memory(decision)
+                        else:
+                            state.remember_or_reinforce(decision)
                 
                 # Auto-detect mood events from user + Lin content
                 detected_events = _auto_detect_mood_events(context, full_content)

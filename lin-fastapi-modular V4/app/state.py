@@ -61,6 +61,8 @@ class AppState:
                 "importance": r.get("importance", 3),
                 "keyword": r.get("keyword", ""),
                 "expires_at": r.get("expires_at"),
+                "created_by": r.get("created_by", "user"),
+                "archived": r.get("archived", False),
                 "time": _fmt_time(r.get("created_at")),
             }
             for r in db.load_memories()
@@ -253,10 +255,10 @@ class AppState:
         db.save_state_value("last_journal_date", self.last_journal_date)
 
     # ---------- 长期记忆 ----------
-    def add_memory(self, tag, content, category="长期记忆", importance=3, keyword=""):
+    def add_memory(self, tag, content, category="长期记忆", importance=3, keyword="", created_by="user"):
         expires_at = compute_expiry(importance)
         memory_id = db.insert_memory(tag, content, category=category, importance=importance,
-                                      keyword=keyword, expires_at=expires_at)
+                                      keyword=keyword, expires_at=expires_at, created_by=created_by)
         self.memory_bank.append({
             "id": memory_id,
             "tag": tag,
@@ -265,6 +267,8 @@ class AppState:
             "importance": importance,
             "keyword": keyword,
             "expires_at": expires_at,
+            "created_by": created_by,
+            "archived": False,
             "time": datetime.now().strftime("%Y-%m-%d %H:%M"),
         })
         if len(self.memory_bank) > 300:
@@ -294,7 +298,53 @@ class AppState:
             category=decision["category"],
             importance=decision["importance"],
             keyword=keyword,
+            created_by="agent",
         )
+
+    def update_memory(self, decision):
+        """
+        Lin 判断"同一件事已经变化"：只能更新自己建立的记忆（created_by=agent），
+        找不到符合条件的对象（keyword没命中，或命中的是Anna手动建的）就转为新增一条，
+        不去动Anna手动建立的记忆。
+        """
+        keyword = decision.get("keyword", "")
+        target = db.find_memory_by_keyword(keyword, created_by="agent") if keyword else None
+        if not target:
+            return self.add_memory(
+                tag=decision["tag"],
+                content=decision["summary"],
+                category=decision["category"],
+                importance=decision["importance"],
+                keyword=keyword,
+                created_by="agent",
+            )
+        new_importance = decision["importance"]
+        new_expiry = compute_expiry(new_importance)
+        ok = db.update_memory(target["id"], content=decision["summary"],
+                               importance=new_importance, expires_at=new_expiry)
+        if ok:
+            for m in self.memory_bank:
+                if m["id"] == target["id"]:
+                    m["content"] = decision["summary"]
+                    m["importance"] = new_importance
+                    m["expires_at"] = new_expiry
+                    break
+        return target["id"]
+
+    def archive_memory(self, decision):
+        """
+        Lin 判断"这件事已经失效/被推翻"：只能封存自己建立的记忆（created_by=agent），
+        找不到符合条件的对象就什么都不做，绝不碰Anna手动建立的记忆。
+        归档是逻辑删除（archived=True），不是物理删除，Anna仍可在数据库里找回。
+        """
+        keyword = decision.get("keyword", "")
+        target = db.find_memory_by_keyword(keyword, created_by="agent") if keyword else None
+        if not target:
+            return None
+        ok = db.archive_memory(target["id"])
+        if ok:
+            self.memory_bank = [m for m in self.memory_bank if m.get("id") != target["id"]]
+        return target["id"] if ok else None
 
     def delete_memory(self, memory_id):
         self.memory_bank = [m for m in self.memory_bank if m.get("id") != memory_id]
@@ -311,6 +361,8 @@ class AppState:
                 "importance": r.get("importance", 3),
                 "keyword": r.get("keyword", ""),
                 "expires_at": r.get("expires_at"),
+                "created_by": r.get("created_by", "user"),
+                "archived": r.get("archived", False),
                 "time": _fmt_time(r.get("created_at")),
             }
             for r in db.load_memories()
@@ -320,7 +372,8 @@ class AppState:
         """挑最重要的几条塞进 prompt（不是最新的几条——星级高的比刚存的更该被记住）。"""
         if not self.memory_bank:
             return ""
-        top = sorted(self.memory_bank, key=lambda m: m.get("importance", 3), reverse=True)[:n]
+        active = [m for m in self.memory_bank if not m.get("archived")]
+        top = sorted(active, key=lambda m: m.get("importance", 3), reverse=True)[:n]
         lines = "\n".join(f"[{m['category']}·{m['tag']}·{'⭐'*m.get('importance',3)}] {m['content']}" for m in top)
         return f"\n\n【Lin对Anna的记忆】\n{lines}"
 

@@ -173,7 +173,6 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 .sidebar-btn{width:36px;height:36px;border:none;background:var(--white);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--dark);border-radius:6px;transition:background .2s;box-shadow:0 1px 3px var(--shadow);}
 .sidebar-btn:hover{background:var(--blush);}
 .sidebar-btn svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;}
-@media (min-width:768px){.sidebar-btn{display:none;}}
 .sidebar-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.3);z-index:300;opacity:0;pointer-events:none;transition:opacity .3s cubic-bezier(0.4, 0, 0.2, 1);}
 .sidebar-overlay.active{opacity:1;pointer-events:auto;}
 .sidebar{position:fixed;top:0;left:0;bottom:0;width:min(85vw,320px);background:var(--white);z-index:301;transform:translateX(-100%);transition:transform .3s cubic-bezier(0.4, 0, 0.2, 1);display:flex;flex-direction:column;box-shadow:4px 0 24px rgba(0,0,0,.15);padding-top:env(safe-area-inset-top);}

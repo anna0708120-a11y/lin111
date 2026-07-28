@@ -189,10 +189,11 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 .sidebar-new-btn{width:100%;padding:10px 14px;background:var(--rose);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;margin-bottom:12px;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:6px;}
 .sidebar-new-btn:hover{background:var(--rose-deep);transform:translateY(-1px);}
 .sidebar-new-btn:active{transform:translateY(0);}
-.sidebar-new-btn-fixed{width:calc(100% - 24px);margin:12px;padding:10px 14px;background:var(--rose);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;transition:all .2s;flex-shrink:0;box-shadow:0 -2px 12px rgba(0,0,0,.08);}
-.sidebar-new-btn-fixed:hover{background:var(--rose-deep);transform:translateY(-1px);}
-.sidebar-new-btn-fixed:active{transform:translateY(0);}
-.sidebar-session{padding:10px 12px;border-radius:6px;cursor:pointer;margin-bottom:2px;transition:background .15s;display:flex;align-items:center;justify-content:space-between;gap:8px;position:relative;}
+.sidebar-new-chat-btn{width:calc(100% - 24px);margin:4px 12px 12px;padding:10px 14px;background:var(--rose);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;transition:all .2s;flex-shrink:0;display:flex;align-items:center;justify-content:center;gap:6px;}
+.sidebar-new-chat-btn svg{width:15px;height:15px;flex-shrink:0;}
+.sidebar-new-chat-btn:hover{background:var(--rose-deep);transform:translateY(-1px);}
+.sidebar-new-chat-btn:active{transform:translateY(0);}
+.sidebar-session{padding:10px 12px;border-radius:6px;cursor:pointer;margin-bottom:2px;transition:background .15s;display:flex;align-items:center;justify-content:space-between;gap:8px;position:relative;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;}
 .sidebar-session:hover{background:var(--blush);}
 .sidebar-session.active{background:var(--blush);}
 .sidebar-session.active::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:20px;background:var(--rose);border-radius:0 2px 2px 0;}
@@ -200,9 +201,28 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 .sidebar-session.active .sidebar-session-info{padding-left:8px;}
 .sidebar-session-title{font-size:13px;color:var(--dark);font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.4;}
 .sidebar-session-time{font-size:11px;color:var(--muted);margin-top:1px;}
-.sidebar-session-delete{width:22px;height:22px;border:none;background:none;color:var(--muted);cursor:pointer;border-radius:4px;opacity:0;transition:opacity .2s,background .15s;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:14px;}
-.sidebar-session:hover .sidebar-session-delete{opacity:1;}
-.sidebar-session-delete:hover{background:rgba(200,60,60,.1);color:#c83c3c;}
+.sidebar-session-more{width:26px;height:26px;border:none;background:none;color:var(--muted);cursor:pointer;border-radius:4px;opacity:0;transition:opacity .2s,background .15s;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
+.sidebar-session-more svg{width:16px;height:16px;}
+.sidebar-session:hover .sidebar-session-more{opacity:1;}
+.sidebar-session-more:hover{background:rgba(0,0,0,.06);}
+.sidebar-session-more.force-visible{opacity:1;}
+@media (hover:none){.sidebar-session-more{opacity:1;}}
+
+/* Session 操作 context menu（Rename / Star / Delete） */
+.session-ctx-menu{position:fixed;min-width:168px;background:var(--white);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.18);z-index:400;padding:4px;font-size:13px;}
+.session-ctx-item{width:100%;display:flex;align-items:center;gap:10px;padding:9px 10px;background:none;border:none;border-radius:6px;color:var(--dark);cursor:pointer;text-align:left;font-size:13px;}
+.session-ctx-item:hover{background:var(--blush);}
+.session-ctx-item svg{width:15px;height:15px;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
+.session-ctx-item.danger{color:#c83c3c;}
+.session-ctx-item.danger:hover{background:rgba(200,60,60,.08);}
+.session-ctx-item.starred svg{fill:currentColor;}
+.session-ctx-divider{height:1px;background:var(--border);margin:4px 2px;}
+.session-ctx-confirm{padding:8px 10px 4px;font-size:12px;color:var(--muted);line-height:1.5;}
+.session-ctx-confirm-actions{display:flex;gap:6px;padding:6px 4px 4px;}
+.session-ctx-confirm-actions button{flex:1;padding:7px 0;border:none;border-radius:6px;font-size:12.5px;cursor:pointer;}
+.session-ctx-confirm-cancel{background:var(--blush);color:var(--dark);}
+.session-ctx-confirm-ok{background:#c83c3c;color:#fff;}
+.sidebar-session-title-input{font-size:13px;color:var(--dark);font-family:inherit;background:var(--white);border:1px solid var(--rose);border-radius:4px;padding:2px 6px;width:100%;box-sizing:border-box;}
 
 /* 親密狀態卡片 */
 .intimacy-card{cursor:default;}
@@ -759,6 +779,10 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
       <div class="sidebar-title">聊天室</div>
       <button class="sidebar-close" id="sidebarClose">×</button>
     </div>
+    <button class="sidebar-new-chat-btn" id="sidebarNewChatBtn" type="button">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v10M3 8h10"/></svg>
+      <span>New chat</span>
+    </button>
     <div class="sidebar-content">
       <div class="sidebar-section">
         <div class="sidebar-section-title">Recent</div>

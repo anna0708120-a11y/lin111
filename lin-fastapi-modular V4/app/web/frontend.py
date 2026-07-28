@@ -127,17 +127,24 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 .think-toggle:active{opacity:1;}
 .think-box{font-size:12px;line-height:1.65;color:var(--muted);background:var(--blush);border-radius:12px;padding:10px 12px;margin-bottom:6px;max-width:78%;white-space:pre-line;}
 .mstar{font-size:9px;letter-spacing:1px;}
-/* Phase 3: Tool UI（假数据渲染，未接真实工具） */
+/* Phase 3: Tool UI（假数据渲染，未接真实工具）—— 开放枚举状态映射 */
 .tool-card{font-size:12px;line-height:1.5;border-radius:12px;padding:8px 12px;margin-bottom:6px;max-width:78%;background:var(--blush);border:1px solid var(--border);}
 .tool-card-head{display:flex;align-items:center;gap:6px;font-weight:600;color:var(--muted);}
 .tool-card-icon{font-size:13px;}
 .tool-card-name{flex:1;}
 .tool-card-status{font-size:10px;letter-spacing:.5px;text-transform:uppercase;padding:2px 6px;border-radius:8px;}
-.tool-card.running .tool-card-status{background:var(--border);color:var(--muted);}
+.tool-card-message{margin-top:6px;color:var(--muted);white-space:pre-line;font-size:11px;}
+.tool-card-details{margin-top:4px;color:var(--muted);font-size:10px;line-height:1.6;font-family:ui-monospace,monospace;}
+.tool-card-details li{list-style:none;padding-left:12px;position:relative;}
+.tool-card-details li:before{content:'✓';position:absolute;left:0;color:var(--rose);}
+/* 状态色彩映射（开放枚举，兼容未来 waiting/cancelled/paused/streaming/custom） */
+.tool-card.running .tool-card-status,.tool-card.waiting .tool-card-status,.tool-card.streaming .tool-card-status{background:var(--border);color:var(--muted);}
 .tool-card.success .tool-card-status{background:var(--rose);color:#fff;}
-.tool-card.error .tool-card-status{background:#e08a8a;color:#fff;}
-.tool-card-result{margin-top:6px;color:var(--muted);white-space:pre-line;}
-.tool-card.running .tool-card-icon{animation:tool-spin 1s linear infinite;display:inline-block;}
+.tool-card.error .tool-card-status,.tool-card.cancelled .tool-card-status{background:#e08a8a;color:#fff;}
+.tool-card.paused .tool-card-status{background:#d4b896;color:#fff;}
+.tool-card.custom .tool-card-status{background:var(--blush);color:var(--muted);border:1px dashed var(--border);}
+/* 动画：running/waiting/streaming 状态下图标旋转 */
+.tool-card.running .tool-card-icon,.tool-card.waiting .tool-card-icon,.tool-card.streaming .tool-card-icon{animation:tool-spin 1s linear infinite;display:inline-block;}
 @keyframes tool-spin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
 .tab-bar{display:flex;background:var(--white);border-top:1px solid var(--border);position:fixed;bottom:0;left:0;right:0;padding-bottom:var(--safe-bottom);z-index:200;height:56px;}
 .tb{flex:1;padding:10px 4px 8px;display:flex;flex-direction:column;align-items:center;gap:2px;border:none;background:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:9px;color:var(--muted);text-transform:uppercase;}

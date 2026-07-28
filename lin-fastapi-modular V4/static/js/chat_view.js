@@ -70,32 +70,66 @@ class ChatView {
   }
 
   // Phase 3: Tool UI —— 生成单个工具调用卡片的 HTML
-  // tool: { name: string, status: 'running'|'success'|'error', result?: string }
+  // tool: {
+  //   name: string,            // 工具标识，例如 'github_search_repo'
+  //   status: string,          // 开放枚举，未知状态一律 fallback 到中性样式，不报错
+  //   title?: string,          // 可选，优先于 name 显示在卡头
+  //   message?: string,        // 单行/多行简短消息（取代旧的 result 字段）
+  //   details?: string[]       // 逐行详情列表，例如 Codex 读取文件清单、GitHub commit hash 列表
+  // }
+  // 设计目的：status 为开放枚举，新增 Codex/GitHub/MCP 等工具的新状态时不需要改这个函数，
+  // 只要在 CSS 里加对应的 .tool-card.<status> 规则即可；未定义的状态会 fallback 到中性图标 + 原样文字。
   _renderToolCard(tool) {
-    const icons = { running: '⏳', success: '✅', error: '⚠️' };
-    const labels = { running: '執行中', success: '完成', error: '錯誤' };
-    const status = ['running', 'success', 'error'].includes(tool.status) ? tool.status : 'running';
-    const icon = icons[status];
-    const label = labels[status];
-    const name = _escapeHtml(tool.name || 'unknown_tool');
-    const resultHtml = tool.result ? '<div class="tool-card-result">' + _escapeHtml(tool.result) + '</div>' : '';
-    return '<div class="tool-card ' + status + '">' +
+    const iconMap = {
+      running: '⏳', waiting: '⏳', streaming: '⏳',
+      success: '✅', error: '⚠️', cancelled: '✖️',
+      paused: '⏸️', custom: '🔧',
+    };
+    const labelMap = {
+      running: '執行中', waiting: '等待中', streaming: '進行中',
+      success: '完成', error: '錯誤', cancelled: '已取消',
+      paused: '已暫停', custom: '自訂',
+    };
+    const status = tool.status || 'running';
+    // 未知状态（没有对应 CSS 规则的 status）统一 fallback 到 .tool-card.custom，
+    // 避免样式空白；已知状态才用自己的 class，让 CSS 里的专属配色生效。
+    const knownStatuses = ['running', 'waiting', 'streaming', 'success', 'error', 'cancelled', 'paused', 'custom'];
+    const icon = iconMap[status] || '🔧';
+    const label = labelMap[status] || _escapeHtml(status);
+    const cardClass = knownStatuses.includes(status) ? status : 'custom';
+    const name = _escapeHtml(tool.title || tool.name || 'unknown_tool');
+    const messageHtml = tool.message ? '<div class="tool-card-message">' + _escapeHtml(tool.message) + '</div>' : '';
+    let detailsHtml = '';
+    if (Array.isArray(tool.details) && tool.details.length > 0) {
+      detailsHtml = '<ul class="tool-card-details">' +
+        tool.details.map(d => '<li>' + _escapeHtml(d) + '</li>').join('') +
+        '</ul>';
+    }
+    return '<div class="tool-card ' + cardClass + '">' +
       '<div class="tool-card-head"><span class="tool-card-icon">' + icon + '</span>' +
       '<span class="tool-card-name">' + name + '</span>' +
       '<span class="tool-card-status">' + label + '</span></div>' +
-      resultHtml + '</div>';
+      messageHtml + detailsHtml + '</div>';
   }
 
-  // Phase 3: 测试用 —— 用假数据渲染工具调用卡片，验证 running/success/error 三种状态样式
+  // Phase 3: 测试用 —— 用假数据渲染工具调用卡片，覆盖开放枚举状态 + title/message/details 结构
   // 用法（浏览器 console）：window.chatView.renderToolUIDemo()
   renderToolUIDemo() {
     if (!this.cmEl) return;
     const demoTools = [
-      { name: 'github_search_repo', status: 'running' },
-      { name: 'github_read_file', status: 'success', result: 'README.md（1.2KB）已讀取' },
-      { name: 'codex_run_command', status: 'error', result: '權限不足：無法執行 shell 指令' },
+      { name: 'github_search_repo', status: 'running', message: 'Searching commits...' },
+      {
+        name: 'codex_read_repo', status: 'success', title: 'Reading repository',
+        message: 'Finished', details: ['app/state.py', 'app/web/frontend.py', 'static/js/chat_view.js'],
+      },
+      { name: 'codex_run_command', status: 'error', message: '權限不足：無法執行 shell 指令' },
+      {
+        name: 'mcp_supabase', status: 'streaming', title: 'Calling Supabase',
+        message: 'Connected', details: ['Querying...'],
+      },
+      { name: 'unknown_future_tool', status: 'weird_new_status', message: '未知狀態 fallback 測試' },
     ];
-    let html = '<div class="clabel">Tool UI Demo（假數據）</div>';
+    let html = '<div class="clabel">Tool UI Demo（假數據，開放枚舉）</div>';
     demoTools.forEach(t => { html += this._renderToolCard(t); });
     this.cmEl.innerHTML = html;
     this.scrollToBottom();

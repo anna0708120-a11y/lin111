@@ -223,8 +223,11 @@ class AppState:
         db.save_context("chat_config", {"limit": new_limit})
 
     def add_log(self, event_type, content):
+        # Activity Log 顯示時間固定用香港時區，不依賴 server 系統時區
+        # （Render 預設跑 UTC，naive datetime.now() 會慢 8 小時）
+        from zoneinfo import ZoneInfo
         self.activity_log.append({
-            "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "time": datetime.now(ZoneInfo("Asia/Hong_Kong")).strftime("%Y-%m-%d %H:%M:%S"),
             "type": event_type,
             "content": content,
         })

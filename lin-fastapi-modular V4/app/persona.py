@@ -36,9 +36,11 @@ def build_system_prompt(context, memory_summary="", world_context="", conversati
                            帮助模型记得你们刚才在聊什么，避免凭空编造。
     """
     from datetime import datetime
+    from zoneinfo import ZoneInfo
     
     # 提取当前时间（置顶，避免 LLM 编造时间）
-    now = datetime.now()
+    # 明确使用 Asia/Hong_Kong，不依赖 server 系统时区（Render 预设跑 UTC）
+    now = datetime.now(ZoneInfo("Asia/Hong_Kong"))
     hour = now.hour
     time_period = "凌晨" if 0 <= hour < 6 else "早上" if 6 <= hour < 12 else "下午" if 12 <= hour < 18 else "晚上"
     current_time = f"【当前真实时间】\n现在是 {now.strftime('%Y年%m月%d日')} {time_period} {now.strftime('%H:%M')}（24小时制，北京时间）\n请在回复中使用准确的时间，不要编造或猜测。"

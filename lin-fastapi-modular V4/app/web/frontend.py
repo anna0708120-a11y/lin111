@@ -127,6 +127,18 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 .think-toggle:active{opacity:1;}
 .think-box{font-size:12px;line-height:1.65;color:var(--muted);background:var(--blush);border-radius:12px;padding:10px 12px;margin-bottom:6px;max-width:78%;white-space:pre-line;}
 .mstar{font-size:9px;letter-spacing:1px;}
+/* Phase 3: Tool UI（假数据渲染，未接真实工具） */
+.tool-card{font-size:12px;line-height:1.5;border-radius:12px;padding:8px 12px;margin-bottom:6px;max-width:78%;background:var(--blush);border:1px solid var(--border);}
+.tool-card-head{display:flex;align-items:center;gap:6px;font-weight:600;color:var(--muted);}
+.tool-card-icon{font-size:13px;}
+.tool-card-name{flex:1;}
+.tool-card-status{font-size:10px;letter-spacing:.5px;text-transform:uppercase;padding:2px 6px;border-radius:8px;}
+.tool-card.running .tool-card-status{background:var(--border);color:var(--muted);}
+.tool-card.success .tool-card-status{background:var(--rose);color:#fff;}
+.tool-card.error .tool-card-status{background:#e08a8a;color:#fff;}
+.tool-card-result{margin-top:6px;color:var(--muted);white-space:pre-line;}
+.tool-card.running .tool-card-icon{animation:tool-spin 1s linear infinite;display:inline-block;}
+@keyframes tool-spin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
 .tab-bar{display:flex;background:var(--white);border-top:1px solid var(--border);position:fixed;bottom:0;left:0;right:0;padding-bottom:var(--safe-bottom);z-index:200;height:56px;}
 .tb{flex:1;padding:10px 4px 8px;display:flex;flex-direction:column;align-items:center;gap:2px;border:none;background:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:9px;color:var(--muted);text-transform:uppercase;}
 .tb.active{color:var(--rose-deep);}

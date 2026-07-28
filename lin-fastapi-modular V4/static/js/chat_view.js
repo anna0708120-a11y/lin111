@@ -3,6 +3,13 @@
  * 负责：渲染消息区、更新标题、滚动、切换动效反馈
  */
 
+// Phase 3: Tool UI 用的轻量转义（项目里原本没有 escapeHtml，避免工具名/结果里混入 HTML 破版）
+function _escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str == null ? '' : String(str);
+  return div.innerHTML;
+}
+
 class ChatView {
   constructor() {
     this.cmEl = null;
@@ -51,8 +58,45 @@ class ChatView {
       if (m.r === 'lin' && m.think) {
         thinkHtml = '<div class="think-toggle" onclick="toggleThink(this)">💭 查看思考過程</div><div class="think-box" style="display:none">' + m.think + '</div>';
       }
+      // Phase 3: Tool UI（假数据渲染，未接真实工具）。消息对象带 tool 字段时，渲染工具卡片而非气泡。
+      if (m.tool) {
+        html += this._renderToolCard(m.tool);
+        return; // forEach 内用 return 相当于 continue
+      }
       html += '<div class="msg ' + m.r + (showMeta ? '' : ' grouped') + '">' + thinkHtml + '<div class="msg-row">' + avatarHtml(m.r) + '<div class="bub">' + m.t + '</div></div>' + meta + '</div>';
     });
+    this.cmEl.innerHTML = html;
+    this.scrollToBottom();
+  }
+
+  // Phase 3: Tool UI —— 生成单个工具调用卡片的 HTML
+  // tool: { name: string, status: 'running'|'success'|'error', result?: string }
+  _renderToolCard(tool) {
+    const icons = { running: '⏳', success: '✅', error: '⚠️' };
+    const labels = { running: '執行中', success: '完成', error: '錯誤' };
+    const status = ['running', 'success', 'error'].includes(tool.status) ? tool.status : 'running';
+    const icon = icons[status];
+    const label = labels[status];
+    const name = _escapeHtml(tool.name || 'unknown_tool');
+    const resultHtml = tool.result ? '<div class="tool-card-result">' + _escapeHtml(tool.result) + '</div>' : '';
+    return '<div class="tool-card ' + status + '">' +
+      '<div class="tool-card-head"><span class="tool-card-icon">' + icon + '</span>' +
+      '<span class="tool-card-name">' + name + '</span>' +
+      '<span class="tool-card-status">' + label + '</span></div>' +
+      resultHtml + '</div>';
+  }
+
+  // Phase 3: 测试用 —— 用假数据渲染工具调用卡片，验证 running/success/error 三种状态样式
+  // 用法（浏览器 console）：window.chatView.renderToolUIDemo()
+  renderToolUIDemo() {
+    if (!this.cmEl) return;
+    const demoTools = [
+      { name: 'github_search_repo', status: 'running' },
+      { name: 'github_read_file', status: 'success', result: 'README.md（1.2KB）已讀取' },
+      { name: 'codex_run_command', status: 'error', result: '權限不足：無法執行 shell 指令' },
+    ];
+    let html = '<div class="clabel">Tool UI Demo（假數據）</div>';
+    demoTools.forEach(t => { html += this._renderToolCard(t); });
     this.cmEl.innerHTML = html;
     this.scrollToBottom();
   }

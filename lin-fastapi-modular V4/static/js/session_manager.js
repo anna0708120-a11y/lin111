@@ -88,14 +88,42 @@ class SessionManager {
 
   async delete(sessionId) {
     try {
-      await fetch(this.apiBase + '/chat-sessions/' + sessionId, { method: 'DELETE' });
+      const res = await fetch(this.apiBase + '/chat-sessions/' + sessionId, { method: 'DELETE' });
+      const data = await res.json();
+
+      if (data.status !== 'Success') {
+        // 后端拒绝删除（例如正在使用中的 session）：
+        // 不清空 currentSessionId，保持前后端状态一致
+        return { ok: false, message: data.message || '删除失败' };
+      }
+
       if (this.currentSessionId === sessionId) {
         this.currentSessionId = null;
       }
       await this.loadSessions();
-      return true;
+      return { ok: true };
     } catch (err) {
       console.error('Failed to delete session:', err);
+      return { ok: false, message: '删除失败，请检查网络' };
+    }
+  }
+
+  async rename(sessionId, title) {
+    try {
+      const res = await fetch(this.apiBase + '/chat-sessions/' + sessionId, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title })
+      });
+      const data = await res.json();
+      if (data.status === 'Success') {
+        const s = this.sessions.find(s => s.id === sessionId);
+        if (s) s.title = title;
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('Failed to rename session:', err);
       return false;
     }
   }

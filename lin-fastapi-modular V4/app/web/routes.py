@@ -835,3 +835,18 @@ def delete_chat_session(session_id: str):
     session_module.delete_session(session_id)
     return {"status": "Success"}
 
+class RenameSessionPayload(BaseModel):
+    title: str
+
+@router.patch("/chat-sessions/{session_id}")
+def rename_chat_session(session_id: str, payload: RenameSessionPayload):
+    """重命名聊天会话（侧边栏用）"""
+    from app import session as session_module
+
+    title = (payload.title or "").strip()
+    if not title:
+        return {"status": "Error", "message": "标题不能为空"}
+
+    session_module.update_session_title(session_id, title[:60])
+    return {"status": "Success"}
+

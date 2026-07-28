@@ -87,14 +87,6 @@ class ChatView {
     this.appendLiveMessage(role, text, think);
   }
 
-  // 用数据库回来的整段历史一次性渲染，不写 localStorage。
-  // Session 切换 / 新建时的 replay 走这条路径，避免污染共享的聊天缓存。
-  renderHistory(messages) {
-    if (typeof renderOnly === 'function') {
-      renderOnly(messages || []);
-    }
-  }
-
   updateHeader(title) {
     if (!this.headerEl) return;
     this.headerEl.style.opacity = '0';

@@ -858,4 +858,3 @@ def star_chat_session(session_id: str):
 
     new_state = session_module.toggle_star_session(session_id)
     return {"status": "Success", "starred": new_state}
-

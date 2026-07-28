@@ -72,6 +72,9 @@ class Sidebar {
     this._closeCtxMenu();
     this.listEl.innerHTML = '';
 
+    this._closeCtxMenu();
+    this.listEl.innerHTML = '';
+
     if (sessions.length === 0) {
       this.listEl.innerHTML = '<div class="es">暂无聊天记录</div>';
       return;

@@ -146,7 +146,7 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 /* 动画：running/waiting/streaming 状态下图标旋转 */
 .tool-card.running .tool-card-icon,.tool-card.waiting .tool-card-icon,.tool-card.streaming .tool-card-icon{animation:tool-spin 1s linear infinite;display:inline-block;}
 @keyframes tool-spin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
-.tab-bar{display:flex;background:var(--white);border-top:1px solid var(--border);position:fixed;bottom:0;left:0;right:0;padding-bottom:var(--safe-bottom);z-index:200;height:56px;}
+.tab-bar{display:flex;background:var(--white);border-top:1px solid var(--border);position:fixed;bottom:0;left:0;right:0;padding-bottom:calc(var(--safe-bottom) * 0.8);z-index:200;height:56px;}
 .tb{flex:1;padding:10px 4px 8px;display:flex;flex-direction:column;align-items:center;gap:2px;border:none;background:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:9px;color:var(--muted);text-transform:uppercase;}
 .tb.active{color:var(--rose-deep);}
 .ti{font-size:16px;}

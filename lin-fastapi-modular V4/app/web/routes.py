@@ -18,6 +18,7 @@ from app.event_bus import event_bus
 from app.notify.bark import send_to_bark
 from app.state import state
 from app.web.pwa import MANIFEST_JSON, SERVICE_WORKER_JS
+from app.web.diagnose import DIAGNOSE_HTML
 
 router = APIRouter()
 
@@ -98,6 +99,11 @@ def health():
 @router.get("/manifest.json")
 def manifest():
     return Response(content=MANIFEST_JSON, media_type="application/manifest+json")
+
+@router.get("/diagnose")
+def diagnose_page():
+    """臨時診斷頁：讀取真實 viewport / safe-area / .tab-bar 數值，驗證完成後可刪除。"""
+    return Response(content=DIAGNOSE_HTML, media_type="text/html")
 
 @router.get("/sw.js")
 def service_worker():

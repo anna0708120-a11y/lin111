@@ -555,6 +555,30 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
   .bub { max-width: 90% !important; }
   .ci { font-size: 13px !important; }
 }
+
+/* Developer Tool Panel —— 開發模式專用，預設折疊、不佔聊天高度、不推開消息 */
+.dev-panel{position:fixed;right:12px;bottom:calc(70px + var(--safe-bottom));z-index:300;max-width:min(340px, calc(100vw - 24px));background:var(--white);border:1px solid var(--border);border-radius:12px;box-shadow:0 4px 16px var(--shadow);font-family:'DM Sans',sans-serif;font-size:12px;color:var(--dark);}
+.dev-panel.collapsed{max-height:32px;overflow:hidden;}
+.dev-panel.expanded{max-height:70vh;overflow-y:auto;}
+.dev-panel-summary{display:flex;align-items:center;gap:6px;padding:6px 10px;cursor:pointer;white-space:nowrap;overflow-x:auto;height:20px;scrollbar-width:none;}
+.dev-panel-summary::-webkit-scrollbar{display:none;}
+.dev-panel-dot{flex-shrink:0;}
+.dev-panel-summary-text{flex-shrink:0;color:var(--muted);}
+.dev-panel-body{padding:0 10px 10px;border-top:1px solid var(--border);}
+.dev-panel-meta{color:var(--muted);font-size:10px;padding:6px 0;}
+.dev-panel-section{border-bottom:1px solid var(--border);}
+.dev-panel-section:last-child{border-bottom:none;}
+.dev-panel-section-head{display:flex;align-items:center;gap:6px;padding:6px 0;cursor:pointer;}
+.dev-panel-section-title{flex:1;font-weight:500;}
+.dev-panel-section-status{color:var(--muted);font-size:11px;}
+.dev-panel-section-detail{padding:0 0 8px 20px;}
+.dev-panel-reason{color:var(--rose-deep);margin-bottom:4px;}
+.dev-panel-empty{color:var(--muted);}
+.dev-panel-kv-row{display:flex;gap:6px;padding:2px 0;}
+.dev-panel-kv-key{color:var(--muted);min-width:110px;flex-shrink:0;}
+.dev-panel-kv-val{word-break:break-all;}
+.dev-panel-reasoning-block{margin:4px 0;}
+.dev-panel-reasoning-pre{white-space:pre-wrap;word-break:break-word;max-height:200px;overflow-y:auto;background:var(--blush);border-radius:6px;padding:6px;margin-top:4px;font-family:inherit;user-select:text;}
 </style>
 </head>
 <body>
@@ -894,6 +918,7 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 <script src="/static/js/session_manager.js"></script>
 <script src="/static/js/sidebar.js"></script>
 <script src="/static/js/chat_view.js"></script>
+<script src="/static/js/dev_panel.js"></script>
 <script>
 const AU = window.location.origin;
 
@@ -1600,6 +1625,10 @@ async function confirmImageSend() {
                 addMsg('lin', data.message);
               }
             }
+
+            else if (currentEvent === 'devtrace') {
+              if (window.devPanel) window.devPanel.ingest(data);
+            }
             
           } catch(e) {
             console.error('Parse SSE error:', e, line);
@@ -1743,6 +1772,10 @@ async function send(){
               if(data.message){
                 addMsg('lin', data.message);
               }
+            }
+
+            else if(currentEvent === 'devtrace'){
+              if (window.devPanel) window.devPanel.ingest(data);
             }
             
           }catch(e){
@@ -2192,6 +2225,7 @@ sidebar.onSwitchSession = (sessionId) => renderActiveSession(sessionId, { fresh:
 
 async function initChatExperience() {
   chatView.init();
+  if (window.devPanel) window.devPanel.init();
   sidebar.init();
   await sessionManager.init();
 

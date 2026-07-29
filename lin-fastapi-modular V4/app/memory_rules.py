@@ -191,6 +191,47 @@ def parse_memory_decision(reasoning_text):
         "summary": summary,
     }
 
+def parse_memory_decision_traced(reasoning_text):
+    """
+    parse_memory_decision 的诊断包装版，专供 Developer Panel 的 Trace Collector 使用。
+    不改动 parse_memory_decision 本身的行为或既有呼叫端（brain.py 主流程仍用原函数），
+    这个函数只是在外面多做一层"为什么失败"的判断，回传结构固定为：
+
+        {"decision": dict 或 None, "status": "passed"/"failed", "reason": 字符串}
+
+    reason 只在 status 是 failed 时有意义，用来在 Developer Panel 的 Parser Section 里
+    显示具体卡在哪一步（找不到标签 / 缺少收尾标签 / worth_remembering 是 no / 字段缺失等）。
+    """
+    if not reasoning_text:
+        return {"decision": None, "status": "failed", "reason": "reasoning 为空"}
+
+    has_open = "[MEMORY_DECISION]" in reasoning_text
+    has_close = "[/MEMORY_DECISION]" in reasoning_text
+
+    if not has_open:
+        return {"decision": None, "status": "failed", "reason": "未找到 [MEMORY_DECISION] 開頭標籤"}
+    if not has_close:
+        return {"decision": None, "status": "failed", "reason": "缺少 [/MEMORY_DECISION] 結尾標籤，區塊未閉合"}
+
+    match = re.search(r"\[MEMORY_DECISION\](.*?)\[/MEMORY_DECISION\]", reasoning_text, re.S)
+    if not match:
+        return {"decision": None, "status": "failed", "reason": "標籤存在但區塊格式無法解析"}
+
+    block = match.group(1)
+    worth = _field(block, "worth_remembering", "no").lower().startswith("y")
+    if not worth:
+        return {"decision": None, "status": "passed", "reason": "worth_remembering: no（本輪判定不值得記）"}
+
+    summary = _field(block, "summary", "")
+    if not summary:
+        return {"decision": None, "status": "failed", "reason": "worth_remembering 是 yes，但缺少 summary 欄位"}
+
+    decision = parse_memory_decision(reasoning_text)
+    if not decision:
+        return {"decision": None, "status": "failed", "reason": "欄位存在但未通過 parse_memory_decision 的驗證（可能 importance<=1）"}
+
+    return {"decision": decision, "status": "passed", "reason": None}
+
 def parse_mood_event(reasoning_text):
     """从 reasoning 里抓 [MOOD_EVENT]...[/MOOD_EVENT]，解析出事件清单跟line。抓不到回传 None。
     

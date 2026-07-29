@@ -57,6 +57,10 @@ class TraceCollector:
     Memory Pipeline 的語意化 Facade。內部持有一個 Timeline 實例（Event Bus），
     record_xxx() 方法把「發生了什麼」翻譯成 timeline.emit(id=..., type="memory", ...)，
     每次呼叫都回傳這次事件的 SSE 字串，brain.py 直接 yield 即可。
+
+    summary 由這個檔案負責產生（Timeline 本身不組字串）：Memory Pipeline 的業務
+    語意只有這裡最清楚，所以每個 record_xxx() 依 status/reason 決定要顯示的
+    一句話，前端 Activity Timeline 直接顯示這句話，不解析 payload。
     """
 
     # brain.py 沿用舊版狀態詞彙呼叫 record_xxx("passed", ...)，
@@ -82,7 +86,11 @@ class TraceCollector:
     # 這樣每個 record 呼叫點天然就是一次即時的事件推送，不用等到最後才打包。
     # ------------------------------------------------------------------
     def record_prompt(self, status, prompt_version=None, total_tokens=None, memory_rule_loaded=None, mood_rule_loaded=None):
-        event = self.timeline.emit("prompt", _MEMORY_TYPE, self._norm(status), payload={
+        norm = self._norm(status)
+        summary = "Preparing prompt..." if norm == "running" else (
+            "Prompt ready" if norm == "success" else "Prompt failed"
+        )
+        event = self.timeline.emit("prompt", _MEMORY_TYPE, norm, summary=summary, payload={
             "prompt_version": prompt_version,
             "total_tokens": total_tokens,
             "memory_rule_loaded": memory_rule_loaded,
@@ -91,7 +99,9 @@ class TraceCollector:
         return self.timeline.to_sse(event)
 
     def record_reasoning(self, status, reasoning_text=None):
-        event = self.timeline.emit("reasoning", _MEMORY_TYPE, self._norm(status), payload={
+        norm = self._norm(status)
+        summary = "Reasoning received" if norm == "success" else "Reasoning unavailable"
+        event = self.timeline.emit("reasoning", _MEMORY_TYPE, norm, summary=summary, payload={
             "reasoning_text": reasoning_text,
             "length": len(reasoning_text) if reasoning_text else 0,
         })
@@ -99,18 +109,29 @@ class TraceCollector:
 
     def record_memory_decision(self, status, parsed_decision=None, reason=None):
         """對應舊版 memory_trace.py 的 record_parse_result 概念，欄位名用 parsed_decision 對齊。"""
-        event = self.timeline.emit("memory_decision", _MEMORY_TYPE, self._norm(status),
+        norm = self._norm(status)
+        summary = "Decision parsed" if norm == "success" else (SKIP_REASONS.get(reason, reason) or "Decision parsing failed")
+        event = self.timeline.emit("memory_decision", _MEMORY_TYPE, norm, summary=summary,
                                     payload={"parsed_decision": parsed_decision}, reason=reason)
         return self.timeline.to_sse(event)
 
     def record_parser(self, status, reason=None, parse_time_ms=None):
-        event = self.timeline.emit("parser", _MEMORY_TYPE, self._norm(status),
+        norm = self._norm(status)
+        summary = "Parser OK" if norm == "success" else (SKIP_REASONS.get(reason, reason) or "Parser failed")
+        event = self.timeline.emit("parser", _MEMORY_TYPE, norm, summary=summary,
                                     payload={"parse_time_ms": parse_time_ms}, reason=reason)
         return self.timeline.to_sse(event)
 
     def record_backend(self, status, backend_action=None, action_taken=None, reason=None):
         """對應舊版 memory_trace.py 的 record_backend_action 概念。"""
-        event = self.timeline.emit("backend", _MEMORY_TYPE, self._norm(status), payload={
+        norm = self._norm(status)
+        if norm == "not_executed":
+            summary = "Nothing to save"
+        elif norm == "success":
+            summary = "Memory pipeline executed"
+        else:
+            summary = SKIP_REASONS.get(reason, reason) or "Backend failed"
+        event = self.timeline.emit("backend", _MEMORY_TYPE, norm, summary=summary, payload={
             "backend_action": backend_action,
             "action_taken": action_taken,
         }, reason=reason)
@@ -118,7 +139,16 @@ class TraceCollector:
 
     def record_db(self, status, memory_id=None, db_error=None):
         """對應舊版 memory_trace.py 的 record_db_result 概念，欄位名用 db_error 對齊。"""
-        event = self.timeline.emit("database", _MEMORY_TYPE, self._norm(status), payload={
+        norm = self._norm(status)
+        if norm == "success":
+            summary = "Memory saved"
+        elif norm == "skipped":
+            summary = SKIP_REASONS.get(db_error, db_error) or "Memory not saved"
+        elif norm == "not_executed":
+            summary = "No memory action"
+        else:
+            summary = db_error or "Database failed"
+        event = self.timeline.emit("database", _MEMORY_TYPE, norm, summary=summary, payload={
             "memory_id": memory_id,
             "db_error": db_error,
         }, reason=db_error)

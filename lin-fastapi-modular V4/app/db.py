@@ -427,3 +427,131 @@ def load_memories_with_conflicts(limit=200):
     except Exception as e:
         print(f"[db] 讀取記憶失敗: {e}")
         return []
+
+# ---------- Phase 2: Memory Trace ----------
+def insert_memory_trace(trace):
+    """
+    插入一條 memory trace 記錄
+    
+    Args:
+        trace: MemoryTrace 物件
+    """
+    if not _client:
+        return
+    try:
+        import json
+        from datetime import datetime
+        
+        # 準備資料
+        data = {
+            "session_id": trace.session_id,
+            "message_id": trace.message_id,
+            "created_at": trace.created_at.isoformat() if trace.created_at else datetime.now().isoformat(),
+            "reasoning_text": trace.reasoning_text,
+            "raw_decision_block": trace.raw_decision_block,
+            "parse_success": trace.parse_success,
+            "parsed_decision": json.dumps(trace.parsed_decision) if trace.parsed_decision else None,
+            "parse_error": trace.parse_error,
+            "backend_action": trace.backend_action,
+            "action_taken": trace.action_taken,
+            "skip_reason": trace.skip_reason,
+            "conflict_with": trace.conflict_with,
+            "memory_id": trace.memory_id,
+            "db_success": trace.db_success,
+            "db_error": trace.db_error,
+        }
+        
+        _client.table("memory_traces").insert(data).execute()
+    except Exception as e:
+        print(f"[db] 插入 memory trace 失敗: {e}")
+
+
+def load_memory_traces(limit=50, session_id=None, action_taken=None):
+    """
+    讀取 memory traces
+    
+    Args:
+        limit: 最多讀取幾條
+        session_id: 過濾特定 session
+        action_taken: 過濾特定 action (created/reinforced/skipped/...)
+    
+    Returns:
+        List[dict]: trace 列表
+    """
+    if not _client:
+        return []
+    try:
+        query = _client.table("memory_traces").select("*")
+        
+        if session_id:
+            query = query.eq("session_id", session_id)
+        if action_taken:
+            query = query.eq("action_taken", action_taken)
+        
+        res = query.order("created_at", desc=True).limit(limit).execute()
+        return res.data or []
+    except Exception as e:
+        print(f"[db] 讀取 memory traces 失敗: {e}")
+        return []
+
+
+def get_memory_trace_stats(days=7):
+    """
+    取得 memory trace 統計數據
+    
+    Args:
+        days: 統計最近 N 天
+    
+    Returns:
+        dict: 統計數據
+    """
+    if not _client:
+        return {}
+    
+    try:
+        from datetime import datetime, timedelta
+        since = (datetime.now() - timedelta(days=days)).isoformat()
+        
+        # 總數
+        total_res = _client.table("memory_traces").select("id", count="exact").gte("created_at", since).execute()
+        total_count = total_res.count if hasattr(total_res, 'count') else 0
+        
+        # 成功數（parse_success=true AND db_success=true AND action_taken != 'skipped'）
+        success_res = _client.table("memory_traces").select("id", count="exact")\
+            .gte("created_at", since)\
+            .eq("parse_success", True)\
+            .eq("db_success", True)\
+            .neq("action_taken", "skipped")\
+            .execute()
+        success_count = success_res.count if hasattr(success_res, 'count') else 0
+        
+        # Parse 失敗數
+        parse_fail_res = _client.table("memory_traces").select("id", count="exact")\
+            .gte("created_at", since)\
+            .eq("parse_success", False)\
+            .execute()
+        parse_fail_count = parse_fail_res.count if hasattr(parse_fail_res, 'count') else 0
+        
+        # Skip 原因分布（取前 10）
+        skip_reasons = _client.table("memory_traces").select("skip_reason")\
+            .gte("created_at", since)\
+            .not_.is_("skip_reason", "null")\
+            .execute()
+        
+        # 統計 skip_reason 分布
+        skip_distribution = {}
+        for row in (skip_reasons.data or []):
+            reason = row.get("skip_reason", "unknown")
+            skip_distribution[reason] = skip_distribution.get(reason, 0) + 1
+        
+        return {
+            "total_count": total_count,
+            "success_count": success_count,
+            "parse_fail_count": parse_fail_count,
+            "success_rate": round(success_count / total_count * 100, 2) if total_count > 0 else 0,
+            "skip_distribution": skip_distribution,
+            "days": days,
+        }
+    except Exception as e:
+        print(f"[db] 取得 memory trace 統計失敗: {e}")
+        return {}

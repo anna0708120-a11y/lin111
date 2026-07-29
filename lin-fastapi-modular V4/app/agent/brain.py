@@ -16,6 +16,7 @@ from app.state import state
 from app.llm.deepseek_client import call_deepseek
 from app.persona import build_system_prompt
 from app.memory_rules import parse_memory_decision, parse_mood_event, strip_hidden_blocks
+from app import memory_trace  # Phase 2: 記錄 memory 決策鏈路
 from app.context.provider import get_context, format_context_for_prompt
 from app import mood_engine
 
@@ -200,15 +201,39 @@ def generate_reply(context, app_name=None, use_cache=True):
 
     thinking_display = None
     if reasoning:
+        # Phase 2: 開始 trace
+        memory_trace.start_trace(session_id=None, message_id=None)
+        memory_trace.record_model_output(reasoning_text=reasoning, raw_decision_block=None)
+        
         decision = parse_memory_decision(reasoning)
         if decision:
+            # 記錄 parse 成功
+            memory_trace.record_parse_result(success=True, parsed_decision=decision)
+            
             action = decision.get("action", "create")
+            result = None
+            
             if action == "update":
-                state.update_memory(decision)
+                result = state.update_memory(decision)
+                memory_trace.record_backend_action("update_memory", result)
             elif action == "archive":
-                state.archive_memory(decision)
+                result = state.archive_memory(decision)
+                memory_trace.record_backend_action("archive_memory", result)
             else:
-                state.remember_or_reinforce(decision)
+                result = state.remember_or_reinforce(decision)
+                memory_trace.record_backend_action("remember_or_reinforce", result)
+            
+            # 記錄 DB 操作結果（假設成功，除非 result 明確失敗）
+            if result and result.get("action_taken") != "skipped":
+                memory_trace.record_db_result(success=True)
+            else:
+                memory_trace.record_db_result(success=False, error=result.get("skip_reason") if result else "unknown")
+        else:
+            # Parse 失敗
+            memory_trace.record_parse_result(success=False, error="parse_memory_decision returned None")
+        
+        # 儲存 trace
+        memory_trace.save_trace()
 
         mood_event = parse_mood_event(reasoning)
         if mood_event:

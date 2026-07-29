@@ -316,7 +316,7 @@ class AppState:
                 if len(self.memory_bank) > 300:
                     self.memory_bank.pop(0)
         
-        return result["memory_id"]
+        return result  # Phase 2: 回傳完整 result 供 trace 使用
 
     def update_memory(self, decision):
         """
@@ -359,7 +359,12 @@ class AppState:
                 conflict_with=target["id"]
             )
             # pending_review 的記憶不加入內存
-            return memory_id
+            return {
+                "memory_id": memory_id,
+                "action_taken": "pending_review",
+                "conflict_with": target["id"],
+                "skip_reason": "conflict_detected"
+            }
         
         # 差異小 -> 直接更新
         new_importance = decision["importance"]
@@ -376,7 +381,12 @@ class AppState:
                     m["expires_at"] = new_expiry
                     break
         
-        return target["id"]
+        return {
+            "memory_id": target["id"],
+            "action_taken": "updated",
+            "conflict_with": None,
+            "skip_reason": None
+        }
 
     def archive_memory(self, decision):
         """
@@ -393,13 +403,23 @@ class AppState:
         
         target = db.find_memory_by_keyword(normalized_keyword, created_by="agent")
         if not target:
-            return None
+            return {
+                "memory_id": None,
+                "action_taken": "skipped",
+                "conflict_with": None,
+                "skip_reason": "not_found"
+            }
         
         ok = db.archive_memory(target["id"])
         if ok:
             self.memory_bank = [m for m in self.memory_bank if m.get("id") != target["id"]]
         
-        return target["id"] if ok else None
+        return {
+            "memory_id": target["id"] if ok else None,
+            "action_taken": "archived" if ok else "skipped",
+            "conflict_with": None,
+            "skip_reason": "db_error" if not ok else None
+        }
 
     def delete_memory(self, memory_id):
         self.memory_bank = [m for m in self.memory_bank if m.get("id") != memory_id]

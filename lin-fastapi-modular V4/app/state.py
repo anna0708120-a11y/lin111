@@ -279,56 +279,103 @@ class AppState:
         """
         Lin 自己判断值得记的一轮：先看关键字有没有存过同一件事，
         有的话星级调高、到期时间重算；没有就新增一条。
+        
+        Phase 1: 加入 keyword normalization 和 conflict detection
         """
-        keyword = decision.get("keyword", "")
-        existing = db.find_memory_by_keyword(keyword) if keyword else None
-        if existing:
-            new_importance = max(existing.get("importance", 3), decision["importance"])
-            new_expiry = compute_expiry(new_importance)
-            db.reinforce_memory(existing["id"], new_importance, new_expiry)
-            for m in self.memory_bank:
-                if m["id"] == existing["id"]:
-                    m["importance"] = new_importance
-                    m["expires_at"] = new_expiry
-                    break
-            return existing["id"]
-        return self.add_memory(
-            tag=decision["tag"],
-            content=decision["summary"],
-            category=decision["category"],
-            importance=decision["importance"],
-            keyword=keyword,
-            created_by="agent",
-        )
+        from app.keyword_normalizer import normalize_keyword
+        from app.memory_conflict import detect_conflict, handle_memory_with_conflict_check
+        
+        raw_keyword = decision.get("keyword", "")
+        
+        # Phase 1: 使用衝突檢查邏輯
+        result = handle_memory_with_conflict_check(decision)
+        
+        # 同步到內存（只有非 pending_review 的才加入）
+        if result["memory_id"] and result["action_taken"] != "pending_review":
+            normalized_keyword = normalize_keyword(raw_keyword)
+            
+            if result["action_taken"] == "reinforced":
+                # 更新內存中的記憶
+                for m in self.memory_bank:
+                    if m.get("id") == result["memory_id"]:
+                        m["importance"] = decision["importance"]
+                        m["expires_at"] = compute_expiry(decision["importance"])
+                        break
+            else:
+                # 新建記憶加入內存
+                self.memory_bank.append({
+                    "id": result["memory_id"],
+                    "tag": decision["tag"],
+                    "category": decision["category"],
+                    "content": decision["summary"],
+                    "importance": decision["importance"],
+                    "keyword": normalized_keyword,
+                    "expires_at": compute_expiry(decision["importance"]),
+                    "created_by": "agent",
+                })
+                if len(self.memory_bank) > 300:
+                    self.memory_bank.pop(0)
+        
+        return result["memory_id"]
 
     def update_memory(self, decision):
         """
         Lin 判断"同一件事已经变化"：只能更新自己建立的记忆（created_by=agent），
         找不到符合条件的对象（keyword没命中，或命中的是Anna手动建的）就转为新增一条，
         不去动Anna手动建立的记忆。
+        
+        Phase 1: 如果內容差異大，視為衝突 -> pending_review
         """
-        keyword = decision.get("keyword", "")
-        target = db.find_memory_by_keyword(keyword, created_by="agent") if keyword else None
+        from app.keyword_normalizer import normalize_keyword
+        from app.memory_conflict import _content_similarity
+        
+        raw_keyword = decision.get("keyword", "")
+        normalized_keyword = normalize_keyword(raw_keyword)
+        
+        # 查找目標記憶（只找 agent 自己建的）
+        target = db.find_memory_by_keyword(normalized_keyword, created_by="agent")
+        
         if not target:
-            return self.add_memory(
+            # 找不到，轉為新建
+            return self.remember_or_reinforce(decision)
+        
+        # 檢查內容差異
+        new_content = decision.get("summary", "").strip()
+        old_content = target.get("content", "").strip()
+        similarity = _content_similarity(new_content, old_content)
+        
+        # 差異大 -> 視為衝突，標記待審核
+        if similarity < 0.5:
+            memory_id = db.insert_memory(
                 tag=decision["tag"],
-                content=decision["summary"],
+                content=new_content,
                 category=decision["category"],
                 importance=decision["importance"],
-                keyword=keyword,
+                keyword=normalized_keyword,
+                raw_keyword=raw_keyword,
+                expires_at=compute_expiry(decision["importance"]),
                 created_by="agent",
+                pending_review=True,
+                conflict_with=target["id"]
             )
+            # pending_review 的記憶不加入內存
+            return memory_id
+        
+        # 差異小 -> 直接更新
         new_importance = decision["importance"]
         new_expiry = compute_expiry(new_importance)
-        ok = db.update_memory(target["id"], content=decision["summary"],
-                               importance=new_importance, expires_at=new_expiry)
+        ok = db.update_memory(target["id"], content=new_content,
+                              importance=new_importance, expires_at=new_expiry)
+        
         if ok:
+            # 同步內存
             for m in self.memory_bank:
-                if m["id"] == target["id"]:
-                    m["content"] = decision["summary"]
+                if m.get("id") == target["id"]:
+                    m["content"] = new_content
                     m["importance"] = new_importance
                     m["expires_at"] = new_expiry
                     break
+        
         return target["id"]
 
     def archive_memory(self, decision):
@@ -336,14 +383,22 @@ class AppState:
         Lin 判断"这件事已经失效/被推翻"：只能封存自己建立的记忆（created_by=agent），
         找不到符合条件的对象就什么都不做，绝不碰Anna手动建立的记忆。
         归档是逻辑删除（archived=True），不是物理删除，Anna仍可在数据库里找回。
+        
+        Phase 1: 加入 keyword normalization
         """
-        keyword = decision.get("keyword", "")
-        target = db.find_memory_by_keyword(keyword, created_by="agent") if keyword else None
+        from app.keyword_normalizer import normalize_keyword
+        
+        raw_keyword = decision.get("keyword", "")
+        normalized_keyword = normalize_keyword(raw_keyword)
+        
+        target = db.find_memory_by_keyword(normalized_keyword, created_by="agent")
         if not target:
             return None
+        
         ok = db.archive_memory(target["id"])
         if ok:
             self.memory_bank = [m for m in self.memory_bank if m.get("id") != target["id"]]
+        
         return target["id"] if ok else None
 
     def delete_memory(self, memory_id):

@@ -68,21 +68,9 @@ def test_conflict_detection():
     print("3. 檢查第二條是否被標記為 pending_review=True")
 
 
-def test_api_endpoints():
-    """測試 API endpoints（需要伺服器運行）"""
-    print("\n=== Test 4: API Endpoints ===")
-    print("⚠ 此測試需要伺服器運行，跳過")
-    print("手動測試步驟：")
-    print("1. 啟動伺服器：uvicorn app.main:app --reload")
-    print("2. 測試 GET /api/memory/pending")
-    print("3. 測試 POST /api/memory/approve/:id")
-    print("4. 測試 POST /api/memory/reject/:id")
-    print("5. 測試 GET /api/memory/conflicts/summary")
-
-
 def test_synonym_map():
     """測試同義詞表"""
-    print("\n=== Test 5: Synonym Map ===")
+    print("\n=== Test 4: Synonym Map ===")
     
     synonym_map = get_synonym_map()
     print(f"同義詞表共 {len(synonym_map)} 項")
@@ -109,7 +97,6 @@ if __name__ == "__main__":
     test_keyword_normalization()
     test_content_similarity()
     test_conflict_detection()
-    test_api_endpoints()
     test_synonym_map()
     
     print("\n" + "=" * 60)

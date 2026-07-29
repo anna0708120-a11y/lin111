@@ -5,11 +5,36 @@ Memory Conflict Detection - Phase 1
 1. 檢查同 keyword 是否已有記憶
 2. 判斷是「強化」還是「衝突」
 3. 衝突時標記 pending_review，等 Anna 審核
+
+直接依賴 app.db（而非獨立的 patch 模組），避免維護兩套邏輯。
 """
-from datetime import datetime
+from app import db
 from app.keyword_normalizer import normalize_keyword
-from app.db_phase1_patch import find_conflicting_memories, insert_memory_with_conflict
 from app.memory_rules import compute_expiry
+
+
+def _content_similarity(text1, text2):
+    """
+    簡單的內容相似度計算（Phase 1 用字符重疊率）
+    Phase 2 可改用 embedding cosine similarity
+    
+    Returns:
+        float: 0.0 ~ 1.0
+    """
+    if not text1 or not text2:
+        return 0.0
+    
+    # 轉成字符集合，計算 Jaccard 相似度
+    set1 = set(text1.lower())
+    set2 = set(text2.lower())
+    
+    intersection = len(set1 & set2)
+    union = len(set1 | set2)
+    
+    if union == 0:
+        return 0.0
+    
+    return intersection / union
 
 
 def detect_conflict(decision):
@@ -34,7 +59,7 @@ def detect_conflict(decision):
     normalized_keyword = normalize_keyword(raw_keyword)
     
     # 2. 查找同 keyword 的記憶（只找 agent 自己建立的）
-    conflicts = find_conflicting_memories(normalized_keyword, created_by="agent")
+    conflicts = db.find_conflicting_memories(normalized_keyword, created_by="agent")
     
     if not conflicts:
         return {"has_conflict": False, "conflicting_memory": None, "action": "create"}
@@ -62,36 +87,9 @@ def detect_conflict(decision):
     }
 
 
-def _content_similarity(text1, text2):
-    """
-    簡單的內容相似度計算（Phase 1 用字符重疊率）
-    Phase 2 可改用 embedding cosine similarity
-    
-    Returns:
-        float: 0.0 ~ 1.0
-    """
-    if not text1 or not text2:
-        return 0.0
-    
-    # 轉成字符集合，計算 Jaccard 相似度
-    set1 = set(text1.lower())
-    set2 = set(text2.lower())
-    
-    intersection = len(set1 & set2)
-    union = len(set1 | set2)
-    
-    if union == 0:
-        return 0.0
-    
-    return intersection / union
-
-
 def handle_memory_with_conflict_check(decision):
     """
-    處理記憶寫入（含衝突檢查）
-    
-    這是 state.remember_or_reinforce() 的 Phase 1 版本，
-    加入了衝突偵測邏輯。
+    處理記憶寫入（含衝突檢查），供 state.remember_or_reinforce() 調用。
     
     Args:
         decision: parse_memory_decision() 的回傳值
@@ -113,7 +111,6 @@ def handle_memory_with_conflict_check(decision):
     if conflict_result["action"] == "reinforce":
         # 強化現有記憶
         existing = conflict_result["conflicting_memory"]
-        from app import db
         new_importance = max(existing.get("importance", 3), decision["importance"])
         new_expiry = compute_expiry(new_importance)
         db.reinforce_memory(existing["id"], new_importance, new_expiry)
@@ -124,9 +121,9 @@ def handle_memory_with_conflict_check(decision):
         }
     
     elif conflict_result["action"] == "conflict":
-        # 衝突：標記 pending_review
+        # 衝突：標記 pending_review，不進 prompt，等 Anna 審核
         existing = conflict_result["conflicting_memory"]
-        memory_id = insert_memory_with_conflict(
+        memory_id = db.insert_memory(
             tag=decision["tag"],
             content=decision["summary"],
             category=decision["category"],
@@ -146,7 +143,7 @@ def handle_memory_with_conflict_check(decision):
     
     else:
         # 正常建立新記憶
-        memory_id = insert_memory_with_conflict(
+        memory_id = db.insert_memory(
             tag=decision["tag"],
             content=decision["summary"],
             category=decision["category"],

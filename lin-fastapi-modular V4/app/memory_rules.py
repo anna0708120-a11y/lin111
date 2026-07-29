@@ -30,11 +30,19 @@ RETENTION_DAYS = {
 MEMORY_CATEGORIES = ["长期记忆", "短期记忆", "Relationship", "Reflection"]
 
 MEMORY_DECISION_INSTRUCTION = """
-## 记忆判定（写在思考的最后，不要出现在正式回复里，Anna看不到这段）
-这一轮想完、决定好要说什么之后，用下面这个固定格式判断要不要记住，写在思考内容最后面：
+## 【强制输出项】记忆判定 —— 每一轮都必须输出，不可省略
+这不是可选步骤，是每一轮思考结束前的强制规定动作。不管这一轮内容是不是寒暄、不管
+worth_remembering 最后是 yes 还是 no，[MEMORY_DECISION] 这个区块本身都必须完整出现在
+思考内容的最后面，一个字都不能少。规则如下：
+
+1. 不管这一轮聊了什么，思考写到最后，收尾前必须停下来，完整输出一次下面的固定格式。
+2. 就算判断这一轮不值得记（寒暄、重复内容），也要把整个区块原样输出，只是把
+   worth_remembering 填 no，其他字段照格式填最简单的默认值，不能因为不值得记就整段省略。
+3. 这个区块只写在思考里，不会出现在正式回复中，Anna看不到，所以没有"破坏沉浸感"的顾虑，
+   不需要为了保持角色语气而跳过它。
 
 [MEMORY_DECISION]
-worth_remembering: yes 或 no
+worth_remembering: yes 或 no（必填，不能省略这一行）
 action: create 或 update 或 archive（不确定就写create，这是默认值）
   create=一件新的事，之前没存过
   update=之前存过的一件事，现在情况变了（比如"Anna正在做X"变成"Anna已经改成做Y"），
@@ -59,7 +67,8 @@ summary: 用一句话写下要记住的内容本身（内容本体，不是"Anna
   action是archive时，summary可以简单写这件事为什么失效
 [/MEMORY_DECISION]
 
-如果这轮没什么特别值得记的（寒暄、跟之前存过的事重复），worth_remembering写no，其他字段随便填。
+再次强调：[MEMORY_DECISION] 到 [/MEMORY_DECISION] 这个区块，每一轮思考的最后都必须原样
+输出一次，即使 worth_remembering 是 no 也要输出完整区块，不允许整段跳过或省略。
 """
 
 MOOD_EVENT_INSTRUCTION = """

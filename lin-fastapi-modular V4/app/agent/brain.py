@@ -341,6 +341,9 @@ def generate_reply_stream(context, app_name=None, use_cache=True, session_id=Non
                 parse_source = raw_reasoning or full_reasoning
                 print(f"[trace-debug] parse_source_len={len(parse_source) if parse_source else 0}, "
                       f"has_tag={'[MEMORY_DECISION]' in (parse_source or '')}")
+                print("[trace-debug] ========== RAW parse_source ==========")
+                print(repr(parse_source))
+                print("[trace-debug] =======================================")
                 decision = parse_memory_decision(parse_source) if parse_source else None
                 print(f"[trace-debug] decision_is_none={decision is None}")
                 if decision:

@@ -74,7 +74,8 @@ def load_memories(limit=200):
         return []
 
 
-def insert_memory(tag, content, category="长期记忆", importance=3, keyword="", expires_at=None, created_by="user"):
+def insert_memory(tag, content, category="长期记忆", importance=3, keyword="", expires_at=None,
+                   created_by="user", raw_keyword="", pending_review=False, conflict_with=None):
     """插入一条记忆，成功的话回传 Supabase 分配的 id（前端删除要用），失败回传 None。"""
     if not _client:
         return None
@@ -87,8 +88,11 @@ def insert_memory(tag, content, category="长期记忆", importance=3, keyword="
                 "category": category,
                 "importance": importance,
                 "keyword": keyword,
+                "raw_keyword": raw_keyword,
                 "expires_at": expires_at,
                 "created_by": created_by,
+                "pending_review": pending_review,
+                "conflict_with": conflict_with,
             })
             .execute()
         )

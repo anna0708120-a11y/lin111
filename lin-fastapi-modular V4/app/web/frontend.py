@@ -1413,10 +1413,10 @@ async function syncChat(){
   }
 }
 
-function smsg(role,text,think){
+function smsg(role,text,think,trace){
   // Wrapper: 委托给 ChatView.appendLiveMessage()，保持旧代码调用兼容性
   if (typeof chatView !== 'undefined' && chatView.appendLiveMessage) {
-    chatView.appendLiveMessage(role, text, think);
+    chatView.appendLiveMessage(role, text, think, trace);
   }
   return chatMemoryCache;
 }
@@ -1560,7 +1560,7 @@ async function confirmImageSend() {
     function processChunk({done, value}) {
       if (done) {
         if (contentBuffer) {
-          smsg('lin', contentBuffer, reasoningBuffer || null);
+          smsg('lin', contentBuffer, reasoningBuffer || null, currentDevTrace ? currentDevTrace.lastPayload : null);
         }
         scrollDown();
         pendingImageDataUrl = null;
@@ -1711,7 +1711,7 @@ async function send(){
       if(done){
         console.log('[DEBUG] Stream done. contentBuffer:', contentBuffer, 'reasoningBuffer:', reasoningBuffer);
         if(contentBuffer){
-          smsg('lin', contentBuffer, reasoningBuffer || null);
+          smsg('lin', contentBuffer, reasoningBuffer || null, currentDevTrace ? currentDevTrace.lastPayload : null);
         }
         scrollDown();
         return;

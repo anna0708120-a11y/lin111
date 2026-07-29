@@ -156,10 +156,11 @@ class ChatView {
   }
 
   // 追加单条新消息到内存缓存并重画（实时发送/接收时用）
-  appendLiveMessage(role, text, think) {
+  appendLiveMessage(role, text, think, trace) {
     if (typeof chatMemoryCache === 'undefined') return;
     const entry = { r: role, t: text, time: ts(), iso: new Date().toISOString() };
     if (think) entry.think = think;
+    if (trace) entry.trace = trace;
     chatMemoryCache.push(entry);
     if (chatMemoryCache.length > 200) chatMemoryCache = chatMemoryCache.slice(-200);
     this.renderMessages(chatMemoryCache);

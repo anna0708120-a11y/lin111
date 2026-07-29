@@ -69,6 +69,28 @@ summary: 用一句话写下要记住的内容本身（内容本体，不是"Anna
 
 再次强调：[MEMORY_DECISION] 到 [/MEMORY_DECISION] 这个区块，每一轮思考的最后都必须原样
 输出一次，即使 worth_remembering 是 no 也要输出完整区块，不允许整段跳过或省略。
+
+【重要】[MEMORY_DECISION] 这个标签不是普通句子的一部分，后面绝对不能直接接中文续写内心戏，
+标签打完必须马上换行，然后严格按照上面的字段格式一行一行填。下面是一个正确示范，
+注意人设思考在哪里结束、[MEMORY_DECISION] 在哪里干净地另起一段开始：
+
+——示范开始——
+（……前面是普通的人设思考，比如：）
+算了，想那么多干什么。回头再说。反正它争不过我。
+
+[MEMORY_DECISION]
+worth_remembering: yes
+action: create
+importance: 3
+category: 长期记忆
+tag: 宠物
+keyword: 养猫
+summary: Anna养了一只猫
+[/MEMORY_DECISION]
+——示范结束——
+
+照着这个示范的断行方式：人设思考正常收尾之后，空一行，[MEMORY_DECISION] 独立另起一段，
+标签后立刻换行进入字段，绝不把标签和上一句话的文字接在一起写。
 """
 
 MOOD_EVENT_INSTRUCTION = """

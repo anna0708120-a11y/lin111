@@ -27,6 +27,8 @@ class ChatView {
   }
 
   // Phase 2: 接管完整渲染逻辑（时间分隔线、已读状态、思考过程、头像）
+  // Developer Trace: lin 訊息若帶 m.trace，會在氣泡下方預留穩定掛載點（data-message-id），
+  // render 完成後只遍歷「帶 trace 的訊息」逐一掛載，不做全域 document 掃描。
   renderMessages(history) {
     console.log('[ChatView] renderMessages called, history.length:', history ? history.length : 0);
     if (!this.cmEl) return;
@@ -38,6 +40,7 @@ class ChatView {
       return;
     }
     
+    const traceSlots = []; // 記錄需要掛載 DevTrace 的 {messageId, trace}
     let html = '<div class="clabel">with Lin</div>';
     history.forEach((m, i) => {
       const cur = m.iso ? new Date(m.iso) : new Date();
@@ -63,9 +66,26 @@ class ChatView {
         html += this._renderToolCard(m.tool);
         return; // forEach 内用 return 相当于 continue
       }
-      html += '<div class="msg ' + m.r + (showMeta ? '' : ' grouped') + '">' + thinkHtml + '<div class="msg-row">' + avatarHtml(m.r) + '<div class="bub">' + m.t + '</div></div>' + meta + '</div>';
+      // 穩定掛載點：優先用後端給的 message_id（DB row id 或 idx-N fallback），
+      // 沒有的話（例如純本地新增、尚未帶 message_id 的舊資料）就不掛 data-message-id，devSlotHtml 也不會渲染。
+      const messageId = m.message_id != null ? String(m.message_id) : null;
+      let devSlotHtml = '';
+      if (m.r === 'lin' && messageId) {
+        devSlotHtml = '<div class="dt-slot" data-message-id="' + _escapeHtml(messageId) + '"></div>';
+        if (m.trace) traceSlots.push({ messageId, trace: m.trace });
+      }
+      html += '<div class="msg ' + m.r + (showMeta ? '' : ' grouped') + '">' + thinkHtml + '<div class="msg-row">' + avatarHtml(m.r) + '<div class="bub">' + m.t + '</div></div>' + devSlotHtml + meta + '</div>';
     });
     this.cmEl.innerHTML = html;
+
+    // 只遍歷「這次 render 裡實際帶 trace 的訊息」，用 cmEl.querySelector 限定範圍，不做全域 document 掃描。
+    traceSlots.forEach(({ messageId, trace }) => {
+      const slot = this.cmEl.querySelector('.dt-slot[data-message-id="' + CSS.escape(messageId) + '"]');
+      if (slot && window.DevTrace) {
+        window.DevTrace.mountHistory(slot, trace);
+      }
+    });
+
     this.scrollToBottom();
   }
 

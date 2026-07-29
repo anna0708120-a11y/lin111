@@ -310,15 +310,20 @@ def get_conversation():
             return ""
 
     messages = []
-    for turn in state.conversation_history:
+    for idx, turn in enumerate(state.conversation_history):
         entry = {
             "r": "anna" if turn.get("role") == "anna" else "lin",
             "t": turn.get("content", ""),
             "iso": turn.get("time", ""),
             "time": _display_time(turn.get("time", "")),
+            # 穩定掛載點用：優先用資料庫 row id，沒有的話（例如剛寫入、DB 還沒回填）fallback 用序號，
+            # 不用隨機 id，保證同一份歷史多次渲染時掛載點一致。
+            "message_id": turn.get("id") if turn.get("id") is not None else f"idx-{idx}",
         }
         if turn.get("thinking"):
             entry["think"] = turn["thinking"]
+        if turn.get("trace"):
+            entry["trace"] = turn["trace"]
         messages.append(entry)
     return {"messages": messages}
 

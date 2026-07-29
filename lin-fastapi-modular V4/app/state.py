@@ -115,11 +115,13 @@ class AppState:
         self.conversation_history = deque(
             (
                 {
+                    "id": r.get("id"),
                     "role": r.get("role", ""),
                     "content": r.get("content", ""),
                     "thinking": r.get("thinking"),
                     "image_data": r.get("image_data"),
                     "time": r.get("time") or r.get("created_at", ""),
+                    "trace": r.get("trace"),
                 }
                 for r in db.load_conversations(limit=chat_limit)
             ),
@@ -183,11 +185,13 @@ class AppState:
         conversations = deque(
             (
                 {
+                    "id": r.get("id"),
                     "role": r.get("role", ""),
                     "content": r.get("content", ""),
                     "thinking": r.get("thinking"),
                     "image_data": r.get("image_data"),
                     "time": r.get("time") or r.get("created_at", ""),
+                    "trace": r.get("trace"),
                 }
                 for r in db.load_conversations(limit=chat_limit, session_id=session_id)
             ),
@@ -453,11 +457,13 @@ class AppState:
         return f"\n\n【Lin对Anna的记忆】\n{lines}"
 
     # ---------- 对话历史 ----------
-    def add_conversation_turn(self, role, content, thinking=None, image_data=None, session_id=None):
+    def add_conversation_turn(self, role, content, thinking=None, image_data=None, session_id=None, trace=None):
         """
         记录一轮对话：role 是 'anna' 或 'lin'，content 是说的话。
         用 deque(maxlen=config.CHAT_HISTORY_LIMIT) 自动保留最近N条，超过自动丢弃最旧的。
         同时写回 Supabase，让手机/电脑/网页三端下次打开能读到同一份记录。
+        trace：Developer Panel 用的版本化 trace dict（TraceCollector.export()），可选，
+        只有 lin 的回覆会带，不影响既有呼叫端（不传就是 None）。
         """
         target_session = session_id or self.current_session_id
         
@@ -467,10 +473,11 @@ class AppState:
             "thinking": thinking,
             "image_data": image_data,
             "time": datetime.now().isoformat(),
+            "trace": trace,
         }
         self.conversation_history.append(turn)
         
-        db.insert_conversation_turn(role, content, thinking=thinking, image_data=image_data, session_id=target_session)
+        db.insert_conversation_turn(role, content, thinking=thinking, image_data=image_data, session_id=target_session, trace=trace)
         
         from app import session as session_module
         session_module.update_session_activity(target_session)

@@ -556,29 +556,45 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
   .ci { font-size: 13px !important; }
 }
 
-/* Developer Tool Panel —— 開發模式專用，預設折疊、不佔聊天高度、不推開消息 */
-.dev-panel{position:fixed;right:12px;bottom:calc(70px + var(--safe-bottom));z-index:300;max-width:min(340px, calc(100vw - 24px));background:var(--white);border:1px solid var(--border);border-radius:12px;box-shadow:0 4px 16px var(--shadow);font-family:'DM Sans',sans-serif;font-size:12px;color:var(--dark);}
-.dev-panel.collapsed{max-height:32px;overflow:hidden;}
-.dev-panel.expanded{max-height:70vh;overflow-y:auto;}
-.dev-panel-summary{display:flex;align-items:center;gap:6px;padding:6px 10px;cursor:pointer;white-space:nowrap;overflow-x:auto;height:20px;scrollbar-width:none;}
-.dev-panel-summary::-webkit-scrollbar{display:none;}
-.dev-panel-dot{flex-shrink:0;}
-.dev-panel-summary-text{flex-shrink:0;color:var(--muted);}
-.dev-panel-body{padding:0 10px 10px;border-top:1px solid var(--border);}
-.dev-panel-meta{color:var(--muted);font-size:10px;padding:6px 0;}
-.dev-panel-section{border-bottom:1px solid var(--border);}
-.dev-panel-section:last-child{border-bottom:none;}
-.dev-panel-section-head{display:flex;align-items:center;gap:6px;padding:6px 0;cursor:pointer;}
-.dev-panel-section-title{flex:1;font-weight:500;}
-.dev-panel-section-status{color:var(--muted);font-size:11px;}
-.dev-panel-section-detail{padding:0 0 8px 20px;}
-.dev-panel-reason{color:var(--rose-deep);margin-bottom:4px;}
-.dev-panel-empty{color:var(--muted);}
-.dev-panel-kv-row{display:flex;gap:6px;padding:2px 0;}
-.dev-panel-kv-key{color:var(--muted);min-width:110px;flex-shrink:0;}
-.dev-panel-kv-val{word-break:break-all;}
-.dev-panel-reasoning-block{margin:4px 0;}
-.dev-panel-reasoning-pre{white-space:pre-wrap;word-break:break-word;max-height:200px;overflow-y:auto;background:var(--blush);border-radius:6px;padding:6px;margin-top:4px;font-family:inherit;user-select:text;}
+/* Developer Trace —— 吸附在每則 Lin 回覆下方，不是浮動 widget。風格參考 Linear/Cursor：克制、單色階、細邊框。 */
+.dt-slot:empty{display:none;}
+.dt-root{margin:6px 0 4px 44px;max-width:calc(100% - 60px);font-family:'DM Sans',sans-serif;font-size:12px;border:1px solid var(--border);border-radius:10px;background:var(--white);overflow:hidden;}
+.dt-summary{display:flex;align-items:center;gap:6px;padding:6px 10px;cursor:pointer;user-select:none;}
+.dt-summary-icon{display:flex;color:var(--muted);flex-shrink:0;}
+.dt-summary-text{flex:1;color:var(--muted);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color .2s ease;}
+.dt-summary-chevron{display:flex;color:var(--muted);flex-shrink:0;transition:transform .25s cubic-bezier(.4,0,.2,1);}
+.dt-expanded .dt-summary-chevron{transform:rotate(90deg);}
+.dt-body-wrap{max-height:0;overflow:hidden;opacity:0;transform:translateY(-4px);transition:max-height .28s cubic-bezier(.4,0,.2,1),opacity .22s ease,transform .22s cubic-bezier(.4,0,.2,1);}
+.dt-expanded .dt-body-wrap{opacity:1;transform:translateY(0);}
+.dt-body{padding:2px 10px 10px;border-top:1px solid var(--border);max-height:360px;overflow-y:auto;}
+.dt-meta{color:var(--muted);font-size:10px;padding:6px 0 4px;letter-spacing:.2px;}
+.dt-status-passed{color:#2E9E5B;}
+.dt-status-failed{color:#D64545;}
+.dt-status-waiting,.dt-status-running{color:#3B7DD8;}
+.dt-status-skipped,.dt-status-not_executed,.dt-status-unknown{color:var(--muted);}
+.dt-spin{animation:dtSpin 0.9s linear infinite;}
+@keyframes dtSpin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
+
+/* Timeline：左側時間軸 rail + 右側內容，而不是純文字堆疊 */
+.dt-timeline{display:flex;flex-direction:column;}
+.dt-node{display:flex;gap:8px;}
+.dt-node-rail{display:flex;flex-direction:column;align-items:center;width:14px;flex-shrink:0;}
+.dt-node-dot{display:flex;align-items:center;justify-content:center;width:14px;height:14px;flex-shrink:0;}
+.dt-node-line{width:1px;flex:1;background:var(--border);margin:2px 0;min-height:10px;}
+.dt-node-main{flex:1;min-width:0;padding-bottom:6px;}
+.dt-node-head{display:flex;align-items:center;gap:6px;cursor:pointer;padding:1px 0;}
+.dt-node-title{font-weight:500;color:var(--dark);}
+.dt-node-status{font-size:10.5px;color:var(--muted);}
+.dt-node-chevron{display:flex;color:var(--muted);margin-left:auto;flex-shrink:0;transition:transform .2s cubic-bezier(.4,0,.2,1);}
+.dt-node-chevron.dt-open{transform:rotate(90deg);}
+.dt-node-detail{padding:4px 0 2px;font-size:11.5px;color:var(--dark);}
+.dt-reason{color:var(--rose-deep);margin-bottom:3px;}
+.dt-empty{color:var(--muted);}
+.dt-kv-row{display:flex;gap:6px;padding:1.5px 0;}
+.dt-kv-key{color:var(--muted);min-width:104px;flex-shrink:0;}
+.dt-kv-val{word-break:break-all;}
+.dt-kv-block{margin:3px 0;}
+.dt-pre{white-space:pre-wrap;word-break:break-word;max-height:180px;overflow-y:auto;background:var(--blush);border-radius:6px;padding:6px;margin-top:3px;font-family:inherit;user-select:text;}
 </style>
 </head>
 <body>
@@ -1371,7 +1387,9 @@ function renderOnly(history){
       t: m.content != null ? m.content : m.t,
       iso: iso,
       time: display,
-      think: m.thinking || m.think
+      think: m.thinking || m.think,
+      message_id: m.message_id,
+      trace: m.trace
     };
   });
   chatMemoryCache = mapped;
@@ -1533,6 +1551,7 @@ async function confirmImageSend() {
     let contentBuffer = '';
     let currentMsgDiv = null;
     let thinkDiv = null;
+    let currentDevTrace = null;
     let currentEvent = null;
     let sseBuffer = '';
     
@@ -1627,7 +1646,11 @@ async function confirmImageSend() {
             }
 
             else if (currentEvent === 'devtrace') {
-              if (window.devPanel) window.devPanel.ingest(data);
+              const msgLinEl = currentMsgDiv ? currentMsgDiv.closest('.msg.lin') : null;
+              if (msgLinEl) {
+                if (!currentDevTrace) currentDevTrace = window.DevTrace.createForContainer(msgLinEl);
+                currentDevTrace.ingest(data);
+              }
             }
             
           } catch(e) {
@@ -1677,6 +1700,7 @@ async function send(){
     let contentBuffer = '';
     let currentMsgDiv = null;
     let thinkDiv = null;
+    let currentDevTrace = null;
     let currentEvent = null;
     let sseBuffer = '';
     
@@ -1775,7 +1799,11 @@ async function send(){
             }
 
             else if(currentEvent === 'devtrace'){
-              if (window.devPanel) window.devPanel.ingest(data);
+              const msgLinEl = currentMsgDiv ? currentMsgDiv.closest('.msg.lin') : null;
+              if (msgLinEl) {
+                if (!currentDevTrace) currentDevTrace = window.DevTrace.createForContainer(msgLinEl);
+                currentDevTrace.ingest(data);
+              }
             }
             
           }catch(e){
@@ -2225,7 +2253,6 @@ sidebar.onSwitchSession = (sessionId) => renderActiveSession(sessionId, { fresh:
 
 async function initChatExperience() {
   chatView.init();
-  if (window.devPanel) window.devPanel.init();
   sidebar.init();
   await sessionManager.init();
 

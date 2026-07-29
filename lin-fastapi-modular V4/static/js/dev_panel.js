@@ -1,247 +1,278 @@
 /**
- * Developer Tool Panel
+ * Developer Trace —— 吸附在每則 Lin 回覆下方的開發者追蹤區塊。
  *
- * 開發模式專用面板，用來 3 秒知道現在卡在哪一層，避免一直翻 Render Logs。
- * 消費後端 TraceCollector（app/agent/trace_collector.py）輸出的 `event: devtrace`。
+ * 定位：不是固定右下角的浮動 widget，而是聊天訊息的一部分。
+ * 每則 Lin 回覆自帶一個 DevTrace 實例，翻歷史時該回覆當時的 trace 一起顯示。
  *
- * 可擴展設計：
- *   - 後端 sections 是任意 key 的 dict（不寫死 memory/mood/tool），
- *     前端收到任何 section 都會自動渲染，不需要事先註冊已知清單。
- *   - SECTION_META 只是「已知 section 的展示優化」（icon、順序、展開時的自訂 renderer），
- *     沒有寫進 SECTION_META 的 section 一樣會顯示，只是用預設樣式 fallback，
- *     不會被吃掉或報錯（跟 chat_view.js 的 Tool UI 卡片同一個設計原則）。
- *   - 之後 Mood / Tool Calling / API / Vision 等模組要加自己的 Section，
- *     只需要：
- *       1. 後端呼叫 collector.record("mood", status, data, reason) 之類的方法
- *       2. （可選）前端呼叫 DevPanel.registerSection("mood", { icon, order, renderDetail })
- *          來自訂展開時的細節渲染，不註冊也能顯示，只是用預設格式
- *     不需要改這個檔案的核心渲染流程。
+ * 資料來源統一是 message.trace（TraceCollector.export() 的版本化 payload），
+ * 不區分即時訊息（SSE devtrace）或歷史訊息（DB 讀回的 m.trace）——
+ * 兩條路徑最後都呼叫 DevTrace.mount(container, payload)。
  *
- * 版本相容：devtrace payload 帶 version 欄位，目前只認 version 1，
- * 遇到不認得的 version 一律 fallback 成「盡量顯示看得懂的欄位」，不拋錯、不整個面板消失。
+ * 可擴展設計（registry，不寫死 section 清單）：
+ *   DevTrace.registerSection('mood', { title: 'Mood Engine', renderDetail(section){...} })
+ *   之後 Tool Calling / API / Vector Search / Planner / Workflow 都用這个方式加，
+ *   不需要改这个文件的核心渲染/展開/Timeline逻辑。
  */
 
-const STATUS_ICON = {
-  passed: '🟢',
-  waiting: '🟡',
-  failed: '🔴',
-  skipped: '⚪',
-  not_executed: '⚪',
-  unknown: '⚪',
+// ---- 統一 Icon 集合（不用 emoji，纯 inline SVG，走同一套 stroke 风格，接近 Lucide/Heroicons）----
+const DT_ICONS = {
+  passed: '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
+  failed: '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
+  waiting: '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>',
+  running: '<svg class="dt-spin" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-9-9"/></svg>',
+  skipped: '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/></svg>',
+  not_executed: '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" stroke-dasharray="2.5 3"/></svg>',
+  unknown: '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12.5"/><circle cx="12" cy="16" r="0.6" fill="currentColor" stroke="none"/></svg>',
+  chevron: '<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>',
+  dev: '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>',
 };
 
-const STATUS_LABEL = {
-  passed: 'Passed',
-  waiting: 'Waiting',
-  failed: 'Failed',
-  skipped: 'Skipped',
-  not_executed: 'Not Executed',
-  unknown: 'Unknown',
+const DT_STATUS_LABEL = {
+  passed: 'OK', failed: 'Failed', waiting: 'Waiting',
+  running: 'Running', skipped: 'Skipped', not_executed: '—', unknown: 'Unknown',
 };
 
-// Pipeline 顯示順序（沒列在這裡的 section 會照後端傳來的順序接在後面，不會消失）。
-const PIPELINE_ORDER = ['prompt', 'reasoning', 'memory_decision', 'parser', 'backend', 'database'];
+const DT_PIPELINE_ORDER = ['prompt', 'reasoning', 'memory_decision', 'parser', 'backend', 'database'];
 
-// 已知 section 的展示優化（display name / icon），未知 section 用 key 本身當標題。
-const SECTION_META = {
+const DT_SECTION_META = {
   prompt: { title: 'Prompt' },
   reasoning: { title: 'Reasoning' },
-  memory_decision: { title: 'MEMORY_DECISION' },
+  memory_decision: { title: 'Decision' },
   parser: { title: 'Parser' },
   backend: { title: 'Backend' },
   database: { title: 'Database' },
-  mood: { title: 'Mood' },
+  mood: { title: 'Mood Engine' },
   tool: { title: 'Tool Calling' },
   api: { title: 'API' },
-  trace: { title: 'Trace' },
 };
 
-class DevPanel {
-  constructor() {
-    this.rootEl = null;
-    this.summaryEl = null;
-    this.bodyEl = null;
+const DT_CUSTOM_RENDERERS = {};
+const DT_AUTO_COLLAPSE_MS = 3000;
+
+function dtRegisterSection(key, { title, renderDetail } = {}) {
+  if (title) DT_SECTION_META[key] = Object.assign({}, DT_SECTION_META[key], { title });
+  if (typeof renderDetail === 'function') DT_CUSTOM_RENDERERS[key] = renderDetail;
+}
+
+function dtEscape(str) {
+  const div = document.createElement('div');
+  div.textContent = str == null ? '' : String(str);
+  return div.innerHTML;
+}
+
+function dtOverallStatus(sections) {
+  const values = Object.values(sections || {});
+  if (values.some(s => s.status === 'failed')) return 'failed';
+  if (values.some(s => s.status === 'waiting' || s.status === 'running')) return 'waiting';
+  if (values.length > 0 && values.every(s => s.status === 'passed' || s.status === 'skipped' || s.status === 'not_executed')) return 'passed';
+  return 'unknown';
+}
+
+function dtSummaryText(sections) {
+  const failedEntry = Object.entries(sections).find(([, v]) => v.status === 'failed');
+  if (failedEntry) {
+    const [key, val] = failedEntry;
+    const title = (DT_SECTION_META[key] && DT_SECTION_META[key].title) || key;
+    return `${title} Failed${val.reason ? ' · ' + val.reason : ''}`;
+  }
+  const dbEntry = sections.database;
+  const backendEntry = sections.backend;
+  if (dbEntry && dbEntry.status === 'passed') return 'Memory Saved';
+  if (backendEntry && backendEntry.status === 'not_executed') return 'Memory · Nothing to save';
+  const overall = dtOverallStatus(sections);
+  if (overall === 'passed') return 'Memory Pipeline · OK';
+  if (overall === 'waiting') return 'Memory Pipeline · Running...';
+  return 'Developer Trace';
+}
+
+/**
+ * 一個 DevTrace 實例 = 一則 Lin 回覆訊息底下的 Developer 區塊。
+ * container：要插入的 DOM 節點（訊息氣泡下方）。
+ */
+class DevTraceInstance {
+  constructor(container) {
+    this.container = container;
     this.expanded = false;
-    this.sectionState = {}; // sectionKey -> { expanded: bool }
-    this.customRenderers = {}; // sectionKey -> function(data) -> html string
+    this.sectionState = {};
     this.lastPayload = null;
+    this.collapseTimer = null;
+    this._buildSkeleton();
   }
 
-  init() {
-    if (document.getElementById('devPanelRoot')) return; // 避免重複插入
-
+  _buildSkeleton() {
     const root = document.createElement('div');
-    root.id = 'devPanelRoot';
-    root.className = 'dev-panel collapsed';
+    root.className = 'dt-root dt-collapsed';
     root.innerHTML = `
-      <div class="dev-panel-summary" id="devPanelSummary">
-        <span class="dev-panel-dot">⚪</span>
-        <span class="dev-panel-summary-text">Developer Tool</span>
+      <div class="dt-summary">
+        <span class="dt-summary-icon">${DT_ICONS.dev}</span>
+        <span class="dt-summary-text">Developer</span>
+        <span class="dt-summary-chevron">${DT_ICONS.chevron}</span>
       </div>
-      <div class="dev-panel-body" id="devPanelBody" style="display:none;"></div>
+      <div class="dt-body-wrap"><div class="dt-body"></div></div>
     `;
-    document.body.appendChild(root);
-
+    root.querySelector('.dt-summary').addEventListener('click', () => this.toggle());
+    this.container.appendChild(root);
     this.rootEl = root;
-    this.summaryEl = root.querySelector('#devPanelSummary');
-    this.bodyEl = root.querySelector('#devPanelBody');
-
-    this.summaryEl.addEventListener('click', () => this.toggle());
+    this.summaryTextEl = root.querySelector('.dt-summary-text');
+    this.summaryIconEl = root.querySelector('.dt-summary-icon');
+    this.bodyWrapEl = root.querySelector('.dt-body-wrap');
+    this.bodyEl = root.querySelector('.dt-body');
   }
 
-  toggle() {
-    this.expanded = !this.expanded;
-    this.bodyEl.style.display = this.expanded ? 'block' : 'none';
-    this.rootEl.classList.toggle('collapsed', !this.expanded);
-    this.rootEl.classList.toggle('expanded', this.expanded);
-  }
+  toggle(force) {
+    const next = typeof force === 'boolean' ? force : !this.expanded;
+    if (next === this.expanded) return;
+    this.expanded = next;
+    if (this.collapseTimer) { clearTimeout(this.collapseTimer); this.collapseTimer = null; }
 
-  /**
-   * 給其他模組（Mood/Tool/API...）自訂某個 section 展開後的細節渲染方式。
-   * 不呼叫這個也完全沒問題，未註冊的 section 會用預設的 key: value 列表渲染。
-   */
-  registerSection(key, { title, renderDetail } = {}) {
-    if (title) {
-      SECTION_META[key] = Object.assign({}, SECTION_META[key], { title });
-    }
-    if (typeof renderDetail === 'function') {
-      this.customRenderers[key] = renderDetail;
+    if (this.expanded) {
+      this.rootEl.classList.remove('dt-collapsed');
+      this.rootEl.classList.add('dt-expanded');
+      // 高度 + opacity + translateY 動畫：先量出目標高度，再從 0 動畫到目標高度。
+      this.bodyWrapEl.style.maxHeight = this.bodyWrapEl.scrollHeight + 'px';
+    } else {
+      this.rootEl.classList.remove('dt-expanded');
+      this.rootEl.classList.add('dt-collapsed');
+      this.bodyWrapEl.style.maxHeight = '0px';
     }
   }
 
-  /**
-   * 接收一筆 devtrace payload（來自 SSE `event: devtrace`）。
-   * payload 結構：{ version, trace_id, duration_ms, sections: { [key]: {status, reason, data, ts} } }
-   */
   ingest(payload) {
     if (!payload || typeof payload !== 'object') return;
     this.lastPayload = payload;
-
     if (payload.version !== 1) {
-      // 未知版本：不拋錯，盡量以現有欄位繼續顯示，只是不做版本專屬的特殊處理。
-      console.warn('[DevPanel] 收到未知 devtrace version:', payload.version);
+      console.warn('[DevTrace] 未知 devtrace version:', payload.version);
+    }
+    this._renderSummary(payload);
+    this._renderBody(payload);
+
+    // 展開中的話，body 內容變了要重新量高度，避免動畫卡住。
+    if (this.expanded) {
+      this.bodyWrapEl.style.maxHeight = this.bodyWrapEl.scrollHeight + 'px';
     }
 
+    this._scheduleAutoCollapse();
+  }
+
+  // 從歷史訊息直接掛載，不需要動畫效果、也不需要自動收合（本來就是靜態資料）。
+  mountStatic(payload) {
+    if (!payload || typeof payload !== 'object') return;
+    this.lastPayload = payload;
     this._renderSummary(payload);
     this._renderBody(payload);
   }
 
-  _overallStatus(sections) {
-    const values = Object.values(sections || {});
-    if (values.some(s => s.status === 'failed')) return 'failed';
-    if (values.some(s => s.status === 'waiting')) return 'waiting';
-    if (values.length > 0 && values.every(s => s.status === 'passed' || s.status === 'skipped')) return 'passed';
-    return 'unknown';
+  _scheduleAutoCollapse() {
+    if (this.collapseTimer) clearTimeout(this.collapseTimer);
+    this.collapseTimer = setTimeout(() => {
+      if (this.expanded) this.toggle(false);
+    }, DT_AUTO_COLLAPSE_MS);
   }
 
   _renderSummary(payload) {
     const sections = payload.sections || {};
-    const overall = this._overallStatus(sections);
-    const icon = STATUS_ICON[overall] || '⚪';
-
-    // 找出第一個 failed 的 section，摘要文字優先顯示它卡在哪裡，符合「3 秒知道卡在哪一層」的目標。
-    const failedEntry = Object.entries(sections).find(([, v]) => v.status === 'failed');
-    let text;
-    if (failedEntry) {
-      const [key, val] = failedEntry;
-      const title = (SECTION_META[key] && SECTION_META[key].title) || key;
-      text = `${title} Failed${val.reason ? '：' + val.reason : ''}`;
-    } else if (overall === 'passed') {
-      text = 'Memory Ready';
-    } else if (overall === 'waiting') {
-      text = 'Waiting...';
-    } else {
-      text = 'Developer Tool';
-    }
-
-    const dotEl = this.summaryEl.querySelector('.dev-panel-dot');
-    const textEl = this.summaryEl.querySelector('.dev-panel-summary-text');
-    if (dotEl) dotEl.textContent = icon;
-    if (textEl) textEl.textContent = text;
+    const overall = dtOverallStatus(sections);
+    this.summaryIconEl.className = 'dt-summary-icon dt-status-' + overall;
+    this.summaryIconEl.innerHTML = DT_ICONS[overall] || DT_ICONS.unknown;
+    this.summaryTextEl.textContent = dtSummaryText(sections);
   }
 
   _renderBody(payload) {
     const sections = payload.sections || {};
     const keys = Object.keys(sections);
-    // 已知 pipeline 順序優先，其餘未知 section 接在後面，不會消失。
     const ordered = [
-      ...PIPELINE_ORDER.filter(k => keys.includes(k)),
-      ...keys.filter(k => !PIPELINE_ORDER.includes(k)),
+      ...DT_PIPELINE_ORDER.filter(k => keys.includes(k)),
+      ...keys.filter(k => !DT_PIPELINE_ORDER.includes(k)),
     ];
 
-    let html = `<div class="dev-panel-meta">trace_id: ${_dpEscape(payload.trace_id || '')} · ${payload.duration_ms != null ? payload.duration_ms + 'ms' : ''}</div>`;
+    let html = `<div class="dt-meta">${dtEscape(payload.trace_id || '')} · ${payload.duration_ms != null ? payload.duration_ms + 'ms' : ''}</div>`;
+    html += '<div class="dt-timeline">';
 
-    ordered.forEach(key => {
+    ordered.forEach((key, i) => {
       const section = sections[key];
-      const meta = SECTION_META[key] || {};
+      const meta = DT_SECTION_META[key] || {};
       const title = meta.title || key;
-      const icon = STATUS_ICON[section.status] || '⚪';
-      const label = STATUS_LABEL[section.status] || section.status;
+      const status = section.status || 'unknown';
       const isOpen = !!(this.sectionState[key] && this.sectionState[key].expanded);
-
-      const detailHtml = isOpen ? this._renderSectionDetail(key, section) : '';
+      const isLast = i === ordered.length - 1;
 
       html += `
-        <div class="dev-panel-section" data-section="${_dpEscape(key)}">
-          <div class="dev-panel-section-head" onclick="window.devPanel._toggleSection('${_dpEscape(key)}')">
-            <span class="dev-panel-arrow">${isOpen ? '▼' : '▶️'}</span>
-            <span class="dev-panel-section-icon">${icon}</span>
-            <span class="dev-panel-section-title">${_dpEscape(title)}</span>
-            <span class="dev-panel-section-status">${_dpEscape(label)}</span>
+        <div class="dt-node" data-section="${dtEscape(key)}">
+          <div class="dt-node-rail">
+            <span class="dt-node-dot dt-status-${status}">${DT_ICONS[status] || DT_ICONS.unknown}</span>
+            ${isLast ? '' : '<span class="dt-node-line"></span>'}
           </div>
-          <div class="dev-panel-section-detail">${detailHtml}</div>
+          <div class="dt-node-main">
+            <div class="dt-node-head" data-toggle-section="${dtEscape(key)}">
+              <span class="dt-node-title">${dtEscape(title)}</span>
+              <span class="dt-node-status dt-status-${status}">${DT_STATUS_LABEL[status] || status}</span>
+              <span class="dt-node-chevron ${isOpen ? 'dt-open' : ''}">${DT_ICONS.chevron}</span>
+            </div>
+            <div class="dt-node-detail" style="${isOpen ? '' : 'display:none;'}">${isOpen ? this._renderSectionDetail(key, section) : ''}</div>
+          </div>
         </div>`;
     });
 
+    html += '</div>';
     this.bodyEl.innerHTML = html;
+
+    // Section 展開/收合：用事件委派綁在 body 上，重畫後不需要重新逐一綁定。
+    this.bodyEl.querySelectorAll('[data-toggle-section]').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this._toggleSection(el.getAttribute('data-toggle-section'));
+      });
+    });
   }
 
   _toggleSection(key) {
     if (!this.sectionState[key]) this.sectionState[key] = { expanded: false };
     this.sectionState[key].expanded = !this.sectionState[key].expanded;
     if (this.lastPayload) this._renderBody(this.lastPayload);
+    if (this.expanded) this.bodyWrapEl.style.maxHeight = this.bodyWrapEl.scrollHeight + 'px';
   }
 
   _renderSectionDetail(key, section) {
-    if (this.customRenderers[key]) {
-      try {
-        return this.customRenderers[key](section);
-      } catch (e) {
-        console.error('[DevPanel] custom renderer error for section', key, e);
-      }
+    if (DT_CUSTOM_RENDERERS[key]) {
+      try { return DT_CUSTOM_RENDERERS[key](section); }
+      catch (e) { console.error('[DevTrace] custom renderer error:', key, e); }
     }
-
-    // 預設渲染：reason（如果有）+ data 裡的 key: value 逐行列出。
     let html = '';
     if (section.reason) {
-      html += `<div class="dev-panel-reason">Reason: ${_dpEscape(section.reason)}</div>`;
+      html += `<div class="dt-reason">${dtEscape(section.reason)}</div>`;
     }
     const data = section.data || {};
     const entries = Object.entries(data).filter(([, v]) => v !== null && v !== undefined && v !== '');
     if (entries.length === 0 && !section.reason) {
-      html += `<div class="dev-panel-empty">No data.</div>`;
-      return html;
+      return html + '<div class="dt-empty">No data.</div>';
     }
-    if (entries.length > 0) {
-      html += '<div class="dev-panel-kv">' + entries.map(([k, v]) => {
-        let displayVal = v;
-        if (typeof v === 'object') displayVal = JSON.stringify(v);
-        // reasoning_text 特別長，用可滾動、可複製的區塊呈現，而不是塞進單行 kv。
-        if (k === 'reasoning_text' && typeof v === 'string' && v.length > 0) {
-          return `<div class="dev-panel-reasoning-block"><div class="dev-panel-kv-key">${_dpEscape(k)}</div><pre class="dev-panel-reasoning-pre">${_dpEscape(v)}</pre></div>`;
-        }
-        return `<div class="dev-panel-kv-row"><span class="dev-panel-kv-key">${_dpEscape(k)}</span><span class="dev-panel-kv-val">${_dpEscape(String(displayVal))}</span></div>`;
-      }).join('') + '</div>';
-    }
+    html += entries.map(([k, v]) => {
+      if (k === 'reasoning_text' && typeof v === 'string') {
+        return `<div class="dt-kv-block"><span class="dt-kv-key">${dtEscape(k)}</span><pre class="dt-pre">${dtEscape(v)}</pre></div>`;
+      }
+      const val = typeof v === 'object' ? JSON.stringify(v) : String(v);
+      return `<div class="dt-kv-row"><span class="dt-kv-key">${dtEscape(k)}</span><span class="dt-kv-val">${dtEscape(val)}</span></div>`;
+    }).join('');
     return html;
   }
 }
 
-function _dpEscape(str) {
-  const div = document.createElement('div');
-  div.textContent = str == null ? '' : String(str);
-  return div.innerHTML;
-}
+/**
+ * 工廠方法集合，取代舊版全域單例 window.devPanel。
+ * - createForContainer(container): 用於即時串流訊息，回傳一個 instance，之後用 instance.ingest(payload) 持續更新。
+ * - mountHistory(container, payload): 用於歷史訊息一次性掛載（不需要動畫、不需要自動收合）。
+ */
+const DevTrace = {
+  registerSection: dtRegisterSection,
+  createForContainer(container) {
+    return new DevTraceInstance(container);
+  },
+  mountHistory(container, payload) {
+    if (!payload) return;
+    const instance = new DevTraceInstance(container);
+    instance.mountStatic(payload);
+    return instance;
+  },
+};
 
-// 全域單例，跟 chat_view.js 的 window.chatView 是同一種掛法。
-window.devPanel = window.devPanel || new DevPanel();
+window.DevTrace = DevTrace;

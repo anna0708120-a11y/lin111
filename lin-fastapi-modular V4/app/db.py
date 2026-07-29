@@ -240,7 +240,7 @@ def load_conversations(limit=500, session_id=None):
     if not _client:
         return []
     try:
-        query = _client.table("conversation_history").select("role, content, thinking, image_data, created_at, session_id")
+        query = _client.table("conversation_history").select("id, role, content, thinking, image_data, created_at, session_id, trace")
         
         if session_id:
             query = query.eq("session_id", session_id)
@@ -254,7 +254,7 @@ def load_conversations(limit=500, session_id=None):
         print(f"[db] 读取对话历史失败: {e}")
         return []
 
-def insert_conversation_turn(role, content, thinking=None, image_data=None, session_id=None):
+def insert_conversation_turn(role, content, thinking=None, image_data=None, session_id=None, trace=None):
     if not _client:
         return
     try:
@@ -264,6 +264,7 @@ def insert_conversation_turn(role, content, thinking=None, image_data=None, sess
             "thinking": thinking,
             "image_data": image_data,
             "session_id": session_id,
+            "trace": trace,
         }).execute()
     except Exception as e:
         print(f"[db] 写入对话历史失败: {e}")

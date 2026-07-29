@@ -339,16 +339,22 @@ def generate_reply_stream(context, app_name=None, use_cache=True, session_id=Non
                 return
             elif event_type == "done":
                 parse_source = raw_reasoning or full_reasoning
-                if parse_source:
-                    decision = parse_memory_decision(parse_source)
-                    if decision:
-                        action = decision.get("action", "create")
-                        if action == "update":
-                            state.update_memory(decision)
-                        elif action == "archive":
-                            state.archive_memory(decision)
-                        else:
-                            state.remember_or_reinforce(decision)
+                print(f"[trace-debug] parse_source_len={len(parse_source) if parse_source else 0}, "
+                      f"has_tag={'[MEMORY_DECISION]' in (parse_source or '')}")
+                decision = parse_memory_decision(parse_source) if parse_source else None
+                print(f"[trace-debug] decision_is_none={decision is None}")
+                if decision:
+                    print(f"[trace-debug] action={decision.get('action')}, "
+                          f"keyword={decision.get('keyword')}, "
+                          f"importance={decision.get('importance')}")
+                if decision:
+                    action = decision.get("action", "create")
+                    if action == "update":
+                        state.update_memory(decision)
+                    elif action == "archive":
+                        state.archive_memory(decision)
+                    else:
+                        state.remember_or_reinforce(decision)
                 
                 # Auto-detect mood events from user + Lin content
                 detected_events = _auto_detect_mood_events(context, full_content)

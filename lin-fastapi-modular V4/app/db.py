@@ -374,3 +374,56 @@ def upload_photo_file(local_path, storage_filename):
         print(f"[db] 上传图片文件失败: {e}")
         return None
 
+
+# ---------- Phase 1: Conflict Detection & Memory Review ----------
+def find_conflicting_memories(keyword, created_by=None):
+    """
+    尋找可能衝突的記憶（同 keyword 的所有未歸檔記憶）
+    
+    Args:
+        keyword: 正規化後的關鍵字
+        created_by: 過濾來源 ("agent" / "user" / None=不限)
+    
+    Returns:
+        List[dict]: 所有符合條件的記憶，按 created_at 排序（舊→新）
+    """
+    if not _client or not keyword:
+        return []
+    try:
+        query = (
+            _client.table("memory_bank")
+            .select("id, importance, content, created_by, created_at, keyword, raw_keyword, pending_review, conflict_with")
+            .eq("keyword", keyword)
+            .eq("archived", False)
+        )
+        if created_by is not None:
+            query = query.eq("created_by", created_by)
+        res = query.order("created_at", desc=False).execute()
+        return res.data or []
+    except Exception as e:
+        print(f"[db] 查找衝突記憶失敗: {e}")
+        return []
+
+
+def load_memories_with_conflicts(limit=200):
+    """
+    讀取記憶（包含 Phase 1 新增欄位）
+    
+    Returns:
+        List[dict]: 記憶列表，包含 raw_keyword, pending_review, conflict_with
+    """
+    if not _client:
+        return []
+    try:
+        res = (
+            _client.table("memory_bank")
+            .select("id, tag, category, content, importance, keyword, raw_keyword, expires_at, created_at, created_by, archived, pending_review, conflict_with")
+            .eq("archived", False)
+            .order("created_at", desc=False)
+            .limit(limit)
+            .execute()
+        )
+        return res.data or []
+    except Exception as e:
+        print(f"[db] 讀取記憶失敗: {e}")
+        return []

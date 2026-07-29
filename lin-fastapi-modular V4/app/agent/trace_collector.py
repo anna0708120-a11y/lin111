@@ -1,43 +1,47 @@
 """
-Trace Collector —— 通用的執行鏈路收集元件。
+Trace Collector —— Memory Pipeline 專用的語意化 Facade，包在 Timeline（Event Bus）外面。
 
-設計定位：這是一個獨立的基礎元件，不依賴、也不知道 Developer Panel 的存在。
-generate_reply_stream() 呼叫它記錄各節點的執行狀態，它只負責收集與組裝，
-輸出格式（export）本身可以有多個消費者，Developer Panel 只是其中之一：
+定位（重構後）：
+    這個檔案不再是「收集完整報告、最後一次 export」的 Report Collector。
+    真正的 Event Source 是 app/agent/event_bus.py 的 Timeline，
+    這裡只是讓 brain.py 保持可讀性的一層語意化包裝：
 
-    generate_reply_stream
-        │
-        ▼
-    TraceCollector（收集、組裝）
-        │
-        ├── export() → Developer Panel（本輪接入）
-        └── （未來）memory_trace.py 可以改成基於這個收集，不在這一輪處理
+        Brain
+          │
+          ▼
+        collector.record_prompt(...)      ← brain.py 只描述「發生了什麼」
+          │
+          ▼
+        timeline.emit(id="prompt", type="memory", status="success", payload={...})
+          │
+          ▼
+        yield timeline.to_sse(event)      ← brain.py 立刻把這個事件送給前端
 
-欄位命名刻意跟現有 app/memory_trace.py 的既有詞彙對齊（skip_reason / action_taken /
-parsed_decision / db 相關欄位），降低以後合併或遷移的成本，但這次不動 memory_trace.py，
-也不改動任何非串流路徑。
+    brain.py 不需要知道 id/type 這些 Event Bus 的細節，只需要呼叫
+    record_prompt() / record_reasoning() / record_memory_decision() /
+    record_parser() / record_backend() / record_db()，這幾個方法名維持不變，
+    降低這次重構對 brain.py 呼叫端的改動幅度。
 
-brain.py 的用法只會是：
-    collector = TraceCollector()
-    collector.record_prompt(...)
-    collector.record_reasoning(...)
-    collector.record_memory_decision(...)
-    collector.record_parser(...)
-    collector.record_backend(...)
-    collector.record_db(...)
-    yield collector.export_sse()
+    以後如果 payload 格式要調整，只需要改這個檔案裡的 record_xxx()，
+    不需要在 brain.py 裡到處搜尋 emit(...) 呼叫。
 
-不需要自己組裝一個大 dict。
+Timeline 是唯一 Event Source，不是只服務 Developer Panel——
+Memory 只是第一個 Consumer，之後 Browser / Vision / Planner / Tool Calling
+都可以直接呼叫 timeline.emit(id=..., type=..., ...)，不需要新增專屬的
+XxxCollector 類別，也不需要改 Timeline 本體或 dev_panel.js 的渲染邏輯。
+
+這次重構範圍：只讓 Memory Pipeline 跑在 Timeline 架構上，
+不加入 Browser / Vision / OCR / Tool Calling / 假等待動畫。
 """
-import json
-import time
+from app.agent.event_bus import Timeline
 
-SCHEMA_VERSION = 1
+# type 固定用 "memory"：這次範圍內，prompt/reasoning/memory_decision/parser/
+# backend/database 六個節點全部屬於 Memory Pipeline，用同一個 type 方便前端
+# Renderer 用同一種畫法呈現這一組節點。未來 Browser/Vision 等會是別的 type，
+# 不會跟這裡混在一起。
+_MEMORY_TYPE = "memory"
 
-# 開放狀態集合；未知狀態一律 fallback 成 "unknown"，不拋錯（沿用 chat_view.js Tool UI 的風格）。
-VALID_STATUSES = {"passed", "waiting", "failed", "skipped", "not_executed", "unknown"}
-
-# Skip Reason 詞彙沿用 app/memory_trace.py 既有的定義，方便未來兩邊互通、合併。
+# Skip Reason 詞彙沿用既有 app/memory_trace.py 的定義，方便未來兩邊互通、合併。
 SKIP_REASONS = {
     "worth_no": "模型判斷不值得記",
     "parse_failed": "解析 [MEMORY_DECISION] 失敗",
@@ -50,100 +54,79 @@ SKIP_REASONS = {
 
 class TraceCollector:
     """
-    收集這一輪對話從 Prompt 組裝到 DB 寫入，各節點（section）的執行狀態。
-
-    Section 採 registry 設計：不是寫死 memory/mood/tool 這幾個名字，
-    而是呼叫端要記錄什麼 section 就呼叫 record(section_name, ...)，
-    _sections 這個 dict 本身就是 registry，之後新增 Mood/Tool/API/Vision
-    等 section，不需要改這個類別的任何程式碼，也不需要改 Developer Panel 主框架
-    （前端對應會用同樣的 registerSection 機制處理，見 dev_panel.js）。
+    Memory Pipeline 的語意化 Facade。內部持有一個 Timeline 實例（Event Bus），
+    record_xxx() 方法把「發生了什麼」翻譯成 timeline.emit(id=..., type="memory", ...)，
+    每次呼叫都回傳這次事件的 SSE 字串，brain.py 直接 yield 即可。
     """
 
+    # brain.py 沿用舊版狀態詞彙呼叫 record_xxx("passed", ...)，
+    # 這裡統一映射成 Timeline 認識的 "success"，不需要改動 brain.py 既有的呼叫字串。
+    _STATUS_ALIASES = {"passed": "success"}
+
     def __init__(self, trace_id=None):
-        self.trace_id = trace_id or f"trace_{int(time.time() * 1000)}"
-        self._sections = {}
-        self._start_time = time.time()
+        self.timeline = Timeline(trace_id=trace_id)
+
+    def _norm(self, status):
+        return self._STATUS_ALIASES.get(status, status)
+
+    @property
+    def trace_id(self):
+        return self.timeline.trace_id
+
+    def elapsed_ms(self):
+        return self.timeline.elapsed_ms()
 
     # ------------------------------------------------------------------
-    # 通用底層方法：任何 section 都可以透過這個方法記錄，
-    # 下面 record_xxx() 是針對目前 Memory Pipeline 常用節點包的語意化捷徑，
-    # 不是必須的固定清單——未來 Mood/Tool/API 可以直接呼叫 record()，
-    # 不需要在這個檔案裡新增對應的 record_xxx 方法。
-    # ------------------------------------------------------------------
-    def record(self, section, status, data=None, reason=None):
-        """
-        記錄一個 section 的執行結果。
-
-        section: 字串，例如 "prompt" / "reasoning" / "memory_decision" / "parser" /
-                 "permission_check" / "conflict" / "database" / "memory_summary"，
-                 或未來的 "mood" / "tool" / "api" / "vision" 等，不限定固定清單。
-        status:  "passed" / "waiting" / "failed" / "skipped" / "not_executed"。
-        data:    dict，這個 section 展開後要顯示的細節。
-        reason:  字串，簡短說明這個狀態的原因（沿用 SKIP_REASONS 詞彙時盡量對齊 key）。
-        """
-        norm_status = status if status in VALID_STATUSES else "unknown"
-        self._sections[section] = {
-            "status": norm_status,
-            "reason": reason,
-            "data": data or {},
-            "ts": time.time(),
-        }
-
-    # ------------------------------------------------------------------
-    # 語意化捷徑：對應 Memory Pipeline 的常見節點，內部仍然只是呼叫 record()。
-    # 欄位命名跟 app/memory_trace.py 保持一致，方便未來遷移合併。
+    # 語意化方法：brain.py 只呼叫這些，不直接碰 timeline.emit()。
+    # 每個方法都回傳「這次事件對應的 SSE 字串」，brain.py 直接 yield 即可，
+    # 這樣每個 record 呼叫點天然就是一次即時的事件推送，不用等到最後才打包。
     # ------------------------------------------------------------------
     def record_prompt(self, status, prompt_version=None, total_tokens=None, memory_rule_loaded=None, mood_rule_loaded=None):
-        self.record("prompt", status, data={
+        event = self.timeline.emit("prompt", _MEMORY_TYPE, self._norm(status), payload={
             "prompt_version": prompt_version,
             "total_tokens": total_tokens,
             "memory_rule_loaded": memory_rule_loaded,
             "mood_rule_loaded": mood_rule_loaded,
         })
+        return self.timeline.to_sse(event)
 
     def record_reasoning(self, status, reasoning_text=None):
-        self.record("reasoning", status, data={
+        event = self.timeline.emit("reasoning", _MEMORY_TYPE, self._norm(status), payload={
             "reasoning_text": reasoning_text,
             "length": len(reasoning_text) if reasoning_text else 0,
         })
+        return self.timeline.to_sse(event)
 
     def record_memory_decision(self, status, parsed_decision=None, reason=None):
-        """對應 memory_trace.py 的 record_parse_result 概念，欄位名用 parsed_decision 對齊。"""
-        self.record("memory_decision", status, data={"parsed_decision": parsed_decision}, reason=reason)
+        """對應舊版 memory_trace.py 的 record_parse_result 概念，欄位名用 parsed_decision 對齊。"""
+        event = self.timeline.emit("memory_decision", _MEMORY_TYPE, self._norm(status),
+                                    payload={"parsed_decision": parsed_decision}, reason=reason)
+        return self.timeline.to_sse(event)
 
     def record_parser(self, status, reason=None, parse_time_ms=None):
-        self.record("parser", status, data={"parse_time_ms": parse_time_ms}, reason=reason)
+        event = self.timeline.emit("parser", _MEMORY_TYPE, self._norm(status),
+                                    payload={"parse_time_ms": parse_time_ms}, reason=reason)
+        return self.timeline.to_sse(event)
 
     def record_backend(self, status, backend_action=None, action_taken=None, reason=None):
-        """對應 memory_trace.py 的 record_backend_action 概念。"""
-        self.record("backend", status, data={
+        """對應舊版 memory_trace.py 的 record_backend_action 概念。"""
+        event = self.timeline.emit("backend", _MEMORY_TYPE, self._norm(status), payload={
             "backend_action": backend_action,
             "action_taken": action_taken,
         }, reason=reason)
+        return self.timeline.to_sse(event)
 
     def record_db(self, status, memory_id=None, db_error=None):
-        """對應 memory_trace.py 的 record_db_result 概念，欄位名用 db_error 對齊。"""
-        self.record("database", status, data={
+        """對應舊版 memory_trace.py 的 record_db_result 概念，欄位名用 db_error 對齊。"""
+        event = self.timeline.emit("database", _MEMORY_TYPE, self._norm(status), payload={
             "memory_id": memory_id,
             "db_error": db_error,
         }, reason=db_error)
-
-    def elapsed_ms(self):
-        return int((time.time() - self._start_time) * 1000)
+        return self.timeline.to_sse(event)
 
     # ------------------------------------------------------------------
-    # 輸出層：export() 是給任何消費者用的通用介面，Developer Panel 只是其中之一。
+    # 輸出層：export() 回傳目前 Timeline 的完整快照，供歷史 replay 使用
+    # （state.add_conversation_turn(..., trace=collector.export()) 走這條）。
     # ------------------------------------------------------------------
     def export(self):
-        """組成版本化 payload，供任何消費者使用（Developer Panel / 未來的 memory_trace 等）。"""
-        return {
-            "version": SCHEMA_VERSION,
-            "trace_id": self.trace_id,
-            "duration_ms": self.elapsed_ms(),
-            "sections": self._sections,
-        }
-
-    def export_sse(self):
-        """組成可以直接 yield 給前端的 SSE 事件字串（Developer Panel 用的是這個）。"""
-        payload = self.export()
-        return f"event: devtrace\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
+        return self.timeline.export_all()

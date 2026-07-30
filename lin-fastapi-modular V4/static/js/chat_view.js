@@ -161,6 +161,7 @@ class ChatView {
     const entry = { r: role, t: text, time: ts(), iso: new Date().toISOString() };
     if (think) entry.think = think;
     if (trace) entry.trace = trace;
+    if (role === 'lin') { entry.message_id = 'live-' + Date.now(); }
     chatMemoryCache.push(entry);
     if (chatMemoryCache.length > 200) chatMemoryCache = chatMemoryCache.slice(-200);
     this.renderMessages(chatMemoryCache);

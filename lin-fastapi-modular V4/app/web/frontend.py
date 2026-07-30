@@ -2285,6 +2285,9 @@ async function initChatExperience() {
 
 document.addEventListener('DOMContentLoaded', initChatExperience);
 
+.voice-btn{cursor:pointer;margin-right:6px;opacity:.8;}
+.voice-btn:active{opacity:1;}
+
 </script>
 </body>
 </html>"""

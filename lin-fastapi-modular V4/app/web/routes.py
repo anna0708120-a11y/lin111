@@ -24,7 +24,7 @@ from app.web.diagnose import DIAGNOSE_HTML
 router = APIRouter()
 
 class TTSPayload(BaseModel):
-text: str
+    text: str
 
 class Activity(BaseModel):
     activity: str
@@ -94,24 +94,6 @@ class DeviceEventPayload(BaseModel):
     longitude: Optional[float] = None
     label: Optional[str] = None  # 地点名称（如果有的话）
     accuracy: Optional[float] = None
-
-@router.post("/tts")
-def text_to_speech(payload: TTSPayload):
-"""
-按需⽣成语⾳（不是⾃动的），前端点了"播放语⾳"才会打这个。
-免费额度有限，所以这⾥不缓存到 memory_bank，⾳档本⾝存 Supabase Storage，
-URL 由前端⾃⼰存进 localStorage 那条消息记录⾥，同⼀句话第⼆次点不会重新⽣成。
-"""
-from app.llm.tts_client import synth_speech
-audio_bytes = synth_speech(payload.text)
-if not audio_bytes:
-return {"status": "Failed", "url": None}
-filename = f"{uuid.uuid4().hex}.mp3"
-url = db.upload_voice(filename, audio_bytes)
-if not url:
-return {"status": "Failed", "url": None}
-return {"status": "Success", "url": url}
-
 
 @router.get("/health")
 def health():
@@ -887,3 +869,28 @@ def star_chat_session(session_id: str):
 
     new_state = session_module.toggle_star_session(session_id)
     return {"status": "Success", "starred": new_state}
+
+# 檔案開頭 import 區塊加：
+import uuid
+
+# Model 定義區加：
+class TTSPayload(BaseModel):
+    text: str
+
+# 路由區加：
+@router.post("/tts")
+def text_to_speech(payload: TTSPayload):
+    """
+    按需生成语音（不是自动的），前端点了"播放语音"才会打这个。
+    免费额度有限，所以这里不缓存到 memory_bank，音档本身存 Supabase Storage，
+    URL 由前端自己存进 localStorage 那条消息记录里，同一句话第二次点不会重新生成。
+    """
+    from app.llm.tts_client import synth_speech
+    audio_bytes = synth_speech(payload.text)
+    if not audio_bytes:
+        return {"status": "Failed", "url": None}
+    filename = f"{uuid.uuid4().hex}.mp3"
+    url = db.upload_voice(filename, audio_bytes)
+    if not url:
+        return {"status": "Failed", "url": None}
+    return {"status": "Success", "url": url}

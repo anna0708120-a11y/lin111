@@ -4,6 +4,7 @@
 
 以后 Flutter app 要接进来，看这个文件就知道有哪些接口能打。
 """
+import uuid
 from typing import Optional
 
 from fastapi import APIRouter, Depends
@@ -21,6 +22,9 @@ from app.web.pwa import MANIFEST_JSON, SERVICE_WORKER_JS
 from app.web.diagnose import DIAGNOSE_HTML
 
 router = APIRouter()
+
+class TTSPayload(BaseModel):
+text: str
 
 class Activity(BaseModel):
     activity: str
@@ -90,6 +94,24 @@ class DeviceEventPayload(BaseModel):
     longitude: Optional[float] = None
     label: Optional[str] = None  # 地点名称（如果有的话）
     accuracy: Optional[float] = None
+
+@router.post("/tts")
+def text_to_speech(payload: TTSPayload):
+"""
+按需⽣成语⾳（不是⾃动的），前端点了"播放语⾳"才会打这个。
+免费额度有限，所以这⾥不缓存到 memory_bank，⾳档本⾝存 Supabase Storage，
+URL 由前端⾃⼰存进 localStorage 那条消息记录⾥，同⼀句话第⼆次点不会重新⽣成。
+"""
+from app.llm.tts_client import synth_speech
+audio_bytes = synth_speech(payload.text)
+if not audio_bytes:
+return {"status": "Failed", "url": None}
+filename = f"{uuid.uuid4().hex}.mp3"
+url = db.upload_voice(filename, audio_bytes)
+if not url:
+return {"status": "Failed", "url": None}
+return {"status": "Success", "url": url}
+
 
 @router.get("/health")
 def health():

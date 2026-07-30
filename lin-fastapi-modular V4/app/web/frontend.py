@@ -5,29 +5,6 @@
 """
 
 HTML_CONTENT = """<!DOCTYPE html>
-let voiceLoadingIdx=null;
-async function playVoice(idx){
-if(voiceLoadingIdx===idx)return; // 正在⽣成中，避免连点重複请求
-const h=JSON.parse(localStorage.getItem(CK)||'[]');
-const m=h[idx];
-if(!m)return;
-if(m.audioUrl){
-new Audio(m.audioUrl).play().catch(()=>{});
-return;
-}
-voiceLoadingIdx=idx;
-try{
-const r=await fetch(AU+'/tts',{method:'POST',headers:{'Content-Type':'application/json'},
-const d=await r.json();
-if(d.url){
-m.audioUrl=d.url;
-localStorage.setItem(CK,JSON.stringify(h));
-new Audio(d.url).play().catch(()=>{});
-}
-}catch(e){}
-voiceLoadingIdx=null;
-}
-
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
@@ -49,6 +26,30 @@ voiceLoadingIdx=null;
     if(m) m.setAttribute('content', mode==='dark' ? '#000000' : '#C9897A');
   }catch(e){}
 })();
+
+let voiceLoadingIdx=null;
+async function playVoice(idx){
+  if(voiceLoadingIdx===idx)return; // 正在生成中，避免连点重複请求
+  const h=JSON.parse(localStorage.getItem(CK)||'[]');
+  const m=h[idx];
+  if(!m)return;
+  if(m.audioUrl){
+    new Audio(m.audioUrl).play().catch(()=>{});
+    return;
+  }
+  voiceLoadingIdx=idx;
+  try{
+    const r=await fetch(AU+'/tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:m.t})});
+    const d=await r.json();
+    if(d.url){
+      m.audioUrl=d.url;
+      localStorage.setItem(CK,JSON.stringify(h));
+      new Audio(d.url).play().catch(()=>{});
+    }
+  }catch(e){}
+  voiceLoadingIdx=null;
+}
+
 
 // 页面加载完成后,如果当前在Mine tab,立即加载经期数据
 document.addEventListener('DOMContentLoaded', () => {

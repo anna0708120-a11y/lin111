@@ -566,9 +566,9 @@ def upload_voice(filename, audio_bytes):
     if not _client or not audio_bytes:
        return None
 try:
-   from app import config
-   _client.storage.from_(config.VOICE_BUCKET).upload(
-       filename, audio_bytes, {"content-type": "audio/mpeg"}
+    from app import config
+    _client.storage.from_(config.VOICE_BUCKET).upload(
+        filename, audio_bytes, {"content-type": "audio/mpeg"}
    )
    return _client.storage.from_(config.VOICE_BUCKET).get_public_url(filename)
 except Exception as e:

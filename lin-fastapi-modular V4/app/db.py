@@ -569,8 +569,8 @@ try:
     from app import config
     _client.storage.from_(config.VOICE_BUCKET).upload(
         filename, audio_bytes, {"content-type": "audio/mpeg"}
-   )
-   return _client.storage.from_(config.VOICE_BUCKET).get_public_url(filename)
+    )
+    return _client.storage.from_(config.VOICE_BUCKET).get_public_url(filename)
 except Exception as e:
    print(f"[db] 上传语⾳失败: {e}")
    return None

@@ -28,11 +28,11 @@ HTML_CONTENT = """<!DOCTYPE html>
 })();
 
 let voiceLoadingIdx=null;
+const CK='lin_audio_urls';
 async function playVoice(idx){
   if(voiceLoadingIdx===idx)return; // 正在生成中，避免连点重複请求
-  const h=JSON.parse(localStorage.getItem(CK)||'[]');
-  const m=h[idx];
-  if(!m)return;
+  const m=chatMemoryCache[idx];
+  if(!m||m.r!=='lin')return;
   if(m.audioUrl){
     new Audio(m.audioUrl).play().catch(()=>{});
     return;
@@ -43,13 +43,12 @@ async function playVoice(idx){
     const d=await r.json();
     if(d.url){
       m.audioUrl=d.url;
-      localStorage.setItem(CK,JSON.stringify(h));
+      try{const c=JSON.parse(localStorage.getItem(CK)||'{}');c[m.message_id||m.t]=d.url;localStorage.setItem(CK,JSON.stringify(c));}catch(e){}
       new Audio(d.url).play().catch(()=>{});
     }
   }catch(e){}
   voiceLoadingIdx=null;
 }
-
 
 // 页面加载完成后,如果当前在Mine tab,立即加载经期数据
 document.addEventListener('DOMContentLoaded', () => {
@@ -1378,9 +1377,26 @@ function renderMessages(history){
   // Wrapper: 委托给 ChatView，保持旧代码调用兼容性
   if (typeof chatView !== 'undefined' && chatView.renderMessages) {
     chatView.renderMessages(history);
-  }
+  addVoiceButtons();
+}
 }
 
+
+function addVoiceButtons(){
+  document.querySelectorAll('#cm .msg.lin').forEach(el=>{
+    const meta=el.querySelector('.mtime2');
+    if(!meta||meta.querySelector('.voice-btn'))return;
+    const slot=el.querySelector('.dt-slot');
+    const mid=slot?slot.dataset.messageId:null;
+    const idx=chatMemoryCache.findIndex(m=>m.r==='lin'&&(!mid||m.message_id==mid));
+    if(idx<0)return;
+    const btn=document.createElement('button');
+    btn.className='voice-btn';
+    btn.textContent='🔊';
+    btn.onclick=e=>{e.stopPropagation();playVoice(idx);};
+    meta.prepend(btn);
+  });
+}
 function lchat(){
   // Wrapper: 委托给 ChatView.refresh()，换头像等场景调用
   if (typeof chatView !== 'undefined' && chatView.refresh) {
@@ -1412,7 +1428,8 @@ function renderOnly(history){
   // 委托给 ChatView.renderMessages()
   if (typeof chatView !== 'undefined' && chatView.renderMessages) {
     chatView.renderMessages(chatMemoryCache);
-  }
+  addVoiceButtons();
+}
 }
 
 async function syncChat(){

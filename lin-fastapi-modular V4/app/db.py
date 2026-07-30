@@ -559,12 +559,12 @@ def get_memory_trace_stats(days=7):
 
 # ---------- 语⾳（Supabase Storage） ----------
 def upload_voice(filename, audio_bytes):
-"""
-把 mp3 bytes 传到 Supabase Storage 的 voices 桶，回传公开访问⽹址。
-没接 Supabase 或桶不存在都回传 None（第⼀次⽤要去 Supabase 后台⼿动建⼀个叫 voices 的公开桶）。
-"""
-if not _client or not audio_bytes:
-   return None
+    """
+    把 mp3 bytes 传到 Supabase Storage 的 voices 桶，回传公开访问⽹址。
+    没接 Supabase 或桶不存在都回传 None（第⼀次⽤要去 Supabase 后台⼿动建⼀个叫 voices 的公开桶）。
+    """
+    if not _client or not audio_bytes:
+       return None
 try:
    from app import config
    _client.storage.from_(config.VOICE_BUCKET).upload(

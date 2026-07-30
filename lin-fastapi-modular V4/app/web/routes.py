@@ -816,10 +816,12 @@ def get_chat_session(session_id: str):
         messages = []
         for conv in conversations:
             messages.append({
+                "message_id": conv.get("id"),
                 "role": conv.get("role", ""),
                 "content": conv.get("content", ""),
                 "thinking": conv.get("thinking"),
-                "time": conv.get("time") or conv.get("created_at", "")
+                "time": conv.get("time") or conv.get("created_at", ""),
+                "trace": conv.get("trace")
             })
         
         return {

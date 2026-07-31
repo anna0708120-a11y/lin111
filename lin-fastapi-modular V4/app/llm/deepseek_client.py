@@ -16,35 +16,35 @@ import requests
 from app import config
 
 
-def call_claude(system_prompt, temperature=0.95, max_tokens=None, top_p=0.95, thinking=True):
+def call_deepseek(system_prompt, temperature=0.95, max_tokens=None, top_p=0.95):
     """
     调 DeepSeek 的 chat completions 接口。
     不带对话历史，每次都把人设+情境拼成一条完整的 system message 发过去。
 
     返回 (content, reasoning_content)：
       content            正式回复，失败时是 None
-      reasoning_content   真思考过程，没开thinking或模型没给的话是 None
+      reasoning_content   真思考过程，deepseek-reasoner 自动提供，其他模型可能为空
     """
-    if not config.CLAUDE_API_KEY:
-        print("[claude_client] 没有设置 CLAUDE_API_KEY，跳过调用")
+    if not config.DEEPSEEK_API_KEY:
+        print("[deepseek_client] 没有设置 CLAUDE_API_KEY，跳过调用")
         return None, None
 
     payload = {
-        "model": config.CLAUDE_MODEL,
+        "model": config.DEEPSEEK_MODEL,
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": "请根据以上人设与情境，给出你的回应。"},
         ],
         "temperature": temperature,
-        "max_tokens": max_tokens or config.CLAUDE_MAX_TOKENS,
+        "max_tokens": max_tokens or config.DEEPSEEK_MAX_TOKENS,
         "top_p": top_p,
     }
 
     try:
         response = requests.post(
-            config.CLAUDE_BASE_URL,
+            config.DEEPSEEK_BASE_URL,
             headers={
-                "Authorization": f"Bearer {config.CLAUDE_API_KEY}",
+                "Authorization": f"Bearer {config.DEEPSEEK_API_KEY}",
                 "Content-Type": "application/json",
             },
             json=payload,
@@ -52,7 +52,7 @@ def call_claude(system_prompt, temperature=0.95, max_tokens=None, top_p=0.95, th
         )
         result = response.json()
         if "choices" not in result:
-            print(f"[claude_client] 回应里没有 choices: {result}")
+            print(f"[deepseek_client] 回应里没有 choices: {result}")
             return None, None
 
         message = result["choices"][0]["message"]
@@ -61,11 +61,11 @@ def call_claude(system_prompt, temperature=0.95, max_tokens=None, top_p=0.95, th
         reasoning = reasoning.strip() if reasoning else None
         return content, reasoning
     except Exception as e:
-        print(f"[claude_client] 呼叫失败: {e}")
+        print(f"[deepseek_client] 呼叫失败: {e}")
         return None, None
 
 
-def call_claude_stream(system_prompt, temperature=0.95, max_tokens=None, top_p=0.95, thinking=True):
+def call_deepseek_stream(system_prompt, temperature=0.95, max_tokens=None, top_p=0.95):
     """
     流式調用 DeepSeek API，逐 token yield SSE 事件。
     Yields: (event_type, data)
@@ -73,21 +73,18 @@ def call_claude_stream(system_prompt, temperature=0.95, max_tokens=None, top_p=0
         - ("content", chunk) - 回答內容
         - ("done", usage_info) - 結束標記
     """
-    print("[🔥 ENTRY] call_claude_stream called, system_prompt length:", len(system_prompt))
+    print("[🔥 ENTRY] call_deepseek_stream called, system_prompt length:", len(system_prompt))
     payload = {
-        "model": config.CLAUDE_MODEL,
+        "model": config.DEEPSEEK_MODEL,
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": "请根据以上人设与情境，给出你的回应。"},
         ],
         "temperature": temperature,
-        "max_tokens": max_tokens or config.CLAUDE_MAX_TOKENS,
+        "max_tokens": max_tokens or config.DEEPSEEK_MAX_TOKENS,
         "top_p": top_p,
         "stream": True  # 🔥 關鍵
     }
-    if thinking:
-        payload["thinking"] = {"type": "enabled"}
-        payload["reasoning_effort"] = config.CLAUDE_REASONING_EFFORT
     
     try:
         # 🔍 DEBUG: 完整记录发送给 DeepSeek 的 payload
@@ -125,9 +122,9 @@ def call_claude_stream(system_prompt, temperature=0.95, max_tokens=None, top_p=0
             print(f"[PAYLOAD_LOG] Failed: {e}")
         
         response = requests.post(
-            config.CLAUDE_BASE_URL,
+            config.DEEPSEEK_BASE_URL,
             headers={
-                "Authorization": f"Bearer {config.CLAUDE_API_KEY}",
+                "Authorization": f"Bearer {config.DEEPSEEK_API_KEY}",
                 "Content-Type": "application/json",
             },
             json=payload,
@@ -189,5 +186,5 @@ def call_claude_stream(system_prompt, temperature=0.95, max_tokens=None, top_p=0
                     yield ("done", data.get("usage", {}))
                     
     except Exception as e:
-        print(f"[claude_client] Stream 失敗: {e}")
+        print(f"[deepseek_client] Stream 失敗: {e}")
         yield ("error", str(e))

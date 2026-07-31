@@ -1177,8 +1177,16 @@ function intimacyLevel(val){
 
 async function loadIntimacy(){
   try{
+    console.log("[VERIFY] 正在调用 /intimacy/status");
     const r=await fetch(AU+'/intimacy/status');
+    console.log("[VERIFY] 接口返回状态:", r.status);
+    if (!r.ok) {
+      const text = await r.text();
+      console.error("[VERIFY] 接口返回错误:", text);
+      return;
+    }
     const d=await r.json();
+    console.log("[VERIFY] 接口返回数据:", d);
     renderIntimacy(d);
   }catch(e){console.error('[loadIntimacy]',e);}
 }

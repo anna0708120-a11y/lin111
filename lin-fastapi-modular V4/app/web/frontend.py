@@ -1483,6 +1483,11 @@ async function syncChat(){
   try{
     const r = await fetch(AU+'/conversation');
     const d = await r.json();
+    console.log("[VERIFY] GET /conversation 返回数据:", d);
+    console.log("[VERIFY] 返回的 messages 数量:", d.messages ? d.messages.length : 0);
+    if (d.messages && d.messages.length > 0) {
+      console.log("[VERIFY] serverMessages 最后一条:", d.messages[d.messages.length - 1]);
+    }
     if(d && Array.isArray(d.messages)){
       renderOnly(d.messages);
     }

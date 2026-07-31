@@ -1,7 +1,7 @@
 '''
 LLM Provider 工厂 - 根据配置选择provider
 '''
-from app.llm.providers.deepseek_provider import DeepSeekProvider
+from deepseek_provider import DeepSeekProvider
 from app import config
 
 # 当前选择的provider名称(存储在state中,可动态切换)
@@ -37,7 +37,7 @@ def get_provider():
 def list_available_models():
     '''返回可用模型列表'''
     models = [
-        {'id': 'deepseek', 'name': 'DeepSeek Flash', 'available': bool(config.DEEPSEEK_API_KEY)},
+        {'id': 'deepseek', 'name': 'DeepSeek Chat', 'available': bool(config.DEEPSEEK_API_KEY)},
         {'id': 'claude', 'name': 'Claude Sonnet 5', 'available': False},
         {'id': 'gpt', 'name': 'GPT-5', 'available': False},
         {'id': 'gemini', 'name': 'Gemini', 'available': False},

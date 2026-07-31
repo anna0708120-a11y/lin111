@@ -14,22 +14,15 @@ except ImportError:
     pass
 
 # ---- DeepSeek ----
-# .env 或 Railway 的环境变量里填 CLAUDE_API_KEY，这里留空
-CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY", "")
-# Claude 模型配置
-
-CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-sonnet-5")
-CLAUDE_BASE_URL = os.getenv("CLAUDE_BASE_URL", "https://yunwu.ai/v1/chat/completions")
+# .env 或 Railway 的环境变量里填 DEEPSEEK_API_KEY，这里留空
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
+# DeepSeek 模型配置
+DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1/chat/completions")
 # thinking mode：开了之后回应会带独立的 reasoning_content（真思考），不用再靠prompt装格式
-CLAUDE_REASONING_EFFORT = os.getenv("CLAUDE_REASONING_EFFORT", "high")
+DEEPSEEK_REASONING_EFFORT = os.getenv("DEEPSEEK_REASONING_EFFORT", "medium")
 # thinking mode 的思考内容也算在这个token数里，调太小思考会被截断
-CLAUDE_MAX_TOKENS = int(os.getenv("CLAUDE_MAX_TOKENS", 1200))
-# 真的 thinking mode（不是靠prompt装格式），"high"比较平衡，"max"更慢更贵
-CLAUDE_REASONING_EFFORT = os.getenv("CLAUDE_REASONING_EFFORT", "high")
-# thinking mode 的输出包含推理+正文一起算token，180太容易被截断，调高一点
-CLAUDE_MAX_TOKENS = int(os.getenv("CLAUDE_MAX_TOKENS", 1200))
-
-# ---- Bark 推送 ----
+DEEPSEEK_MAX_TOKENS = int(os.getenv("DEEPSEEK_MAX_TOKENS", 8000))
 # 想同时推给手机+电脑，就在 Render 环境变量填 BARK_KEYS，两个key用逗号隔开，
 # 例如：BARK_KEYS=手机的key,电脑的key
 # 只填一个也没关系，旧的 BARK_KEY 变量还继续有效。

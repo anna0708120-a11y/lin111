@@ -1428,12 +1428,27 @@ function renderOnly(history){
     };
   });
   
-  // 智能合并：服务器数据 + 本地 pending 消息（排除临时 ID）
+  // 智能合并：服务器数据 + 本地 pending 消息
   const serverIds = new Set(serverMessages.map(m => m.message_id));
+  
+  // 检查最后一条服务器消息的时间
+  const lastServerTime = serverMessages.length > 0 ? new Date(serverMessages[serverMessages.length - 1].iso).getTime() : 0;
+  
   const localPending = chatMemoryCache.filter(m => {
     const id = m.message_id;
-    // 排除：1) 服务器已有的 2) 临时 ID（temp_ 开头）
-    return id && !id.toString().startsWith('temp_') && !serverIds.has(id);
+    if (!id) return false;
+    
+    // 如果服务器已有这个 ID，跳过
+    if (serverIds.has(id)) return false;
+    
+    // 临时消息：如果它比服务器最后一条消息更新，保留它（可能还没保存到数据库）
+    if (id.toString().startsWith('temp_')) {
+      const msgTime = new Date(m.iso).getTime();
+      return msgTime > lastServerTime;
+    }
+    
+    // 其他 pending 消息保留
+    return true;
   });
   
   chatMemoryCache = [...serverMessages, ...localPending];

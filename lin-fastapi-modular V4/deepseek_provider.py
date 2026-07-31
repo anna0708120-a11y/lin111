@@ -20,7 +20,6 @@ class DeepSeekProvider:
             yield {'error': 'DeepSeek API key not configured'}
             return
         
-        # 修正：base_url 可能不包含 /v1/chat/completions，需要補全
         url = self.base_url
         if not url.endswith('/chat/completions') and not url.endswith('/anthropic'):
             url = url.rstrip('/') + '/v1/chat/completions'
@@ -34,7 +33,6 @@ class DeepSeekProvider:
             'stream': True
         }
         
-        # 只有 deepseek-reasoner 才支持 thinking mode
         if thinking and 'reasoner' in self.model.lower():
             payload['reasoning_effort'] = self.reasoning_effort
         
@@ -67,10 +65,24 @@ class DeepSeekProvider:
                         if not choices:
                             continue
                         delta = choices[0].get('delta', {})
-                        if 'content' in delta and delta['content']:
-                            yield {'token': delta['content']}
-                        if 'reasoning_content' in delta and delta['reasoning_content']:
-                            yield {'thinking_token': delta['reasoning_content']}
+                        
+                        # 修復：deepseek-reasoner 模型的 content 會是 null，實際內容在 reasoning_content
+                        # 檢查 reasoning_content 是否有內容，如果有且是 reasoner 模型，當作 thinking
+                        # 如果不是 reasoner 模型但有 reasoning_content，當作 content
+                        reasoning_content = delta.get('reasoning_content', '')
+                        content = delta.get('content', '')
+                        
+                        if reasoning_content:
+                            if 'reasoner' in self.model.lower():
+                                # reasoner 模型：reasoning_content 是思考過程
+                                yield {'thinking_token': reasoning_content}
+                            else:
+                                # 其他模型：如果返回 reasoning_content，也當作正常內容
+                                yield {'token': reasoning_content}
+                        
+                        if content:
+                            yield {'token': content}
+                        
                         if choices[0].get('finish_reason'):
                             yield {'done': True}
                             break

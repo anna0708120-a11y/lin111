@@ -36,9 +36,9 @@ def call_deepseek(system_prompt, temperature=0.95, max_tokens=None, top_p=0.95, 
         "max_tokens": max_tokens or config.DEEPSEEK_MAX_TOKENS,
         "top_p": top_p,
     }
-    if thinking:
-        payload["thinking"] = {"type": "enabled"}
-        payload["reasoning_effort"] = config.DEEPSEEK_REASONING_EFFORT
+    #     if thinking:
+    #         payload["thinking"] = {"type": "enabled"}
+    #         payload["reasoning_effort"] = config.DEEPSEEK_REASONING_EFFORT
 
     try:
         response = requests.post(

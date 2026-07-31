@@ -610,6 +610,8 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 .at-node-summary-wrap.at-rotate-in{opacity:0;transform:translateX(6px);animation:atFadeIn .22s ease forwards;}
 @keyframes atFadeIn{to{opacity:1;transform:translateX(0);}}
 .at-node-summary{color:var(--dark);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;}
+.voice-btn{cursor:pointer;margin-right:6px;opacity:.8;}
+.voice-btn:active{opacity:1;}
 </style>
 </head>
 <body>
@@ -2302,8 +2304,6 @@ async function initChatExperience() {
 
 document.addEventListener('DOMContentLoaded', initChatExperience);
 
-.voice-btn{cursor:pointer;margin-right:6px;opacity:.8;}
-.voice-btn:active{opacity:1;}
 
 </script>
 </body>

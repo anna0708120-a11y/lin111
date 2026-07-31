@@ -1407,9 +1407,7 @@ function lchat(){
 }
 
 function renderOnly(history){
-  // 把資料庫回來的歷史畫到畫面上，並整批寫入內存快取。
-  // 專門給 Session 切換 / 新建 / 頁面初次載入時的 replay 用。
-  const mapped = (history || []).map(m => {
+  const serverMessages = (history || []).map(m => {
     const iso = m.iso || m.time || new Date().toISOString();
     let display = '';
     try {
@@ -1426,13 +1424,19 @@ function renderOnly(history){
       trace: m.trace
     };
   });
-  chatMemoryCache = mapped;
-  // 委托给 ChatView.renderMessages()
+  
+  // 智能合并：服务器数据 + 本地 pending 消息
+  const serverIds = new Set(serverMessages.map(m => m.message_id));
+  const localPending = chatMemoryCache.filter(m => !serverIds.has(m.message_id));
+  
+  chatMemoryCache = [...serverMessages, ...localPending];
+  
   if (typeof chatView !== 'undefined' && chatView.renderMessages) {
     chatView.renderMessages(chatMemoryCache);
+  }
   addVoiceButtons();
 }
-}
+
 
 async function syncChat(){
   // 跨装置同步：直接从 Supabase 拉当前 session 的聊天记录渲染，

@@ -1177,16 +1177,13 @@ function intimacyLevel(val){
 
 async function loadIntimacy(){
   try{
-    console.log("[VERIFY] 正在调用 /intimacy/status");
     const r=await fetch(AU+'/intimacy/status');
-    console.log("[VERIFY] 接口返回状态:", r.status);
     if (!r.ok) {
       const text = await r.text();
       console.error("[VERIFY] 接口返回错误:", text);
       return;
     }
     const d=await r.json();
-    console.log("[VERIFY] 接口返回数据:", d);
     renderIntimacy(d);
   }catch(e){console.error('[loadIntimacy]',e);}
 }
@@ -1491,10 +1488,8 @@ async function syncChat(){
   try{
     const r = await fetch(AU+'/conversation');
     const d = await r.json();
-    console.log("[VERIFY] GET /conversation 返回数据:", d);
     console.log("[VERIFY] 返回的 messages 数量:", d.messages ? d.messages.length : 0);
     if (d.messages && d.messages.length > 0) {
-      console.log("[VERIFY] serverMessages 最后一条:", d.messages[d.messages.length - 1]);
     }
     if(d && Array.isArray(d.messages)){
       renderOnly(d.messages);

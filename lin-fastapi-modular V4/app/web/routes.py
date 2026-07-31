@@ -192,12 +192,9 @@ def get_intimacy_status():
     from app.intimacy.body_state import get_body_level, get_body_description
     
     try:
-        print("[VERIFY] /intimacy/status 被调用")
         # 先 tick 確保數值最新
         tick_and_update(state, datetime.now())
-        print("[VERIFY] tick_and_update 完成")
     except Exception as e:
-        print(f"[VERIFY ERROR] tick_and_update 失败: {e}")
         import traceback
         traceback.print_exc()
         raise
@@ -313,12 +310,9 @@ def get_conversation():
     这样才能做到跨装置同步。
     """
     from datetime import datetime as _dt
-    
-    print(f"[VERIFY GET] /conversation 被调用")
     print(f"[VERIFY GET] state.conversation_history 总数: {len(state.conversation_history)}")
     if state.conversation_history:
         last = state.conversation_history[-1]
-        print(f"[VERIFY GET] 最后一条: role={last.get('role')}, content={last.get('content', '')[:50]}...")
 
     def _display_time(iso_str):
         if not iso_str:

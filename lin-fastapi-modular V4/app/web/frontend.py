@@ -1594,8 +1594,24 @@ async function confirmImageSend() {
     
     function processChunk({done, value}) {
       if (done) {
-        if (contentBuffer) {
-          smsg('lin', contentBuffer, reasoningBuffer || null, currentDevTrace ? currentDevTrace.lastPayload : null);
+        console.log('[DEBUG] Image stream done. contentBuffer:', contentBuffer, 'reasoningBuffer:', reasoningBuffer);
+        // 修復：與 send() 保持一致，不要調用 smsg()
+        // 直接將消息添加到內存緩存並保存到資料庫
+        if(contentBuffer){
+          const entry = { 
+            r: 'lin', 
+            t: contentBuffer, 
+            time: ts(), 
+            iso: new Date().toISOString() 
+          };
+          if(reasoningBuffer) entry.think = reasoningBuffer;
+          if(currentDevTrace && currentDevTrace.lastPayload) entry.trace = currentDevTrace.lastPayload;
+          
+          chatMemoryCache.push(entry);
+          if(chatMemoryCache.length > 200) chatMemoryCache = chatMemoryCache.slice(-200);
+          
+          // 異步保存到後端，不阻塞 UI
+          syncChat().catch(e => console.error('[DEBUG] Failed to sync image chat:', e));
         }
         scrollDown();
         pendingImageDataUrl = null;

@@ -118,15 +118,11 @@ def observe_anna(activity: Activity):
     """
     🔥 Streaming 版本：返回 SSE 流式回應
     """
-    print(f"[TRACE] /watch request received app_name={activity.app_name!r} is_empty={not activity.app_name} is_chat_ui={activity.app_name == '聊天界面'}")
     target_session_id = activity.session_id or state.current_session_id
     
     if activity.app_name and activity.app_name != "聊天界面":
-        print(f"[TRACE] before check_app_cooldown app_name={activity.app_name!r}")
         cooldown_result = state.check_app_cooldown(activity.app_name)
-        print(f"[TRACE] check_app_cooldown result={cooldown_result}")
         if not cooldown_result:
-            print("[TRACE] entering empty_stream")
             def empty_stream():
                 yield "event: conten{\"delta\": \"\"}\n\n"
                 yield "event: done\n {}\n\n"

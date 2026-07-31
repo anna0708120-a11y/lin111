@@ -31,7 +31,10 @@ def call_claude(system_prompt, temperature=0.95, max_tokens=None, top_p=0.95, th
 
     payload = {
         "model": config.CLAUDE_MODEL,
-        "messages": [{"role": "system", "content": system_prompt}],
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": "请根据以上人设与情境，给出你的回应。"},
+        ],
         "temperature": temperature,
         "max_tokens": max_tokens or config.CLAUDE_MAX_TOKENS,
         "top_p": top_p,
@@ -75,7 +78,10 @@ def call_claude_stream(system_prompt, temperature=0.95, max_tokens=None, top_p=0
     """
     payload = {
         "model": config.CLAUDE_MODEL,
-        "messages": [{"role": "system", "content": system_prompt}],
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": "请根据以上人设与情境，给出你的回应。"},
+        ],
         "temperature": temperature,
         "max_tokens": max_tokens or config.CLAUDE_MAX_TOKENS,
         "top_p": top_p,
@@ -85,8 +91,6 @@ def call_claude_stream(system_prompt, temperature=0.95, max_tokens=None, top_p=0
         payload["thinking"] = {"type": "enabled"}
         payload["reasoning_effort"] = config.CLAUDE_REASONING_EFFORT
     
-    print("[TRACE] entered call_claude_stream")
-    print(f"[TRACE] sending Claude request model={payload.get('model')} stream={payload.get('stream')} thinking={thinking} base_url={config.CLAUDE_BASE_URL}")
     try:
         response = requests.post(
             config.CLAUDE_BASE_URL,
@@ -98,16 +102,6 @@ def call_claude_stream(system_prompt, temperature=0.95, max_tokens=None, top_p=0
             timeout=45,
             stream=True  # 🔥 關鍵
         )
-        print(f"[TRACE] Claude HTTP status={response.status_code}")
-        if response.status_code != 200:
-            try:
-                _preview = response.text[:500]
-            except Exception:
-                _preview = "<unreadable>"
-            print(f"[TRACE] Claude response={_preview}")
-        else:
-            print("[TRACE] Claude response=<200 OK, streaming body, not consumed to preserve stream>")
-        
         reasoning_buffer = []  # 用於過濾 [MEMORY_DECISION] 等隱藏標籤
         
         for line in response.iter_lines():
@@ -160,7 +154,6 @@ def call_claude_stream(system_prompt, temperature=0.95, max_tokens=None, top_p=0
                     # 標籤用；不能拿上面那份 cleaned 版本解析，因為標籤已經被拔掉了
                     yield ("raw_reasoning", full_reasoning)
                     
-                    print("[TRACE] SSE finished")
                     yield ("done", data.get("usage", {}))
                     
     except Exception as e:

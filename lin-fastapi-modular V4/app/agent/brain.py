@@ -287,7 +287,6 @@ def generate_reply_stream(context, app_name=None, use_cache=True, session_id=Non
     """
     流式生成回覆，yield SSE 格式的事件。
     """
-    print("[TRACE] entered generate_reply_stream")
     from app.llm.claude_client import call_claude_stream
     from app.memory_rules import parse_memory_decision, parse_memory_decision_traced, parse_mood_event, strip_hidden_blocks
     from app import mood_engine
@@ -297,16 +296,12 @@ def generate_reply_stream(context, app_name=None, use_cache=True, session_id=Non
     target_session = session_id or state.current_session_id
     
     rate_limit_ok = state.check_rate_limit()
-    print(f"[TRACE] check_rate_limit result={rate_limit_ok}")
     if not rate_limit_ok:
-        print("[TRACE] blocked by rate_limit, returning early")
         err_msg = "今天额度用完了，或者刚刚问太快了，ata: {}\n\n"
         return
     
-    print(f"[TRACE] cache check use_cache={use_cache}")
     if use_cache and state.last_context_cache == context and state.last_reply_at:
         if datetime.now() - state.last_reply_at < timedelta(minutes=2):
-            print("[TRACE] returning cached FALLBACK_REPLIES, not calling Claude")
             yield f"data: {json.dumps({'type': 'content', 'text': random.choice(FALLBACK_REPLIES)})}\n\n"
             yield "data: {\"type\": \"done\"}\n\n"
             return
@@ -339,10 +334,8 @@ def generate_reply_stream(context, app_name=None, use_cache=True, session_id=Non
     raw_reasoning = ""
     full_content = ""
     
-    print(f"[TRACE] about to call call_claude_stream model={config.CLAUDE_MODEL} max_tokens={config.CLAUDE_MAX_TOKENS}")
     try:
         for event_type, data in call_claude_stream(system_prompt, max_tokens=config.CLAUDE_MAX_TOKENS):
-            print(f"[TRACE] SSE chunk received event_type={event_type}")
             if event_type == "reasoning":
                 full_reasoning += data
                 yield f"event: reasoning\ndata: {json.dumps({'content': data})}\n\n"

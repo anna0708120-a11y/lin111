@@ -191,8 +191,16 @@ def get_intimacy_status():
     from app.intimacy.tick import tick_and_update
     from app.intimacy.body_state import get_body_level, get_body_description
     
-    # 先 tick 確保數值最新
-    tick_and_update(state, datetime.now())
+    try:
+        print("[VERIFY] /intimacy/status 被调用")
+        # 先 tick 確保數值最新
+        tick_and_update(state, datetime.now())
+        print("[VERIFY] tick_and_update 完成")
+    except Exception as e:
+        print(f"[VERIFY ERROR] tick_and_update 失败: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
     
     cycle = get_current_cycle(state)
     progress = get_cycle_progress(state, datetime.now())

@@ -203,27 +203,28 @@ EVENT_EFFECTS = {
             "social": -0.08,
         },
     },
-    "LONG_CHAT": {
+    
+"LONG_CHAT": {
         "LOW": {
-            "attachment": +0.02,
+            "attachment": +0.01,
             "social": +0.01,
             "curiosity": +0.01,
-            "fatigue": +0.02,
+            "fatigue": +0.01,
             "libido": +0.01,
         },
         "MEDIUM": {
-            "attachment": +0.06,
-            "social": +0.04,
-            "curiosity": +0.03,
-            "fatigue": +0.07,
-            "libido": +0.04,
+            "attachment": +0.04,
+            "social": +0.03,
+            "curiosity": +0.02,
+            "fatigue": +0.05,
+            "libido": +0.03,
         },
         "HIGH": {
-            "attachment": +0.15,
-            "social": +0.10,
-            "curiosity": +0.08,
-            "fatigue": +0.18,
-            "libido": +0.10,
+            "attachment": +0.10,  # 0.15 → 0.10（-33%）
+            "social": +0.07,      # 0.10 → 0.07（-30%）
+            "curiosity": +0.06,   # 0.08 → 0.06（-25%）
+            "fatigue": +0.12,     # 0.18 → 0.12（-33%）
+            "libido": +0.07,      # 0.10 → 0.07（-30%）
         },
     },
     "SHORT_REPLY": {

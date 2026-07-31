@@ -1428,9 +1428,13 @@ function renderOnly(history){
     };
   });
   
-  // 智能合并：服务器数据 + 本地 pending 消息
+  // 智能合并：服务器数据 + 本地 pending 消息（排除临时 ID）
   const serverIds = new Set(serverMessages.map(m => m.message_id));
-  const localPending = chatMemoryCache.filter(m => !serverIds.has(m.message_id));
+  const localPending = chatMemoryCache.filter(m => {
+    const id = m.message_id;
+    // 排除：1) 服务器已有的 2) 临时 ID（temp_ 开头）
+    return id && !id.toString().startsWith('temp_') && !serverIds.has(id);
+  });
   
   chatMemoryCache = [...serverMessages, ...localPending];
   

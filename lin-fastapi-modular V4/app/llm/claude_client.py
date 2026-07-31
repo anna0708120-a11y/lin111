@@ -1,0 +1,156 @@
+import json
+import re
+import requests
+"""
+封装对 DeepSeek API 的调用。
+
+支持 thinking mode：开启后回应会带独立的 reasoning_content（模型真的推理过程），
+不用再靠 prompt 硬性要求输出固定格式、自己切字符串解析。
+
+以后想换别的模型，只需要在这个文件里加新函数，改 agent/brain.py 里调用的那一行。
+"""
+import json
+import re
+import requests
+
+from app import config
+
+
+def call_claude(system_prompt, temperature=0.95, max_tokens=None, top_p=0.95, thinking=True):
+    """
+    调 DeepSeek 的 chat completions 接口。
+    不带对话历史，每次都把人设+情境拼成一条完整的 system message 发过去。
+
+    返回 (content, reasoning_content)：
+      content            正式回复，失败时是 None
+      reasoning_content   真思考过程，没开thinking或模型没给的话是 None
+    """
+    if not config.CLAUDE_API_KEY:
+        print("[claude_client] 没有设置 CLAUDE_API_KEY，跳过调用")
+        return None, None
+
+    payload = {
+        "model": config.CLAUDE_MODEL,
+        "messages": [{"role": "system", "content": system_prompt}],
+        "temperature": temperature,
+        "max_tokens": max_tokens or config.CLAUDE_MAX_TOKENS,
+        "top_p": top_p,
+    }
+    #     if thinking:
+    #         payload["thinking"] = {"type": "enabled"}
+    #         payload["reasoning_effort"] = config.CLAUDE_REASONING_EFFORT
+
+    try:
+        response = requests.post(
+            config.CLAUDE_BASE_URL,
+            headers={
+                "Authorization": f"Bearer {config.CLAUDE_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json=payload,
+            timeout=45,
+        )
+        result = response.json()
+        if "choices" not in result:
+            print(f"[claude_client] 回应里没有 choices: {result}")
+            return None, None
+
+        message = result["choices"][0]["message"]
+        content = (message.get("content") or "").strip() or None
+        reasoning = message.get("reasoning_content")
+        reasoning = reasoning.strip() if reasoning else None
+        return content, reasoning
+    except Exception as e:
+        print(f"[claude_client] 呼叫失败: {e}")
+        return None, None
+
+
+def call_claude_stream(system_prompt, temperature=0.95, max_tokens=None, top_p=0.95, thinking=True):
+    """
+    流式調用 DeepSeek API，逐 token yield SSE 事件。
+    Yields: (event_type, data)
+        - ("reasoning", chunk) - 思考內容
+        - ("content", chunk) - 回答內容
+        - ("done", usage_info) - 結束標記
+    """
+    payload = {
+        "model": config.CLAUDE_MODEL,
+        "messages": [{"role": "system", "content": system_prompt}],
+        "temperature": temperature,
+        "max_tokens": max_tokens or config.CLAUDE_MAX_TOKENS,
+        "top_p": top_p,
+        "stream": True  # 🔥 關鍵
+    }
+    if thinking:
+        payload["thinking"] = {"type": "enabled"}
+        payload["reasoning_effort"] = config.CLAUDE_REASONING_EFFORT
+    
+    try:
+        response = requests.post(
+            config.CLAUDE_BASE_URL,
+            headers={
+                "Authorization": f"Bearer {config.CLAUDE_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json=payload,
+            timeout=45,
+            stream=True  # 🔥 關鍵
+        )
+        
+        reasoning_buffer = []  # 用於過濾 [MEMORY_DECISION] 等隱藏標籤
+        
+        for line in response.iter_lines():
+            if not line or line.decode().startswith(": ping"):
+                continue
+            
+            if line.startswith(b"data: "):
+                payload_str = line[6:].strip()
+                if payload_str == b"[DONE]":
+                    break
+                data = json.loads(payload_str)
+                delta = data["choices"][0]["delta"]
+                
+                # 用值是否為 None 判斷，而不是 key 是否存在：
+                # DeepSeek 吐正式 content 的 chunk 裡，"reasoning_content" 這個 key
+                # 通常還在，只是值是 null，用 "in delta" 判斷會誤判成 reasoning，
+                # 導致 content 永遠被吃掉、送不到前端。
+                reasoning_chunk = delta.get("reasoning_content")
+                content_chunk = delta.get("content")
+                
+                # 處理 reasoning_content
+                if reasoning_chunk is not None:
+                    reasoning_buffer.append(reasoning_chunk)
+                    
+                    # 檢查是否包含隱藏標籤
+                    full_reasoning = "".join(reasoning_buffer)
+                    if "[MEMORY_DECISION]" in full_reasoning or "[MOOD_REPORT]" in full_reasoning or "[MOOD_EVENT]" in full_reasoning:
+                        # 暫時不發送，等完整 reasoning 結束後過濾
+                        pass
+                    else:
+                        yield ("reasoning", reasoning_chunk)
+                
+                # 處理 content（獨立判斷，不用 elif，避免同一個 chunk 裡兩者都有時漏掉）
+                if content_chunk is not None:
+                    yield ("content", content_chunk)
+                
+                # 結束標記
+                if data["choices"][0].get("finish_reason"):
+                    # 過濾並發送完整 reasoning（如果有隱藏標籤）
+                    full_reasoning = "".join(reasoning_buffer)
+                    cleaned = re.sub(r'\[MEMORY_DECISION\].*?\[/MEMORY_DECISION\]', '', full_reasoning, flags=re.DOTALL)
+                    cleaned = re.sub(r'\[MOOD_REPORT\].*?\[/MOOD_REPORT\]', '', cleaned, flags=re.DOTALL)
+                    cleaned = re.sub(r'\[MOOD_EVENT\].*?\[/MOOD_EVENT\]', '', cleaned, flags=re.DOTALL)
+                    
+                    # 如果 reasoning 被過濾了，補發乾淨版本給前端顯示
+                    if cleaned != full_reasoning:
+                        yield ("reasoning", cleaned)
+                    
+                    # 把未經過濾的原始 reasoning 單獨傳出，供上層解析 [MOOD_REPORT]/[MEMORY_DECISION]
+                    # 標籤用；不能拿上面那份 cleaned 版本解析，因為標籤已經被拔掉了
+                    yield ("raw_reasoning", full_reasoning)
+                    
+                    yield ("done", data.get("usage", {}))
+                    
+    except Exception as e:
+        print(f"[claude_client] Stream 失敗: {e}")
+        yield ("error", str(e))

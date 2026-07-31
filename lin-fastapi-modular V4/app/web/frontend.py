@@ -1454,6 +1454,17 @@ function renderOnly(history){
   console.log("[DEBUG] 合并前 chatMemoryCache 最后一条:", chatMemoryCache[chatMemoryCache.length - 1]);
   console.log("[DEBUG] serverMessages 数量:", serverMessages.length, "localPending 数量:", localPending.length);
   if (localPending.length > 0) console.log("[DEBUG] localPending:", localPending);
+  
+  // 修复：如果 localPending 为空，检查是否有未保存的临时消息
+  if (localPending.length === 0 && chatMemoryCache.length > 0) {
+    const last = chatMemoryCache[chatMemoryCache.length - 1];
+    if (last.message_id && last.message_id.toString().startsWith('temp_')) {
+      // 临时消息还在，说明后端还没保存，保留它
+      console.log("[DEBUG] 保留未保存的临时消息:", last.message_id);
+      localPending.push(last);
+    }
+  }
+  
   chatMemoryCache = [...serverMessages, ...localPending];
   
   if (typeof chatView !== 'undefined' && chatView.renderMessages) {

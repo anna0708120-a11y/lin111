@@ -1,0 +1,226 @@
+From 3507b03696ffeba821fc580df7d9502096ce7797 Mon Sep 17 00:00:00 2001
+From: anna0708120-a11y <anna0708120@gmail.com>
+Date: Fri, 31 Jul 2026 13:40:54 +0000
+Subject: [PATCH] =?UTF-8?q?debug:=20=E6=B7=BB=E5=8A=A0=E5=AE=8C=E6=95=B4?=
+ =?UTF-8?q?=20TRACE=20=E6=97=A5=E8=AA=8C=E8=BF=BD=E8=B9=A4=E8=81=8A?=
+ =?UTF-8?q?=E5=A4=A9=E7=8B=80=E6=85=8B=E6=B5=81?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+只添加日誌，不修改業務邏輯
+
+TRACE 位置：
+- contentBuffer 更新後
+- Stream done 後
+- chatMemoryCache.push 前後
+- syncChat() 調用前
+- renderMessages 顯示詳細內容
+
+用於追蹤 AI 回覆是否進入 chatMemoryCache
+---
+ 0001-debug-TRACE.patch                        | 113 ++++++++++++++++++
+ lin-fastapi-modular V4/app/web/frontend.py    |  11 ++
+ lin-fastapi-modular V4/static/js/chat_view.js |   1 +
+ 3 files changed, 125 insertions(+)
+ create mode 100644 0001-debug-TRACE.patch
+
+diff --git a/0001-debug-TRACE.patch b/0001-debug-TRACE.patch
+new file mode 100644
+index 0000000..b52bec0
+--- /dev/null
++++ b/0001-debug-TRACE.patch
+@@ -0,0 +1,113 @@
++From e27b5884570c50eebf07ee1e0a21edb183b34d13 Mon Sep 17 00:00:00 2001
++From: anna0708120-a11y <anna0708120@gmail.com>
++Date: Fri, 31 Jul 2026 13:37:46 +0000
++Subject: [PATCH] =?UTF-8?q?debug:=20=E6=B7=BB=E5=8A=A0=E5=AE=8C=E6=95=B4?=
++ =?UTF-8?q?=20TRACE=20=E6=97=A5=E8=AA=8C=E8=BF=BD=E8=B9=A4=E8=81=8A?=
++ =?UTF-8?q?=E5=A4=A9=E7=8B=80=E6=85=8B=E6=B5=81?=
++MIME-Version: 1.0
++Content-Type: text/plain; charset=UTF-8
++Content-Transfer-Encoding: 8bit
++
++只添加日誌，不修改業務邏輯
++
++TRACE 位置：
++- contentBuffer 更新後
++- Stream done 後
++- chatMemoryCache.push 前後
++- syncChat() 調用前
++- renderMessages 顯示詳細內容
++
++用於追蹤 AI 回覆是否進入 chatMemoryCache
++---
++ lin-fastapi-modular V4/app/web/frontend.py    | 14 ++++++++++++++
++ lin-fastapi-modular V4/static/js/chat_view.js |  1 +
++ 2 files changed, 15 insertions(+)
++
++diff --git a/lin-fastapi-modular V4/app/web/frontend.py b/lin-fastapi-modular V4/app/web/frontend.py
++index 043bda6..42eaff4 100644
++--- a/lin-fastapi-modular V4/app/web/frontend.py	
+++++ b/lin-fastapi-modular V4/app/web/frontend.py	
++@@ -1,4 +1,7 @@
+++console.log('[TRACE] syncChat() called');
+++console.log('[TRACE] chatMemoryCache.push() before =', chatMemoryCache.length);
++ """
+++console.log('[TRACE] chatMemoryCache.push() after =', chatMemoryCache.length);
++ 前端页面（监控台 / 对话 / 记忆库）。
++ 这部分是从原本 main.py 里原封不动搬过来的，没有改动任何 UI 或逻辑，
++ 只是单纯挪到自己的文件里，让 main.py 不用再塞几百行 HTML/CSS/JS。
++@@ -1434,6 +1437,7 @@ function renderOnly(history){
++ }
++ }
++ 
+++console.log('[TRACE] syncChat() called');
++ async function syncChat(){
++   // 跨装置同步：直接从 Supabase 拉当前 session 的聊天记录渲染，
++   // 数据库是唯一真相来源，不写入 localStorage，只更新内存缓存。
++@@ -1607,10 +1611,13 @@ async function confirmImageSend() {
++           if(reasoningBuffer) entry.think = reasoningBuffer;
++           if(currentDevTrace && currentDevTrace.lastPayload) entry.trace = currentDevTrace.lastPayload;
++           
+++          console.log('[TRACE] chatMemoryCache.push() before =', chatMemoryCache.length);
++           chatMemoryCache.push(entry);
+++          console.log('[TRACE] chatMemoryCache.push() after =', chatMemoryCache.length);
++           if(chatMemoryCache.length > 200) chatMemoryCache = chatMemoryCache.slice(-200);
++           
++           // 異步保存到後端，不阻塞 UI
+++          console.log('[TRACE] syncChat() called');
++           syncChat().catch(e => console.error('[DEBUG] Failed to sync image chat:', e));
++         }
++         scrollDown();
++@@ -1761,6 +1768,8 @@ async function send(){
++       console.log('[DEBUG] processChunk called, done:', done);
++       if(done){
++         console.log('[DEBUG] Stream done. contentBuffer:', contentBuffer, 'reasoningBuffer:', reasoningBuffer);
+++        console.log('[TRACE] Stream finished');
+++        console.log('[TRACE] chatMemoryCache.length =', chatMemoryCache.length);
++         // 修復：不要調用 smsg()，因為消息已經在串流過程中顯示
++         // 直接將消息添加到內存緩存並保存到資料庫
++         if(contentBuffer){
++@@ -1773,10 +1782,13 @@ async function send(){
++           if(reasoningBuffer) entry.think = reasoningBuffer;
++           if(currentDevTrace && currentDevTrace.lastPayload) entry.trace = currentDevTrace.lastPayload;
++           
+++          console.log('[TRACE] chatMemoryCache.push() before =', chatMemoryCache.length);
++           chatMemoryCache.push(entry);
+++          console.log('[TRACE] chatMemoryCache.push() after =', chatMemoryCache.length);
++           if(chatMemoryCache.length > 200) chatMemoryCache = chatMemoryCache.slice(-200);
++           
++           // 異步保存到後端，不阻塞 UI
+++          console.log('[TRACE] syncChat() called');
++           syncChat().catch(e => console.error('[DEBUG] Failed to sync chat:', e));
++         }
++         scrollDown();
++@@ -1832,6 +1844,7 @@ async function send(){
++             else if(currentEvent === 'content' && data.delta !== undefined){
++               console.log('[DEBUG] ✅ CONTENT event received, data.delta:', data.delta);
++               contentBuffer += data.delta;
+++              console.log('[TRACE] contentBuffer =', contentBuffer);
++               
++               if(!currentMsgDiv){
++                 console.log('[DEBUG] Creating content msgDiv');
++@@ -2000,6 +2013,7 @@ async function delmem(id){
++   rmem();
++ }
++ 
+++console.log('[TRACE] syncChat() called');
++ // syncChat() 已從啟動流程移除。初始化唯一入口：DOMContentLoaded → initChatExperience()
++ llogs();setInterval(()=>{llogs();if(document.getElementById('tb-monitor').classList.contains('active')){loadMood();if(intimacyOpen)loadIntimacy();}},10000);
++ 
++diff --git a/lin-fastapi-modular V4/static/js/chat_view.js b/lin-fastapi-modular V4/static/js/chat_view.js
++index 18f40fa..b0acca6 100644
++--- a/lin-fastapi-modular V4/static/js/chat_view.js	
+++++ b/lin-fastapi-modular V4/static/js/chat_view.js	
++@@ -31,6 +31,7 @@ class ChatView {
++   // render 完成後只遍歷「帶 trace 的訊息」逐一掛載，不做全域 document 掃描。
++   renderMessages(history) {
++     console.log('[ChatView] renderMessages called, history.length:', history ? history.length : 0);
+++    console.log('[TRACE] renderMessages ids =', history ? history.map(m => ({ role: m.r, content: m.t?.slice(0,40) })) : []);
++     if (!this.cmEl) return;
++     
++     if (!history || history.length === 0) {
++-- 
++2.39.5
++
+diff --git a/lin-fastapi-modular V4/app/web/frontend.py b/lin-fastapi-modular V4/app/web/frontend.py
+index 043bda6..e84b3e9 100644
+--- a/lin-fastapi-modular V4/app/web/frontend.py	
++++ b/lin-fastapi-modular V4/app/web/frontend.py	
+@@ -1434,6 +1434,7 @@ function renderOnly(history){
+ }
+ }
+ 
++console.log('[TRACE] syncChat() called');
+ async function syncChat(){
+   // 跨装置同步：直接从 Supabase 拉当前 session 的聊天记录渲染，
+   // 数据库是唯一真相来源，不写入 localStorage，只更新内存缓存。
+@@ -1607,10 +1608,13 @@ async function confirmImageSend() {
+           if(reasoningBuffer) entry.think = reasoningBuffer;
+           if(currentDevTrace && currentDevTrace.lastPayload) entry.trace = currentDevTrace.lastPayload;
+           
++          console.log('[TRACE] chatMemoryCache.push() before =', chatMemoryCache.length);
+           chatMemoryCache.push(entry);
++          console.log('[TRACE] chatMemoryCache.push() after =', chatMemoryCache.length);
+           if(chatMemoryCache.length > 200) chatMemoryCache = chatMemoryCache.slice(-200);
+           
+           // 異步保存到後端，不阻塞 UI
++          console.log('[TRACE] syncChat() called');
+           syncChat().catch(e => console.error('[DEBUG] Failed to sync image chat:', e));
+         }
+         scrollDown();
+@@ -1761,6 +1765,8 @@ async function send(){
+       console.log('[DEBUG] processChunk called, done:', done);
+       if(done){
+         console.log('[DEBUG] Stream done. contentBuffer:', contentBuffer, 'reasoningBuffer:', reasoningBuffer);
++        console.log('[TRACE] Stream finished');
++        console.log('[TRACE] chatMemoryCache.length =', chatMemoryCache.length);
+         // 修復：不要調用 smsg()，因為消息已經在串流過程中顯示
+         // 直接將消息添加到內存緩存並保存到資料庫
+         if(contentBuffer){
+@@ -1773,10 +1779,13 @@ async function send(){
+           if(reasoningBuffer) entry.think = reasoningBuffer;
+           if(currentDevTrace && currentDevTrace.lastPayload) entry.trace = currentDevTrace.lastPayload;
+           
++          console.log('[TRACE] chatMemoryCache.push() before =', chatMemoryCache.length);
+           chatMemoryCache.push(entry);
++          console.log('[TRACE] chatMemoryCache.push() after =', chatMemoryCache.length);
+           if(chatMemoryCache.length > 200) chatMemoryCache = chatMemoryCache.slice(-200);
+           
+           // 異步保存到後端，不阻塞 UI
++          console.log('[TRACE] syncChat() called');
+           syncChat().catch(e => console.error('[DEBUG] Failed to sync chat:', e));
+         }
+         scrollDown();
+@@ -1832,6 +1841,7 @@ async function send(){
+             else if(currentEvent === 'content' && data.delta !== undefined){
+               console.log('[DEBUG] ✅ CONTENT event received, data.delta:', data.delta);
+               contentBuffer += data.delta;
++              console.log('[TRACE] contentBuffer =', contentBuffer);
+               
+               if(!currentMsgDiv){
+                 console.log('[DEBUG] Creating content msgDiv');
+@@ -2000,6 +2010,7 @@ async function delmem(id){
+   rmem();
+ }
+ 
++console.log('[TRACE] syncChat() called');
+ // syncChat() 已從啟動流程移除。初始化唯一入口：DOMContentLoaded → initChatExperience()
+ llogs();setInterval(()=>{llogs();if(document.getElementById('tb-monitor').classList.contains('active')){loadMood();if(intimacyOpen)loadIntimacy();}},10000);
+ 
+diff --git a/lin-fastapi-modular V4/static/js/chat_view.js b/lin-fastapi-modular V4/static/js/chat_view.js
+index 18f40fa..b0acca6 100644
+--- a/lin-fastapi-modular V4/static/js/chat_view.js	
++++ b/lin-fastapi-modular V4/static/js/chat_view.js	
+@@ -31,6 +31,7 @@ class ChatView {
+   // render 完成後只遍歷「帶 trace 的訊息」逐一掛載，不做全域 document 掃描。
+   renderMessages(history) {
+     console.log('[ChatView] renderMessages called, history.length:', history ? history.length : 0);
++    console.log('[TRACE] renderMessages ids =', history ? history.map(m => ({ role: m.r, content: m.t?.slice(0,40) })) : []);
+     if (!this.cmEl) return;
+     
+     if (!history || history.length === 0) {
+-- 
+2.39.5
+

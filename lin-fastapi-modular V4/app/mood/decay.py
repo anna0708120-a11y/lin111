@@ -106,6 +106,29 @@ MOOD_BASELINES = {
 }
 
 # ========================================
+# 高值維護成本配置（High Value Maintenance Cost）
+# ========================================
+# 數值越高，Decay 速度越快，讓系統自然穩定在 0.7-0.85
+HIGH_VALUE_MULTIPLIERS = {
+    "attachment": [
+        {"threshold": 0.80, "multiplier": 1.5},   # >0.8 時 Decay 加速 1.5 倍
+        {"threshold": 0.90, "multiplier": 2.5},   # >0.9 時 Decay 加速 2.5 倍
+    ],
+    "libido": [
+        {"threshold": 0.75, "multiplier": 1.5},
+        {"threshold": 0.85, "multiplier": 2.5},
+    ],
+    "curiosity": [
+        {"threshold": 0.80, "multiplier": 1.5},
+        {"threshold": 0.90, "multiplier": 2.5},
+    ],
+    "social": [
+        {"threshold": 0.80, "multiplier": 1.5},
+        {"threshold": 0.90, "multiplier": 2.5},
+    ],
+}
+
+# ========================================
 # Mood 衰减速率配置（每小时向基线靠近的速度）
 # ========================================
 MOOD_DECAY_RATES = {
@@ -125,6 +148,12 @@ def apply_mood_decay(mood: Dict[str, float], elapsed_hours: float, enabled: bool
     
     使用渐近回归方式：
     delta = (baseline - current) * rate * elapsed_hours
+        
+        # V4: 高值維護成本（數值越高，回落越快）
+        if key in HIGH_VALUE_MULTIPLIERS:
+            for rule in HIGH_VALUE_MULTIPLIERS[key]:
+                if current > rule["threshold"]:
+                    delta *= rule["multiplier"]
     
     特点：
     - 离基线越远，回归速度越快
@@ -158,7 +187,19 @@ def apply_mood_decay(mood: Dict[str, float], elapsed_hours: float, enabled: bool
         
         # 计算向基线靠近的变化量（渐近回归）
         # 公式：delta = (baseline - current) * rate * elapsed_hours
+        
+        # V4: 高值維護成本（數值越高，回落越快）
+        if key in HIGH_VALUE_MULTIPLIERS:
+            for rule in HIGH_VALUE_MULTIPLIERS[key]:
+                if current > rule["threshold"]:
+                    delta *= rule["multiplier"]
         delta = (baseline - current) * rate * elapsed_hours
+        
+        # V4: 高值維護成本（數值越高，回落越快）
+        if key in HIGH_VALUE_MULTIPLIERS:
+            for rule in HIGH_VALUE_MULTIPLIERS[key]:
+                if current > rule["threshold"]:
+                    delta *= rule["multiplier"]
         
         # 应用变化
         result[key] = current + delta

@@ -13,6 +13,32 @@ from collections import deque
 from datetime import datetime, timedelta
 
 
+# ========================================
+# 收益遞減配置（Diminishing Returns）
+# ========================================
+DIMINISHING_RETURNS = {
+    "attachment": [
+        {"threshold": 0.70, "multiplier": 0.6},   # >0.7 時效果降到 60%
+        {"threshold": 0.85, "multiplier": 0.3},   # >0.85 時效果降到 30%
+    ],
+    "libido": [
+        {"threshold": 0.65, "multiplier": 0.6},
+        {"threshold": 0.80, "multiplier": 0.3},
+    ],
+    "curiosity": [
+        {"threshold": 0.70, "multiplier": 0.6},
+        {"threshold": 0.85, "multiplier": 0.3},
+    ],
+    "social": [
+        {"threshold": 0.70, "multiplier": 0.6},
+        {"threshold": 0.85, "multiplier": 0.3},
+    ],
+    "possessiveness": [
+        {"threshold": 0.70, "multiplier": 0.6},
+        {"threshold": 0.85, "multiplier": 0.3},
+    ],
+}
+
 # V2.1: 事件冷却机制（Phase 2）
 # 每个事件独立冷却时间（秒）；同一事件在冷却期内拒绝触发，不打折扣
 EVENT_COOLDOWNS = {
@@ -338,7 +364,7 @@ def apply_event(event, level="MEDIUM", line=None):
     
     # V2.2: 啟動主事件鎖定期（10分鐘）
     _active_mood_event = event
-    _active_mood_event_expires_at = now + timedelta(minutes=10)
+    _active_mood_event_expires_at = now + timedelta(minutes=20)  # V3: 延長到 20 分鐘降低觸發頻率
     multiplier = 1.0  # Phase 2: 冷却機制取代遞減係數，通過冷却的事件效果不打折
     
     # 取得當前 mood（深拷貝避免直接修改）
@@ -352,7 +378,13 @@ def apply_event(event, level="MEDIUM", line=None):
         if key in current_mood:
             adjusted_delta = delta * multiplier
             
-            # 動態調整：根據當前 mood 值微調效果
+            # 動態調整
+            
+            # V3: 收益遞減（Diminishing Returns）
+            if key in DIMINISHING_RETURNS:
+                for rule in DIMINISHING_RETURNS[key]:
+                    if current_value > rule["threshold"]:
+                        adjusted_delta *= rule["multiplier"]
             # 規則：越接近極端（0.0 或 1.0），變化幅度越小
             current_value = current_mood[key]
             

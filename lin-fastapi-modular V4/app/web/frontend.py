@@ -1451,6 +1451,9 @@ function renderOnly(history){
     return true;
   });
   
+  console.log("[DEBUG] 合并前 chatMemoryCache 最后一条:", chatMemoryCache[chatMemoryCache.length - 1]);
+  console.log("[DEBUG] serverMessages 数量:", serverMessages.length, "localPending 数量:", localPending.length);
+  if (localPending.length > 0) console.log("[DEBUG] localPending:", localPending);
   chatMemoryCache = [...serverMessages, ...localPending];
   
   if (typeof chatView !== 'undefined' && chatView.renderMessages) {

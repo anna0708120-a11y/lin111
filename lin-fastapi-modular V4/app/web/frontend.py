@@ -1407,6 +1407,9 @@ function lchat(){
 }
 
 function renderOnly(history){
+  console.log("[DEBUG renderOnly] 被调用，history 长度:", history ? history.length : 0);
+  console.log("[DEBUG renderOnly] 调用前 chatMemoryCache 最后一条:", chatMemoryCache[chatMemoryCache.length - 1]);
+  console.trace("[DEBUG renderOnly] 调用栈");
   const serverMessages = (history || []).map(m => {
     const iso = m.iso || m.time || new Date().toISOString();
     let display = '';
@@ -1439,6 +1442,9 @@ function renderOnly(history){
 
 
 async function syncChat(){
+  console.log("[DEBUG syncChat] 被调用");
+  console.log("[DEBUG syncChat] 调用前 chatMemoryCache 最后一条:", chatMemoryCache[chatMemoryCache.length - 1]);
+  console.trace("[DEBUG syncChat] 调用栈");
   // 跨装置同步：直接从 Supabase 拉当前 session 的聊天记录渲染，
   // 数据库是唯一真相来源，不写入 localStorage，只更新内存缓存。
   try{

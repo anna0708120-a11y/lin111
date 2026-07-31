@@ -31,6 +31,8 @@ class ChatView {
   // render 完成後只遍歷「帶 trace 的訊息」逐一掛載，不做全域 document 掃描。
   renderMessages(history) {
     console.log('[ChatView] renderMessages called, history.length:', history ? history.length : 0);
+    console.log("[DEBUG ChatView.renderMessages] chatMemoryCache 最后一条:", typeof chatMemoryCache !== "undefined" ? chatMemoryCache[chatMemoryCache.length - 1] : "未定义");
+    console.trace("[DEBUG ChatView.renderMessages] 调用栈");
     if (!this.cmEl) return;
     
     if (!history || history.length === 0) {

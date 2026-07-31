@@ -135,6 +135,17 @@ def build_intimacy_prompt(state, now: datetime) -> str:
         if dream_summary:
             sections.append(f"【過往夢境】\n{dream_summary}")
     
+
+    # V4: 事件日誌（僅顯示最近 5 條）
+    from app.intimacy.event_log import get_recent_events
+    recent_events = get_recent_events(limit=5)
+    if recent_events:
+        event_lines = []
+        for evt in recent_events:
+            time_str = evt.timestamp.strftime("%m/%d %H:%M")
+            event_lines.append(f"- {time_str} {evt.title} ({evt.duration_minutes}分鐘)")
+        sections.append(f"【最近事件】\n" + "\n".join(event_lines))
+    
     return "\n\n".join(sections)
 
 

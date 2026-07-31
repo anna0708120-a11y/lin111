@@ -105,7 +105,7 @@ class AppState:
 
     # ---------- 日志 ----------
         # 当前选择的模型(用户可在前端切换)
-        self.current_model = "deepseek"  # 默认DeepSeek
+        self.current_model = "claude"  # 默认DeepSeek
 
     def add_log(self, event_type, content):
         self.activity_log.append({

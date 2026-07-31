@@ -122,7 +122,9 @@ def tick_and_update(state, now: datetime):
             state.body_values = apply_influence(state.body_values, enabled=True)
             
             # V4.3: 應用 Mood 自然衰減
-            state.mood = apply_mood_decay(state.mood, elapsed_hours, enabled=True)
+            # V4.3: 傳入當前周期，使用動態 target
+            cycle = get_current_cycle(state)
+            state.mood = apply_mood_decay(state.mood, elapsed_hours, enabled=True, cycle_key=cycle.key)
             
             # clamp 到 0-100
             for key in state.body_values:

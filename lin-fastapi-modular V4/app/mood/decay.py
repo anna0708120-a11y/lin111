@@ -16,6 +16,82 @@ Mood 应该依靠「事件 + 时间自然恢复」来变化，而不是大量互
 
 from typing import Dict
 
+
+# ========================================
+# V3: 動態 Target System（借鑒 Eventide）
+# ========================================
+def get_mood_targets(cycle_key: str = "stable") -> Dict[str, float]:
+    """
+    根據當前周期返回 Mood 目標值（取代固定 baseline）
+    
+    設計理念：
+    - 平穩期：低 libido、中等 attachment
+    - 蓄積期：libido 開始上升
+    - 易感期：libido、attachment 都偏高
+    - 退潮期/恢復期：逐步回落
+    
+    這讓角色有「今天就是想黏人」的動態感，而不是永遠回到同一個數字。
+    """
+    targets_by_cycle = {
+        "stable": {
+            "attachment": 0.6,
+            "curiosity": 0.5,
+            "social": 0.6,
+            "stress": 0.2,
+            "fatigue": 0.3,
+            "libido": 0.4,
+            "possessiveness": 0.3,
+        },
+        "building": {
+            "attachment": 0.65,
+            "curiosity": 0.6,
+            "social": 0.65,
+            "stress": 0.25,
+            "fatigue": 0.35,
+            "libido": 0.55,
+            "possessiveness": 0.35,
+        },
+        "preheat": {
+            "attachment": 0.7,
+            "curiosity": 0.65,
+            "social": 0.7,
+            "stress": 0.3,
+            "fatigue": 0.4,
+            "libido": 0.65,
+            "possessiveness": 0.4,
+        },
+        "sensitive": {
+            "attachment": 0.75,
+            "curiosity": 0.7,
+            "social": 0.75,
+            "stress": 0.35,
+            "fatigue": 0.45,
+            "libido": 0.75,
+            "possessiveness": 0.5,
+        },
+        "ebb": {
+            "attachment": 0.7,
+            "curiosity": 0.6,
+            "social": 0.65,
+            "stress": 0.3,
+            "fatigue": 0.5,
+            "libido": 0.6,
+            "possessiveness": 0.45,
+        },
+        "recovery": {
+            "attachment": 0.65,
+            "curiosity": 0.55,
+            "social": 0.6,
+            "stress": 0.2,
+            "fatigue": 0.35,
+            "libido": 0.45,
+            "possessiveness": 0.35,
+        },
+    }
+    
+    return targets_by_cycle.get(cycle_key, targets_by_cycle["stable"])
+
+
 # ========================================
 # Mood 基线配置（未来迁移到 config.py）
 # ========================================
@@ -43,7 +119,7 @@ MOOD_DECAY_RATES = {
 }
 
 
-def apply_mood_decay(mood: Dict[str, float], elapsed_hours: float, enabled: bool = True) -> Dict[str, float]:
+def apply_mood_decay(mood: Dict[str, float], elapsed_hours: float, enabled: bool = True, cycle_key: str = "stable") -> Dict[str, float]:
     """
     应用 Mood 自然衰减（纯函数，不修改输入）
     
@@ -70,7 +146,10 @@ def apply_mood_decay(mood: Dict[str, float], elapsed_hours: float, enabled: bool
     # 创建新 dict，不修改原值
     result = dict(mood)
     
-    for key, baseline in MOOD_BASELINES.items():
+    # V3: 使用動態 target 取代固定 baseline
+    targets = get_mood_targets(cycle_key)
+    
+    for key, baseline in targets.items():
         if key not in result:
             continue
         
@@ -102,7 +181,10 @@ def get_decay_summary(mood: Dict[str, float]) -> str:
     """
     deviations = []
     
-    for key, baseline in MOOD_BASELINES.items():
+    # V3: 使用動態 target 取代固定 baseline
+    targets = get_mood_targets(cycle_key)
+    
+    for key, baseline in targets.items():
         if key not in mood:
             continue
         

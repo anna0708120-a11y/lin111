@@ -1,57 +1,108 @@
 """
-事件日誌系統（V3 架構預留）
+事件日誌系統（V4 實作）
 
 管理時間軸事件記錄。
-V3 回傳假資料，V4 實作真實資料庫邏輯。
 """
+from datetime import datetime
+from app.database import supabase
+
+
+def log_event(event_type: str, title: str, timestamp: datetime = None, 
+              duration_minutes: int = None, detail_text: str = None, 
+              metadata: dict = None):
+    """
+    寫入事件日誌到資料庫
+    
+    Args:
+        event_type: 'cycle' | 'event' | 'settlement'
+        title: 事件標題
+        timestamp: 事件時間（預設當前時間）
+        duration_minutes: 持續時間（僅 event 類型）
+        detail_text: 詳細描述（settlement 使用）
+        metadata: 額外數據
+    """
+    if timestamp is None:
+        timestamp = datetime.utcnow()
+    
+    data = {
+        "event_type": event_type,
+        "title": title,
+        "timestamp": timestamp.isoformat(),
+    }
+    
+    if duration_minutes is not None:
+        data["duration_minutes"] = duration_minutes
+    if detail_text is not None:
+        data["detail_text"] = detail_text
+    if metadata is not None:
+        data["metadata"] = metadata
+    
+    try:
+        supabase.table("intimacy_events").insert(data).execute()
+    except Exception as e:
+        print(f"❌ 事件日誌寫入失敗: {e}")
+
 
 def get_current_event():
     """回傳當前事件 + 持續時間"""
+    try:
+        result = supabase.table("intimacy_events") \
+            .select("*") \
+            .eq("event_type", "event") \
+            .order("timestamp", desc=True) \
+            .limit(1) \
+            .execute()
+        
+        if result.data:
+            event = result.data[0]
+            hours = event.get("duration_minutes", 0) // 60
+            minutes = event.get("duration_minutes", 0) % 60
+            return {
+                "event": event["title"],
+                "duration_hours": hours,
+                "duration_minutes": minutes
+            }
+    except Exception as e:
+        print(f"❌ 讀取當前事件失敗: {e}")
+    
     return {
-        "event": "等待焦躁",
-        "duration_hours": 2,
-        "duration_minutes": 32
+        "event": "無",
+        "duration_hours": 0,
+        "duration_minutes": 0
     }
 
 
 def get_event_timeline(filter_type="all"):
     """
-    回傳事件時間軸（假資料）
+    回傳事件時間軸（真實資料）
     
-    filter_type: "all" | "cycle" | "event" | "dream" | "settlement"
+    filter_type: "all" | "cycle" | "event" | "settlement"
     """
-    fake_events = [
-        {
-            "id": "evt_1",
-            "type": "settlement",
-            "title": "互動結算",
-            "timestamp": "2026-07-26T07:12:00Z",
-            "detail_text": "數值變化：蓄積感 0，熱度 0，壓抑感 +1，控制力 0，敏感度 0，占有欲 +1，疲惫感 +1"
-        },
-        {
-            "id": "evt_2",
-            "type": "event",
-            "title": "觸發等待焦躁",
-            "timestamp": "2026-07-05T07:12:00Z",
-            "duration_minutes": 159
-        },
-        {
-            "id": "evt_3",
-            "type": "settlement",
-            "title": "互動結算",
-            "timestamp": "2026-07-05T05:46:00Z",
-            "detail_text": "數值變化：蓄積感 0，熱度 0，壓抑感 0，控制力 +1，敏感度 0，占有欲 +1，疲惫感 0"
-        },
-        {
-            "id": "evt_4",
-            "type": "settlement",
-            "title": "互動結算",
-            "timestamp": "2026-07-05T04:56:00Z",
-            "detail_text": "數值變化：蓄積感 0，熱度 +2，壓抑感 +2，控制力 -2，敏感度 +2，占有欲 +3，疲惫感 0"
-        },
-    ]
-    
-    if filter_type == "all":
-        return fake_events
-    else:
-        return [e for e in fake_events if e["type"] == filter_type]
+    try:
+        query = supabase.table("intimacy_events").select("*").order("timestamp", desc=True).limit(50)
+        
+        if filter_type != "all":
+            query = query.eq("event_type", filter_type)
+        
+        result = query.execute()
+        
+        events = []
+        for row in result.data:
+            event = {
+                "id": f"evt_{row['id']}",
+                "type": row["event_type"],
+                "title": row["title"],
+                "timestamp": row["timestamp"],
+            }
+            
+            if row.get("duration_minutes"):
+                event["duration_minutes"] = row["duration_minutes"]
+            if row.get("detail_text"):
+                event["detail_text"] = row["detail_text"]
+            
+            events.append(event)
+        
+        return events
+    except Exception as e:
+        print(f"❌ 讀取事件時間軸失敗: {e}")
+        return []

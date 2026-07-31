@@ -23,6 +23,14 @@ DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com/cha
 DEEPSEEK_REASONING_EFFORT = os.getenv("DEEPSEEK_REASONING_EFFORT", "medium")
 # thinking mode 的思考内容也算在这个token数里，调太小思考会被截断
 DEEPSEEK_MAX_TOKENS = int(os.getenv("DEEPSEEK_MAX_TOKENS", 8000))
+
+
+# ---- CLAUDE 别名（兼容旧代码）----
+CLAUDE_API_KEY = DEEPSEEK_API_KEY
+CLAUDE_MODEL = DEEPSEEK_MODEL
+CLAUDE_BASE_URL = DEEPSEEK_BASE_URL
+CLAUDE_MAX_TOKENS = DEEPSEEK_MAX_TOKENS
+CLAUDE_REASONING_EFFORT = DEEPSEEK_REASONING_EFFORT
 # 想同时推给手机+电脑，就在 Render 环境变量填 BARK_KEYS，两个key用逗号隔开，
 # 例如：BARK_KEYS=手机的key,电脑的key
 # 只填一个也没关系，旧的 BARK_KEY 变量还继续有效。

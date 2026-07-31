@@ -403,7 +403,9 @@ def generate_reply_stream(context, app_name=None, use_cache=True, session_id=Non
                 
                 if full_content and full_content not in ("信号不好。", "今天额度用完了，或者刚刚问太快了，等一下再说。"):
                     thinking_display = strip_hidden_blocks(full_reasoning) if full_reasoning else None
+                    print(f"[VERIFY SAVE] 准备保存消息: role=lin, content={full_content[:50]}..., session={target_session}")
                     state.add_conversation_turn("lin", full_content, thinking=thinking_display, session_id=target_session, trace=collector.export())
+                    print(f"[VERIFY SAVE] 消息已保存到 conversation")
                     
                     from app.notify.bark import send_to_bark
                     send_to_bark(full_content)

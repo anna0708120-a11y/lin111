@@ -39,28 +39,8 @@ def call_claude(system_prompt, temperature=0.95, max_tokens=None, top_p=0.95, th
         "max_tokens": max_tokens or config.CLAUDE_MAX_TOKENS,
         "top_p": top_p,
     }
-    #     if thinking:
-    #         payload["thinking"] = {"type": "enabled"}
-    #         payload["reasoning_effort"] = config.CLAUDE_REASONING_EFFORT
 
     try:
-    # 🔍 DEBUG: 完整记录发送给 DeepSeek 的 payload
-    try:
-        import json
-        from datetime import datetime
-        log_file = f"/tmp/deepseek_payload_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
-        with open(log_file, "w", encoding="utf-8") as f:
-            f.write("=" * 80 + "\n")
-            f.write("DEEPSEEK API PAYLOAD\n")
-            f.write("=" * 80 + "\n\n")
-            f.write(json.dumps(payload, ensure_ascii=False, indent=2))
-            f.write("\n\n" + "=" * 80 + "\n")
-            f.write(f"SYSTEM_PROMPT LENGTH: {len(system_prompt)}\n")
-            f.write("=" * 80 + "\n")
-        print(f"[DEBUG] Payload saved to {log_file}")
-    except Exception as e:
-        print(f"[DEBUG] Failed to save payload: {e}")
-    
         response = requests.post(
             config.CLAUDE_BASE_URL,
             headers={
@@ -109,6 +89,23 @@ def call_claude_stream(system_prompt, temperature=0.95, max_tokens=None, top_p=0
         payload["reasoning_effort"] = config.CLAUDE_REASONING_EFFORT
     
     try:
+        # 🔍 DEBUG: 完整记录发送给 DeepSeek 的 payload
+        import json
+        from datetime import datetime
+        try:
+            log_file = f"/tmp/deepseek_payload_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+            with open(log_file, "w", encoding="utf-8") as log_f:
+                log_f.write("=" * 80 + "\n")
+                log_f.write("DEEPSEEK API PAYLOAD\n")
+                log_f.write("=" * 80 + "\n\n")
+                log_f.write(json.dumps(payload, ensure_ascii=False, indent=2))
+                log_f.write("\n\n" + "=" * 80 + "\n")
+                log_f.write(f"SYSTEM_PROMPT LENGTH: {len(system_prompt)}\n")
+                log_f.write("=" * 80 + "\n")
+            print(f"[PAYLOAD_LOG] Saved to {log_file}")
+        except Exception as log_e:
+            print(f"[PAYLOAD_LOG] Failed: {log_e}")
+        
         # 🔍 DEBUG: 完整记录发送给 DeepSeek 的 payload
         try:
             import json

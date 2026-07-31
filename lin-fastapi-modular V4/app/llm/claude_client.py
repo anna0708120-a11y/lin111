@@ -73,6 +73,7 @@ def call_claude_stream(system_prompt, temperature=0.95, max_tokens=None, top_p=0
         - ("content", chunk) - 回答內容
         - ("done", usage_info) - 結束標記
     """
+    print("[🔥 ENTRY] call_claude_stream called, system_prompt length:", len(system_prompt))
     payload = {
         "model": config.CLAUDE_MODEL,
         "messages": [

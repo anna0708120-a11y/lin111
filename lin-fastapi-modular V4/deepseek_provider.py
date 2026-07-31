@@ -61,10 +61,15 @@ class DeepSeekProvider:
                         if not choices:
                             continue
                         delta = choices[0].get('delta', {})
-                        if 'content' in delta:
-                            yield {'token': delta['content']}
-                        if 'reasoning_content' in delta:
-                            yield {'thinking_token': delta['reasoning_content']}
+                        
+                        # 修復：檢查值是否為真，而不只是鍵是否存在
+                        content = delta.get('content')
+                        reasoning_content = delta.get('reasoning_content')
+                        
+                        if content:
+                            yield {'token': content}
+                        if reasoning_content:
+                            yield {'thinking_token': reasoning_content}
                         if choices[0].get('finish_reason'):
                             yield {'done': True}
                             break

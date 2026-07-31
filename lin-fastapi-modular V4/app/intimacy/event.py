@@ -84,11 +84,13 @@ def check_event_triggers(body_values: dict, context: dict) -> list:
     continuous_turns = context.get("continuous_turns", 0)
     
     # waiting_restless: 等待超過 30 分鐘
-    if silence_minutes > 30:
+    # waiting_restless: 等待超過 10 分鐘（原 30 分鐘太久）
+    if silence_minutes > 10:
         triggered.append("waiting_restless")
     
     # low_fever_cling: 連續對話超過 5 輪
-    if continuous_turns > 5:
+    # low_fever_cling: 連續對話超過 3 輪（原 5 輪太高）
+    if continuous_turns > 3:
         triggered.append("low_fever_cling")
     
     # restraint_rebound: tension > 85 且 control > 60
@@ -96,7 +98,9 @@ def check_event_triggers(body_values: dict, context: dict) -> list:
         triggered.append("restraint_rebound")
     
     # strange_calm: tension > 80 且 heat > 70 且 control > 50
-    if tension > 80 and heat > 70 and control > 50:
+    # strange_calm: 任兩個異常（原條件太嚴格）
+    # 條件：(tension高 且 heat高) 或 (tension高 且 control低) 或 (heat高 且 control低)
+    if (tension > 60 and heat > 60) or (tension > 60 and control < 40) or (heat > 60 and control < 40):
         triggered.append("strange_calm")
     
     return triggered

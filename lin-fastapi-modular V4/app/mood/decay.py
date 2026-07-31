@@ -149,11 +149,6 @@ def apply_mood_decay(mood: Dict[str, float], elapsed_hours: float, enabled: bool
     使用渐近回归方式：
     delta = (baseline - current) * rate * elapsed_hours
         
-        # V4: 高值維護成本（數值越高，回落越快）
-        if key in HIGH_VALUE_MULTIPLIERS:
-            for rule in HIGH_VALUE_MULTIPLIERS[key]:
-                if current > rule["threshold"]:
-                    delta *= rule["multiplier"]
     
     特点：
     - 离基线越远，回归速度越快
@@ -188,11 +183,6 @@ def apply_mood_decay(mood: Dict[str, float], elapsed_hours: float, enabled: bool
         # 计算向基线靠近的变化量（渐近回归）
         # 公式：delta = (baseline - current) * rate * elapsed_hours
         
-        # V4: 高值維護成本（數值越高，回落越快）
-        if key in HIGH_VALUE_MULTIPLIERS:
-            for rule in HIGH_VALUE_MULTIPLIERS[key]:
-                if current > rule["threshold"]:
-                    delta *= rule["multiplier"]
         delta = (baseline - current) * rate * elapsed_hours
         
         # V4: 高值維護成本（數值越高，回落越快）

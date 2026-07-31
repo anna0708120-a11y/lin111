@@ -20,22 +20,27 @@ class DeepSeekProvider:
             yield {'error': 'DeepSeek API key not configured'}
             return
         
+        # 修正：base_url 可能不包含 /v1/chat/completions，需要補全
+        url = self.base_url
+        if not url.endswith('/chat/completions') and not url.endswith('/anthropic'):
+            url = url.rstrip('/') + '/v1/chat/completions'
+        
         payload = {
             'model': self.model,
-            'messages': [{'role': 'system', 'content': system_prompt}],
+            'messages': [{'role': 'user', 'content': system_prompt}],
             'temperature': temperature,
-            'max_tokens': max_tokens or 1500,
+            'max_tokens': max_tokens or 8000,
             'top_p': top_p,
             'stream': True
         }
         
-        if thinking:
-            payload['thinking'] = {'type': 'enabled'}
+        # 只有 deepseek-reasoner 才支持 thinking mode
+        if thinking and 'reasoner' in self.model.lower():
             payload['reasoning_effort'] = self.reasoning_effort
         
         try:
             response = requests.post(
-                self.base_url,
+                url,
                 headers={'Authorization': f'Bearer {self.api_key}', 'Content-Type': 'application/json'},
                 json=payload,
                 stream=True,
@@ -43,7 +48,8 @@ class DeepSeekProvider:
             )
             
             if response.status_code != 200:
-                yield {'error': f'HTTP {response.status_code}'}
+                error_text = response.text[:200]
+                yield {'error': f'HTTP {response.status_code}: {error_text}'}
                 return
             
             for line in response.iter_lines():
@@ -61,9 +67,9 @@ class DeepSeekProvider:
                         if not choices:
                             continue
                         delta = choices[0].get('delta', {})
-                        if 'content' in delta:
+                        if 'content' in delta and delta['content']:
                             yield {'token': delta['content']}
-                        if 'reasoning_content' in delta:
+                        if 'reasoning_content' in delta and delta['reasoning_content']:
                             yield {'thinking_token': delta['reasoning_content']}
                         if choices[0].get('finish_reason'):
                             yield {'done': True}

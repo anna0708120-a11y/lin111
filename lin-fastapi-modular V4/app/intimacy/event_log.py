@@ -106,3 +106,10 @@ def get_event_timeline(filter_type="all"):
     except Exception as e:
         print(f"❌ 讀取事件時間軸失敗: {e}")
         return []
+
+
+def get_recent_events(limit=5):
+    """
+    回傳最近 N 條事件（別名，供 prompt.py 使用）
+    """
+    return get_event_timeline(filter_type="all")[:limit]

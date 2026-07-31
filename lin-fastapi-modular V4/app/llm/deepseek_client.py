@@ -41,8 +41,14 @@ def call_deepseek(system_prompt, temperature=0.95, max_tokens=None, top_p=0.95):
     }
 
     try:
+        url = f"{config.DEEPSEEK_BASE_URL}/chat/completions"
+        print(f"[DEBUG] DEEPSEEK_BASE_URL={config.DEEPSEEK_BASE_URL}")
+        print(f"[DEBUG] FINAL_URL={url}")
+        url = f"{config.DEEPSEEK_BASE_URL}/chat/completions"
+        print(f"[DEBUG] DEEPSEEK_BASE_URL={config.DEEPSEEK_BASE_URL}")
+        print(f"[DEBUG] FINAL_URL={url}")
         response = requests.post(
-            config.DEEPSEEK_BASE_URL,
+            url,
             headers={
                 "Authorization": f"Bearer {config.DEEPSEEK_API_KEY}",
                 "Content-Type": "application/json",
@@ -121,8 +127,11 @@ def call_deepseek_stream(system_prompt, temperature=0.95, max_tokens=None, top_p
         except Exception as e:
             print(f"[PAYLOAD_LOG] Failed: {e}")
         
+        url = f"{config.DEEPSEEK_BASE_URL}/chat/completions"
+        print(f"[DEBUG-STREAM] DEEPSEEK_BASE_URL={config.DEEPSEEK_BASE_URL}")
+        print(f"[DEBUG-STREAM] FINAL_URL={url}")
         response = requests.post(
-            config.DEEPSEEK_BASE_URL,
+            url,
             headers={
                 "Authorization": f"Bearer {config.DEEPSEEK_API_KEY}",
                 "Content-Type": "application/json",

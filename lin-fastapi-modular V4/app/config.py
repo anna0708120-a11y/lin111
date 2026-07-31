@@ -18,7 +18,7 @@ except ImportError:
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
 # DeepSeek 模型配置
 DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-v4-flash")
-DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com/chat/completions")
+DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
 # thinking mode：开了之后回应会带独立的 reasoning_content（真思考），不用再靠prompt装格式
 DEEPSEEK_REASONING_EFFORT = os.getenv("DEEPSEEK_REASONING_EFFORT", "medium")
 # thinking mode 的思考内容也算在这个token数里，调太小思考会被截断

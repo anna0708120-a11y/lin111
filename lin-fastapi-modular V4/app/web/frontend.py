@@ -1745,8 +1745,23 @@ async function send(){
       console.log('[DEBUG] processChunk called, done:', done);
       if(done){
         console.log('[DEBUG] Stream done. contentBuffer:', contentBuffer, 'reasoningBuffer:', reasoningBuffer);
+        // 修復：不要調用 smsg()，因為消息已經在串流過程中顯示
+        // 直接將消息添加到內存緩存並保存到資料庫
         if(contentBuffer){
-          smsg('lin', contentBuffer, reasoningBuffer || null, currentDevTrace ? currentDevTrace.lastPayload : null);
+          const entry = { 
+            r: 'lin', 
+            t: contentBuffer, 
+            time: ts(), 
+            iso: new Date().toISOString() 
+          };
+          if(reasoningBuffer) entry.think = reasoningBuffer;
+          if(currentDevTrace && currentDevTrace.lastPayload) entry.trace = currentDevTrace.lastPayload;
+          
+          chatMemoryCache.push(entry);
+          if(chatMemoryCache.length > 200) chatMemoryCache = chatMemoryCache.slice(-200);
+          
+          // 異步保存到後端，不阻塞 UI
+          syncChat().catch(e => console.error('[DEBUG] Failed to sync chat:', e));
         }
         scrollDown();
         return;

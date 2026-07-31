@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 
 from app import config
 from app.state import state
-from app.llm.deepseek_client import call_deepseek
+from app.llm.claude_client import call_claude
 from app.persona import build_system_prompt
 from app.memory_rules import parse_memory_decision, parse_mood_event, strip_hidden_blocks
 from app import memory_trace  # Phase 2: 記錄 memory 決策鏈路
@@ -194,7 +194,7 @@ def generate_reply(context, app_name=None, use_cache=True):
     world_context = format_context_for_prompt(get_context())
     system_prompt = build_system_prompt(context, memory_summary, world_context, conversation_history)
 
-    content, reasoning = call_deepseek(system_prompt, max_tokens=config.DEEPSEEK_MAX_TOKENS)
+    content, reasoning = call_claude(system_prompt, max_tokens=config.CLAUDE_MAX_TOKENS)
     state.record_call()
 
     if not content:
@@ -277,7 +277,7 @@ def write_daily_journal():
             "但不要编造今天发生了什么具体的事情——因为今天真的什么都没发生。"
         )
     system_prompt = build_system_prompt(context, state.recent_memory_text())
-    content, _ = call_deepseek(system_prompt, max_tokens=config.DEEPSEEK_MAX_TOKENS, thinking=False)
+    content, _ = call_claude(system_prompt, max_tokens=config.CLAUDE_MAX_TOKENS, thinking=False)
     state.record_call()
     if content:
         state.add_note(content)
@@ -287,7 +287,7 @@ def generate_reply_stream(context, app_name=None, use_cache=True, session_id=Non
     """
     流式生成回覆，yield SSE 格式的事件。
     """
-    from app.llm.deepseek_client import call_deepseek_stream
+    from app.llm.claude_client import call_claude_stream
     from app.memory_rules import parse_memory_decision, parse_memory_decision_traced, parse_mood_event, strip_hidden_blocks
     from app import mood_engine
     from app.agent.trace_collector import TraceCollector
@@ -334,7 +334,7 @@ def generate_reply_stream(context, app_name=None, use_cache=True, session_id=Non
     full_content = ""
     
     try:
-        for event_type, data in call_deepseek_stream(system_prompt, max_tokens=config.DEEPSEEK_MAX_TOKENS):
+        for event_type, data in call_claude_stream(system_prompt, max_tokens=config.CLAUDE_MAX_TOKENS):
             if event_type == "reasoning":
                 full_reasoning += data
                 yield f"event: reasoning\ndata: {json.dumps({'content': data})}\n\n"

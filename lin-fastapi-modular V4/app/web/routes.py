@@ -313,6 +313,12 @@ def get_conversation():
     这样才能做到跨装置同步。
     """
     from datetime import datetime as _dt
+    
+    print(f"[VERIFY GET] /conversation 被调用")
+    print(f"[VERIFY GET] state.conversation_history 总数: {len(state.conversation_history)}")
+    if state.conversation_history:
+        last = state.conversation_history[-1]
+        print(f"[VERIFY GET] 最后一条: role={last.get('role')}, content={last.get('content', '')[:50]}...")
 
     def _display_time(iso_str):
         if not iso_str:

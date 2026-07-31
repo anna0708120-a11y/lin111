@@ -20,25 +20,22 @@ class DeepSeekProvider:
             yield {'error': 'DeepSeek API key not configured'}
             return
         
-        url = self.base_url
-        if not url.endswith('/chat/completions') and not url.endswith('/anthropic'):
-            url = url.rstrip('/') + '/v1/chat/completions'
-        
         payload = {
             'model': self.model,
-            'messages': [{'role': 'user', 'content': system_prompt}],
+            'messages': [{'role': 'system', 'content': system_prompt}],
             'temperature': temperature,
-            'max_tokens': max_tokens or 8000,
+            'max_tokens': max_tokens or 1500,
             'top_p': top_p,
             'stream': True
         }
         
-        if thinking and 'reasoner' in self.model.lower():
+        if thinking:
+            payload['thinking'] = {'type': 'enabled'}
             payload['reasoning_effort'] = self.reasoning_effort
         
         try:
             response = requests.post(
-                url,
+                self.base_url,
                 headers={'Authorization': f'Bearer {self.api_key}', 'Content-Type': 'application/json'},
                 json=payload,
                 stream=True,
@@ -46,8 +43,7 @@ class DeepSeekProvider:
             )
             
             if response.status_code != 200:
-                error_text = response.text[:200]
-                yield {'error': f'HTTP {response.status_code}: {error_text}'}
+                yield {'error': f'HTTP {response.status_code}'}
                 return
             
             for line in response.iter_lines():
@@ -65,24 +61,10 @@ class DeepSeekProvider:
                         if not choices:
                             continue
                         delta = choices[0].get('delta', {})
-                        
-                        # 修復：deepseek-reasoner 模型的 content 會是 null，實際內容在 reasoning_content
-                        # 檢查 reasoning_content 是否有內容，如果有且是 reasoner 模型，當作 thinking
-                        # 如果不是 reasoner 模型但有 reasoning_content，當作 content
-                        reasoning_content = delta.get('reasoning_content', '')
-                        content = delta.get('content', '')
-                        
-                        if reasoning_content:
-                            if 'reasoner' in self.model.lower():
-                                # reasoner 模型：reasoning_content 是思考過程
-                                yield {'thinking_token': reasoning_content}
-                            else:
-                                # 其他模型：如果返回 reasoning_content，也當作正常內容
-                                yield {'token': reasoning_content}
-                        
-                        if content:
-                            yield {'token': content}
-                        
+                        if 'content' in delta:
+                            yield {'token': delta['content']}
+                        if 'reasoning_content' in delta:
+                            yield {'thinking_token': delta['reasoning_content']}
                         if choices[0].get('finish_reason'):
                             yield {'done': True}
                             break

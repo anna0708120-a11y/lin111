@@ -4,7 +4,7 @@
 管理時間軸事件記錄。
 """
 from datetime import datetime
-from app.database import supabase
+from app.db import _client as supabase
 
 
 def log_event(event_type: str, title: str, timestamp: datetime = None, 

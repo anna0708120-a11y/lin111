@@ -1437,11 +1437,12 @@ function renderOnly(history){
   const serverIds = new Set(serverMessages.map(m => m.message_id));
   
   // 检查最后一条服务器消息的时间
-  const lastServerTime = serverMessages.length > 0 ? new Date(serverMessages[serverMessages.length - 1].iso).getTime() : 0;
-  
-  const localPending = chatMemoryCache.filter(m => {
-    const id = m.message_id;
-    if (!id) return false;
+  const lastServerTime = serverMessages.length > 0 ? new Date(serverMessages[serverMessages.length - 1].iso).getTime() : 0;  
+
+    const localPending = chatMemoryCache.filter(m => {
+  const id = m.message_id;
+  // 保留没有 message_id 的消息（可能是刚发送还未保存到数据库的）
+  if (!id) return true;  // ← 修改为 return true
     
     // 如果服务器已有这个 ID，跳过
     if (serverIds.has(id)) return false;

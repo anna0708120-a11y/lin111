@@ -13,6 +13,10 @@ from datetime import datetime
 from typing import Optional
 from app import db
 
+# 内存模式存储（当 db._client 为 None 时使用）
+_memory_sessions = {}
+_memory_messages = {}
+
 def generate_session_id() -> str:
     """生成新的 session ID"""
     return str(uuid.uuid4())

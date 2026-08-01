@@ -79,7 +79,6 @@ def is_connected():
 
 # ---------- 通用状态 (key -> value，比如 last_anchor_at、proactive设置) ----------
 def load_state_value(key, default=None):
-    _log_query("load_state_value")
     if not _client:
         return default
     try:
@@ -92,7 +91,6 @@ def load_state_value(key, default=None):
 
 
 def save_state_value(key, value):
-    _log_query("save_state_value")
     if not _client:
         return
     try:
@@ -131,7 +129,6 @@ def load_memories(limit=200):
 
 
 def insert_memory(tag, content, category="长期记忆", importance=3, keyword="", expires_at=None,
-    _log_query("insert_memory")
                    created_by="user", raw_keyword="", pending_review=False, conflict_with=None):
     """插入一条记忆，成功的话回传 Supabase 分配的 id（前端删除要用），失败回传 None。"""
     if not _client:
@@ -161,7 +158,6 @@ def insert_memory(tag, content, category="长期记忆", importance=3, keyword="
 
 
 def find_memory_by_keyword(keyword, created_by=None):
-    _log_query("find_memory_by_keyword")
     """
     找同一件事有没有已经存过（用关键字精确比对，还没有语意搜索）。
     created_by=None：不限制来源，给 reinforce 用（现有逻辑不变）。
@@ -188,7 +184,6 @@ def find_memory_by_keyword(keyword, created_by=None):
 
 
 def update_memory(memory_id, content=None, importance=None, expires_at=None):
-    _log_query("update_memory")
     """更新一条已存在的记忆（修正用），只更新有给值的字段。"""
     if not _client or not memory_id:
         return False
@@ -210,7 +205,6 @@ def update_memory(memory_id, content=None, importance=None, expires_at=None):
 
 
 def archive_memory(memory_id):
-    _log_query("archive_memory")
     """把记忆标记为已归档（逻辑删除，不物理删除），用于处理过期或被推翻的记忆。"""
     if not _client or not memory_id:
         return False
@@ -223,7 +217,6 @@ def archive_memory(memory_id):
 
 
 def reinforce_memory(memory_id, importance, expires_at):
-    _log_query("reinforce_memory")
     """同一件事又被提到：星级调高、到期时间重算。"""
     if not _client:
         return
@@ -237,7 +230,6 @@ def reinforce_memory(memory_id, importance, expires_at):
 
 
 def delete_memory(memory_id):
-    _log_query("delete_memory")
     if not _client:
         return
     try:
@@ -363,7 +355,6 @@ def insert_note(content):
         print(f"[db] 写入碎碎念失败: {e}")
 # ---------- Context State（Mac/天气/日历/屏幕时间/定位 快照） ----------
 def load_context(source):
-    _log_query("load_context")
     """读某个来源最新的一条快照。找不到回传 None。"""
     if not _client:
         return None
@@ -382,7 +373,6 @@ def load_context(source):
 
 
 def save_context(source, payload):
-    _log_query("save_context")
     """写入/更新某个来源的最新快照（同一个source只留一条,用upsert）。"""
     if not _client:
         return

@@ -55,6 +55,21 @@ def get_session_list(limit: int = 20) -> list:
         return res.data or []
     except Exception as e:
         print(f"[session] 读取 session 列表失败: {e}")
+        # Errno 11: 数据库锁，重试一次
+        if "Resource temporarily unavailable" in str(e) or "Errno 11" in str(e):
+            import time
+            time.sleep(0.1)
+            try:
+                res = (
+                    db._client.table("chat_sessions")
+                    .select("id, title, created_at, updated_at, message_count, starred")
+                    .order("updated_at", desc=True)
+                    .limit(limit)
+                    .execute()
+                )
+                return res.data or []
+            except Exception as retry_e:
+                print(f"[session] 重试后仍失败: {retry_e}")
         return []
 
 def toggle_star_session(session_id: str) -> bool:

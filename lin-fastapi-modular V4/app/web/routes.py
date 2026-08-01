@@ -827,28 +827,21 @@ def create_chat_session(payload: dict):
 @router.get("/chat-sessions/{session_id}")  # ← 注意参数名是 session_id 不是 sessionId
 def get_chat_session(session_id: str):
     """获取指定聊天会话的详细信息（包含完整消息列表）"""
-    try:
+        try:
         print(f"[SESSION TRACE] GET /chat-sessions/{session_id}")
-        print(f"[DEBUG] 函数已进入，session_id={session_id}")
-        
         from app import session as session_module
         
-        # 获取 session 基本信息
         session_info = session_module.get_session_by_id(session_id)
         if not session_info:
-            print(f"[DEBUG] session_info 为空")
             return {"status": "Error", "message": "聊天室不存在"}
         
-        print(f"[DEBUG] session_info 获取成功: {session_info}")
-        
-        # 加载该 session 的所有消息
         conversations = db.load_conversations(limit=5000, session_id=session_id)
         print(f"[DEBUG] conversations count: {len(conversations)}")
         
         if conversations:
-            print(f"[DEBUG] last conversation: {conversations[-1]}")
+            print(f"[DEBUG] 数据库 role 值: {set(t.get('role') for t in conversations)}")
+            print(f"[DEBUG] last conversation (数据库原始): {conversations[-1]}")
         
-        # 原始逻辑，不修改字段映射
         messages = []
         for turn in conversations:
             messages.append({
@@ -861,7 +854,7 @@ def get_chat_session(session_id: str):
             })
         
         if messages:
-            print(f"[DEBUG] last message: {messages[-1]}")
+            print(f"[DEBUG] last message (API 返回): {messages[-1]}")
         
         print(f"[SESSION TRACE] 返回 messages.length: {len(messages)}")
         
@@ -874,9 +867,9 @@ def get_chat_session(session_id: str):
         print(f"[ERROR] get_chat_session 异常:")
         import traceback
         traceback.print_exc()
-        raise
-        
-
+        raise        
+        return {
+    
 
 
 @router.delete("/chat-sessions/{session_id}")

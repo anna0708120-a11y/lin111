@@ -140,12 +140,6 @@ def observe_anna(activity: Activity):
                 yield "event: conten{\"delta\": \"\"}\n\n"
                 yield "event: done\n {}\n\n"
     
-    # ========== DB STATS ==========
-    from app import db
-    query_count = db.get_query_count()
-    print(f"[DB STATS] 本次请求数据库查询总数: {query_count}")
-    db.reset_query_count()
-    # ========== END STATS ==========
     
             return StreamingResponse(empty_stream(), media_type="text/event-stream")
         

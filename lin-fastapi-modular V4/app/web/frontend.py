@@ -2363,6 +2363,9 @@ async function renderActiveSession(sessionId, { fresh = false, skipFeedback = fa
     chatMemoryCache = [];
     chatView.clear();
     console.log("[SESSION TRACE] STEP4b: cache cleared");
+    console.log("[SESSION TRACE] STEP4c: calling renderHistory([])");
+    chatView.renderHistory([]);
+    console.log("[SESSION TRACE] STEP4d: renderHistory([]) finished");
   } else {
     console.log("[SESSION TRACE] STEP4a: fresh=false, fetching messages");
     const messages = await sessionManager.getMessages(sessionId);

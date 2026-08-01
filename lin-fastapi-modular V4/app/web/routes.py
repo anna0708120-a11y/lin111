@@ -868,8 +868,6 @@ def get_chat_session(session_id: str):
         import traceback
         traceback.print_exc()
         raise
-        return {
-    
 
 
 @router.delete("/chat-sessions/{session_id}")

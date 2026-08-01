@@ -30,18 +30,12 @@ if config.SUPABASE_URL and config.SUPABASE_KEY:
         print("[INIT TRACE] 准备调用 create_client")
         _client = create_client(
             config.SUPABASE_URL, 
-            config.SUPABASE_KEY,
-            options={
-                "postgrest": {
-                    "timeout": 10,
-                    "max_retries": 2
-                }
-            }
+            config.SUPABASE_KEY
         )
         print(f"[INIT TRACE] create_client 成功，_client={_client}")
         print(f"[INIT TRACE] _client 对象 ID: {id(_client)}")
         print(f"[INIT TRACE] _client 类型: {type(_client)}")
-        print("[db] Supabase 已连接（带连接池配置）")
+        print("[db] Supabase 已连接")
     except Exception as e:
         print(f"[INIT TRACE] *** EXCEPTION 发生 ***")
         print(f"[INIT TRACE] 异常类型: {type(e)}")

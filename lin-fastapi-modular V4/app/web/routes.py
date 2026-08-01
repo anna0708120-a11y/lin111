@@ -7,7 +7,7 @@
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 
@@ -139,7 +139,19 @@ def service_worker():
     return Response(content=SERVICE_WORKER_JS, media_type="application/javascript")
 
 @router.post("/watch")
-def observe_anna(activity: Activity):
+def observe_anna(activity: Activity, request: Request):
+    # ========== 详细追踪 ==========
+    from datetime import datetime
+    print(
+        f"[WATCH DETAIL] "
+        f"time={datetime.now().isoformat()} "
+        f"session={activity.session_id or state.current_session_id} "
+        f"app={activity.app_name} "
+        f"remote={request.client.host} "
+        f"ua={request.headers.get('user-agent', 'unknown')[:50]}"
+    )
+    # ========== END ==========
+    
     """
     🔥 Streaming 版本：返回 SSE 流式回應
     # ========== WATCH TRACE ==========

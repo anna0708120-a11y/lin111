@@ -827,7 +827,7 @@ def create_chat_session(payload: dict):
 @router.get("/chat-sessions/{session_id}")  # ← 注意参数名是 session_id 不是 sessionId
 def get_chat_session(session_id: str):
     """获取指定聊天会话的详细信息（包含完整消息列表）"""
-try:
+    try:
         print(f"[SESSION TRACE] GET /chat-sessions/{session_id}")
         from app import session as session_module
         
@@ -867,7 +867,7 @@ try:
         print(f"[ERROR] get_chat_session 异常:")
         import traceback
         traceback.print_exc()
-        raise     
+        raise
         return {
     
 

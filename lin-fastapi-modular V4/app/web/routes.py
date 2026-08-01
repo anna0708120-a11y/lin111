@@ -807,6 +807,7 @@ def get_chat_sessions():
             "starred": bool(s.get("starred", False))
         })
     
+    print(f"[SESSION TRACE] GET /chat-sessions 返回 {len(formatted_sessions)} 个聊天室")
     return {"sessions": formatted_sessions}
 
 @router.post("/chat-sessions")

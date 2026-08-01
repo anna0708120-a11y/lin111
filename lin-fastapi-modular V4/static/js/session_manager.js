@@ -25,6 +25,7 @@ class SessionManager {
   }
 
   async loadSessions() {
+        console.log("[SIDEBAR TRACE] loadSessions called");
     try {
       const res = await fetch(this.apiBase + '/chat-sessions');
       const data = await res.json();

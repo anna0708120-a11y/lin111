@@ -42,6 +42,7 @@ class SessionManager {
   }
 
   async getMessages(sessionId) {
+        console.log("[SESSION TRACE] sessionManager.getMessages called, sessionId:", sessionId);
     try {
       const res = await fetch(this.apiBase + '/chat-sessions/' + sessionId);
       const data = await res.json();

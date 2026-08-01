@@ -2341,6 +2341,7 @@ const sidebar = new Sidebar(sessionManager);
 const chatView = new ChatView();
 
 async function renderActiveSession(sessionId, { fresh = false, skipFeedback = false } = {}) {
+  console.log("[SESSION TRACE] renderActiveSession called, sessionId:", sessionId, "fresh:", fresh);
   const cm = document.getElementById('cm');
   cm.classList.add('fading');
 
@@ -2351,6 +2352,7 @@ async function renderActiveSession(sessionId, { fresh = false, skipFeedback = fa
     chatView.clear();
   } else {
     const messages = await sessionManager.getMessages(sessionId);
+    console.log("[SESSION TRACE] getMessages 返回 messages.length:", messages ? messages.length : 0);
     chatView.renderHistory(messages);
   }
 

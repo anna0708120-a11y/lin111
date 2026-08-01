@@ -810,8 +810,25 @@ def get_chat_sessions():
 
 @router.post("/chat-sessions")
 def create_chat_session(payload: dict):
+    print("[SESSION TRACE] POST /chat-sessions called")
+    print(f"[SESSION TRACE] payload: {payload}")
+    print("[SESSION TRACE] POST /chat-sessions called")
+    print(f"[SESSION TRACE] payload: {payload}")
+    print("[SESSION TRACE] POST /chat-sessions called")
+    print(f"[SESSION TRACE] payload: {payload}")
+    print("[SESSION TRACE] POST /chat-sessions called")
+    print(f"[SESSION TRACE] payload: {payload}")
     """创建新的聊天会话"""
     new_session = state.create_new_session()
+
+    print(f"[SESSION TRACE] 新建 session_id: {new_session_id}")
+    print(f"[SESSION TRACE] 返回数据: title={payload.get('title')}, session_id={new_session_id}")
+
+    print(f"[SESSION TRACE] 新建 session_id: {new_session_id}")
+    print(f"[SESSION TRACE] 返回数据: title={payload.get('title')}, session_id={new_session_id}")
+
+    print(f"[SESSION TRACE] 新建 session_id: {new_session_id}")
+    print(f"[SESSION TRACE] 返回数据: title={payload.get('title')}, session_id={new_session_id}")
     return {
         "status": "Success",
         "session_id": new_session["id"],
@@ -819,6 +836,8 @@ def create_chat_session(payload: dict):
     }
 
 @router.get("/chat-sessions/{session_id}")
+def get_chat_session(session_id: str):
+    print(f"[SESSION TRACE] GET /chat-sessions/{{session_id}} called, session_id: {session_id}")
 def get_chat_session(session_id: str):
     """获取指定会话的消息"""
     try:

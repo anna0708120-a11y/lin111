@@ -2343,8 +2343,17 @@ const chatView = new ChatView();
 async function renderActiveSession(sessionId, { fresh = false, skipFeedback = false } = {}) {
   console.log("[SESSION TRACE] STEP1: renderActiveSession called, sessionId:", sessionId, "fresh:", fresh);
   const cm = document.getElementById('cm');
-  cm.classList.add('fading');
-  console.log("[SESSION TRACE] STEP2: fading added");
+  console.log("[SESSION TRACE] STEP1.5: cm element found:", cm !== null);
+  if (!cm) {
+    console.error("[SESSION TRACE] ERROR: cm element not found!");
+    return;
+  }
+  try {
+    cm.classList.add('fading');
+    console.log("[SESSION TRACE] STEP2: fading added");
+  } catch (e) {
+    console.error("[SESSION TRACE] ERROR in classList.add:", e);
+  }
 
   await new Promise(r => setTimeout(r, 120));
   console.log("[SESSION TRACE] STEP3: after timeout");

@@ -8,15 +8,26 @@ state.py 透过这个模块存取数据，不直接碰 Supabase。
 """
 from app import config
 
+# === 第一优先：直接验证环境变量 ===
+print(f"[CONFIG VERIFY] SUPABASE_URL[:30] = {config.SUPABASE_URL[:30] if config.SUPABASE_URL else 'EMPTY'}")
+print(f"[CONFIG VERIFY] bool(SUPABASE_URL) = {bool(config.SUPABASE_URL)}")
+print(f"[CONFIG VERIFY] SUPABASE_KEY[:10] = {config.SUPABASE_KEY[:10] if config.SUPABASE_KEY else 'EMPTY'}")
+print(f"[CONFIG VERIFY] bool(SUPABASE_KEY) = {bool(config.SUPABASE_KEY)}")
+
 _client = None
 
 print(f"[DB TRACE] 初始化检查: SUPABASE_URL={bool(config.SUPABASE_URL)}, SUPABASE_KEY={bool(config.SUPABASE_KEY)}")
 print(f"[DB TRACE] SUPABASE_URL 值: {config.SUPABASE_URL[:20] if config.SUPABASE_URL else 'EMPTY'}...")
 
+# === 第二优先：追踪 create_client 执行 ===
 if config.SUPABASE_URL and config.SUPABASE_KEY:
+    print("[INIT TRACE] 进入 if 分支：环境变量存在")
     try:
+        print("[INIT TRACE] 准备 import supabase")
         from supabase import create_client
-        # 增加连接池配置，避免 Errno 11
+        print("[INIT TRACE] supabase 模块导入成功")
+        
+        print("[INIT TRACE] 准备调用 create_client")
         _client = create_client(
             config.SUPABASE_URL, 
             config.SUPABASE_KEY,
@@ -27,16 +38,22 @@ if config.SUPABASE_URL and config.SUPABASE_KEY:
                 }
             }
         )
+        print(f"[INIT TRACE] create_client 成功，_client={_client}")
+        print(f"[INIT TRACE] _client 对象 ID: {id(_client)}")
+        print(f"[INIT TRACE] _client 类型: {type(_client)}")
         print("[db] Supabase 已连接（带连接池配置）")
-        print(f"[DB TRACE] _client 对象 ID: {id(_client)}")
     except Exception as e:
+        print(f"[INIT TRACE] *** EXCEPTION 发生 ***")
+        print(f"[INIT TRACE] 异常类型: {type(e)}")
+        print(f"[INIT TRACE] 异常消息: {e}")
         print(f"[db] Supabase 连接失败，退回内存模式: {e}")
         import traceback
         traceback.print_exc()
         _client = None
+        print(f"[INIT TRACE] _client 已设为 None")
 else:
-    print("[DB TRACE] SUPABASE 环境变量未设置，_client 保持为 None")
-
+    print("[INIT TRACE] 未进入 if 分支：环境变量为空")
+    _client = None
 
 def is_connected():
     return _client is not None

@@ -2341,30 +2341,44 @@ const sidebar = new Sidebar(sessionManager);
 const chatView = new ChatView();
 
 async function renderActiveSession(sessionId, { fresh = false, skipFeedback = false } = {}) {
-  console.log("[SESSION TRACE] renderActiveSession called, sessionId:", sessionId, "fresh:", fresh);
+  console.log("[SESSION TRACE] STEP1: renderActiveSession called, sessionId:", sessionId, "fresh:", fresh);
   const cm = document.getElementById('cm');
   cm.classList.add('fading');
+  console.log("[SESSION TRACE] STEP2: fading added");
 
   await new Promise(r => setTimeout(r, 120));
+  console.log("[SESSION TRACE] STEP3: after timeout");
 
   if (fresh) {
+    console.log("[SESSION TRACE] STEP4a: fresh=true, clearing cache");
     chatMemoryCache = [];
     chatView.clear();
+    console.log("[SESSION TRACE] STEP4b: cache cleared");
   } else {
+    console.log("[SESSION TRACE] STEP4a: fresh=false, fetching messages");
     const messages = await sessionManager.getMessages(sessionId);
-    console.log("[SESSION TRACE] getMessages 返回 messages.length:", messages ? messages.length : 0);
+    console.log("[SESSION TRACE] STEP4b: getMessages 返回 messages.length:", messages ? messages.length : 0);
     chatView.renderHistory(messages);
+    console.log("[SESSION TRACE] STEP4c: renderHistory called");
   }
 
+  console.log("[SESSION TRACE] STEP5: getting current session");
   const session = sessionManager.getCurrentSession();
   chatView.updateHeader(session ? session.title : '新对话');
+  console.log("[SESSION TRACE] STEP6: updateHeader called");
+  
   chatView.scrollToBottom();
+  console.log("[SESSION TRACE] STEP7: scrollToBottom called");
 
   cm.classList.remove('fading');
+  console.log("[SESSION TRACE] STEP8: fading removed");
+  
   // 頁面初始化時不顯示「已切換聊天」提示
   if (!skipFeedback) {
     chatView.showFeedback(fresh ? '已建立新聊天' : '已切換聊天');
+    console.log("[SESSION TRACE] STEP9: showFeedback called");
   }
+  console.log("[SESSION TRACE] STEP10: renderActiveSession finished");
 }
 
 sidebar.onNewChat = (sessionId) => renderActiveSession(sessionId, { fresh: true });

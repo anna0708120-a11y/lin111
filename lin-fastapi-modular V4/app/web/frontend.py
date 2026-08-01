@@ -2358,15 +2358,11 @@ async function renderActiveSession(sessionId, { fresh = false, skipFeedback = fa
 
   await new Promise(r => setTimeout(r, 120));
   console.log("[SESSION TRACE] STEP3: after timeout");
-
+  
   if (fresh) {
-    console.log("[SESSION TRACE] STEP4a: fresh=true, clearing cache");
-    chatMemoryCache = [];
-    chatView.clear();
-    console.log("[SESSION TRACE] STEP4b: cache cleared");
-    console.log("[SESSION TRACE] STEP4c: calling renderHistory([])");
-    chatView.renderHistory([]);
-    console.log("[SESSION TRACE] STEP4d: renderHistory([]) finished");
+    console.log("[SESSION TRACE] STEP4a: fresh=true, rendering empty history");
+    renderHistory([]);  // ← 直接渲染空历史，不清空全局缓存
+    console.log("[SESSION TRACE] STEP4b: renderHistory([]) finished");
   } else {
     console.log("[SESSION TRACE] STEP4a: fresh=false, fetching messages");
     const messages = await sessionManager.getMessages(sessionId);

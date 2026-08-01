@@ -31,11 +31,18 @@ def create_new_session() -> dict:
     }
     
     # 保存到数据库
+    print(f"[SESSION TRACE] 准备保存 session 到数据库, session_id={session_id}")
     if db._client:
+        print("[SESSION TRACE] db._client 存在，开始插入")
         try:
-            db._client.table("chat_sessions").insert(session).execute()
+            result = db._client.table("chat_sessions").insert(session).execute()
+            print(f"[SESSION TRACE] session 插入成功, result={result}")
         except Exception as e:
-            print(f"[session] 创建 session 失败: {e}")
+            print(f"[SESSION TRACE] ERROR: 创建 session 失败: {e}")
+            import traceback
+            traceback.print_exc()
+    else:
+        print("[SESSION TRACE] ERROR: db._client 为 None，无法保存 session")
     
     return session
 

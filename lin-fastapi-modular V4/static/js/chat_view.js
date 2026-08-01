@@ -179,10 +179,11 @@ class ChatView {
 
   // 换头像等场景：用当前内存缓存重画
   refresh() {
-    if (typeof chatMemoryCache !== 'undefined') {
-      this.renderMessages(chatMemoryCache);
-    }
+  if (typeof chatMemoryCache !== 'undefined' && chatMemoryCache.length > 0) {
+    this.renderMessages(chatMemoryCache);
   }
+  // 如果 chatMemoryCache 为空，不做任何操作，等待 renderActiveSession() 从服务器加载数据
+}
 
   addMessage(role, text, think, animate = true) {
     // 旧接口兼容层，Phase 3 可移除

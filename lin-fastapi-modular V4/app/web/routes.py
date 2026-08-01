@@ -117,6 +117,19 @@ def service_worker():
 def observe_anna(activity: Activity):
     """
     🔥 Streaming 版本：返回 SSE 流式回應
+    # ========== WATCH TRACE ==========
+    from datetime import datetime
+    _watch_count = getattr(observe_anna, '_count', 0) + 1
+    observe_anna._count = _watch_count
+    print(
+        f"[WATCH TRACE] "
+        f"count={_watch_count} "
+        f"time={datetime.now().isoformat()} "
+        f"session_id={activity.session_id or state.current_session_id} "
+        f"app_name={activity.app_name}"
+    )
+    # ========== END TRACE ==========
+    
     """
     target_session_id = activity.session_id or state.current_session_id
     

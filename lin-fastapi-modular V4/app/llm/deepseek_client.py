@@ -1,4 +1,7 @@
 import json
+import uuid
+import inspect
+from datetime import datetime
 import re
 import requests
 """
@@ -71,7 +74,7 @@ def call_deepseek(system_prompt, temperature=0.95, max_tokens=None, top_p=0.95):
         return None, None
 
 
-def call_deepseek_stream(system_prompt, temperature=0.95, max_tokens=None, top_p=0.95):
+def call_deepseek_stream(system_prompt, temperature=0.95, max_tokens=None, top_p=0.95, session_id=None, source="unknown"):
     """
     流式調用 DeepSeek API，逐 token yield SSE 事件。
     Yields: (event_type, data)
@@ -79,6 +82,20 @@ def call_deepseek_stream(system_prompt, temperature=0.95, max_tokens=None, top_p
         - ("content", chunk) - 回答內容
         - ("done", usage_info) - 結束標記
     """
+    
+    # ========== DEEPSEEK TRACE ==========
+    caller = inspect.stack()[1].function if len(inspect.stack()) > 1 else "unknown"
+    request_id = str(uuid.uuid4())[:8]
+    print(
+        f"[DEEPSEEK TRACE] "
+        f"request={request_id} "
+        f"caller={caller} "
+        f"session={session_id[:8] if session_id else 'none'} "
+        f"source={source} "
+        f"time={datetime.now().isoformat()}"
+    )
+    # ========== END TRACE ==========
+    
     print("[🔥 ENTRY] call_deepseek_stream called, system_prompt length:", len(system_prompt))
     payload = {
         "model": config.DEEPSEEK_MODEL,

@@ -340,7 +340,7 @@ def generate_reply_stream(context, app_name=None, use_cache=True, session_id=Non
     full_content = ""
     
     try:
-        for event_type, data in call_deepseek_stream(system_prompt, max_tokens=config.DEEPSEEK_MAX_TOKENS):
+        for event_type, data in call_deepseek_stream(system_prompt, max_tokens=config.DEEPSEEK_MAX_TOKENS, session_id=target_session, source="watch"):
             if event_type == "reasoning":
                 full_reasoning += data
                 yield f"event: reasoning\ndata: {json.dumps({'content': data})}\n\n"

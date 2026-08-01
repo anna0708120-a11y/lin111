@@ -732,6 +732,7 @@ def get_sessions():
 def create_session():
     """创建新聊天室"""
     new_session = state.create_new_session()
+    print(f"[SESSION TRACE] 返回 session_id: {new_session['id']}")
     return {"status": "Success", "session": new_session}
 
 class SwitchSessionPayload(BaseModel):
@@ -812,23 +813,9 @@ def get_chat_sessions():
 def create_chat_session(payload: dict):
     print("[SESSION TRACE] POST /chat-sessions called")
     print(f"[SESSION TRACE] payload: {payload}")
-    print("[SESSION TRACE] POST /chat-sessions called")
-    print(f"[SESSION TRACE] payload: {payload}")
-    print("[SESSION TRACE] POST /chat-sessions called")
-    print(f"[SESSION TRACE] payload: {payload}")
-    print("[SESSION TRACE] POST /chat-sessions called")
-    print(f"[SESSION TRACE] payload: {payload}")
     """创建新的聊天会话"""
     new_session = state.create_new_session()
-
-    print(f"[SESSION TRACE] 新建 session_id: {new_session_id}")
-    print(f"[SESSION TRACE] 返回数据: title={payload.get('title')}, session_id={new_session_id}")
-
-    print(f"[SESSION TRACE] 新建 session_id: {new_session_id}")
-    print(f"[SESSION TRACE] 返回数据: title={payload.get('title')}, session_id={new_session_id}")
-
-    print(f"[SESSION TRACE] 新建 session_id: {new_session_id}")
-    print(f"[SESSION TRACE] 返回数据: title={payload.get('title')}, session_id={new_session_id}")
+    print(f"[SESSION TRACE] 返回 session_id: {new_session['id']}")
     return {
         "status": "Success",
         "session_id": new_session["id"],
@@ -837,8 +824,7 @@ def create_chat_session(payload: dict):
 
 @router.get("/chat-sessions/{session_id}")
 def get_chat_session(session_id: str):
-    print(f"[SESSION TRACE] GET /chat-sessions/{{session_id}} called, session_id: {session_id}")
-def get_chat_session(session_id: str):
+    print(f"[SESSION TRACE] GET /chat-sessions/{session_id}")
     """获取指定会话的消息"""
     try:
         # 从数据库加载该 session 的所有消息
@@ -856,6 +842,7 @@ def get_chat_session(session_id: str):
                 "trace": conv.get("trace")
             })
         
+        print(f"[SESSION TRACE] 返回 messages.length: {len(messages)}")
         return {
             "status": "Success",
             "messages": messages

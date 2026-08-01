@@ -147,3 +147,12 @@ def get_default_session() -> str:
         return new_session["id"]
     
     return sessions[0]["id"]
+
+
+def get_session_by_id(session_id: str):
+    """根据 ID 获取单个 session"""
+    sessions = get_session_list()
+    for s in sessions:
+        if s.get("id") == session_id:
+            return s
+    return None

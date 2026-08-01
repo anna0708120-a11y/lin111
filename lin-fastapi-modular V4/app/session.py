@@ -19,6 +19,8 @@ def generate_session_id() -> str:
 
 def create_new_session() -> dict:
     """创建新聊天室，返回 session 信息"""
+    print(f"[DB TRACE] session.py 中 db 模块 ID: {id(db)}")
+    print(f"[DB TRACE] session.py 中 db._client: {db._client}")
     session_id = generate_session_id()
     now = datetime.now().isoformat()
     
@@ -30,19 +32,21 @@ def create_new_session() -> dict:
         "message_count": 0
     }
     
-    # 保存到数据库
-    print(f"[SESSION TRACE] 准备保存 session 到数据库, session_id={session_id}")
+    # 保存到数据库或内存
+    print(f"[SESSION TRACE] 准备保存 session, session_id={session_id}")
     if db._client:
-        print("[SESSION TRACE] db._client 存在，开始插入")
+        print("[SESSION TRACE] db._client 存在，保存到数据库")
         try:
             result = db._client.table("chat_sessions").insert(session).execute()
-            print(f"[SESSION TRACE] session 插入成功, result={result}")
+            print(f"[SESSION TRACE] session 插入数据库成功")
         except Exception as e:
-            print(f"[SESSION TRACE] ERROR: 创建 session 失败: {e}")
+            print(f"[SESSION TRACE] ERROR: 数据库插入失败: {e}")
             import traceback
             traceback.print_exc()
     else:
-        print("[SESSION TRACE] ERROR: db._client 为 None，无法保存 session")
+        print("[SESSION TRACE] db._client 为 None，使用内存模式")
+        _memory_sessions[session_id] = session
+        print(f"[SESSION TRACE] session 保存到内存，当前内存中有 {len(_memory_sessions)} 个 session")
     
     return session
 

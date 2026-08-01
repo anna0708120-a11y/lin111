@@ -814,6 +814,8 @@ def get_chat_sessions():
 def create_chat_session(payload: dict):
     print("[SESSION TRACE] POST /chat-sessions called")
     print(f"[SESSION TRACE] payload: {payload}")
+    print(f"[DB TRACE] routes.py 中 db 模块 ID: {id(db)}")
+    print(f"[DB TRACE] routes.py 中 db._client: {db._client}")
     """创建新的聊天会话"""
     new_session = state.create_new_session()
     print(f"[SESSION TRACE] 返回 session_id: {new_session['id']}")

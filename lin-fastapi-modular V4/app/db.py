@@ -10,6 +10,9 @@ from app import config
 
 _client = None
 
+print(f"[DB TRACE] 初始化检查: SUPABASE_URL={bool(config.SUPABASE_URL)}, SUPABASE_KEY={bool(config.SUPABASE_KEY)}")
+print(f"[DB TRACE] SUPABASE_URL 值: {config.SUPABASE_URL[:20] if config.SUPABASE_URL else 'EMPTY'}...")
+
 if config.SUPABASE_URL and config.SUPABASE_KEY:
     try:
         from supabase import create_client
@@ -25,9 +28,14 @@ if config.SUPABASE_URL and config.SUPABASE_KEY:
             }
         )
         print("[db] Supabase 已连接（带连接池配置）")
+        print(f"[DB TRACE] _client 对象 ID: {id(_client)}")
     except Exception as e:
         print(f"[db] Supabase 连接失败，退回内存模式: {e}")
+        import traceback
+        traceback.print_exc()
         _client = None
+else:
+    print("[DB TRACE] SUPABASE 环境变量未设置，_client 保持为 None")
 
 
 def is_connected():

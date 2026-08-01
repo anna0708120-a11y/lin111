@@ -140,7 +140,6 @@ def observe_anna(activity: Activity):
                 yield "event: conten{\"delta\": \"\"}\n\n"
                 yield "event: done\n {}\n\n"
     
-    
             return StreamingResponse(empty_stream(), media_type="text/event-stream")
         
         state.update_app_cooldown(activity.app_name)

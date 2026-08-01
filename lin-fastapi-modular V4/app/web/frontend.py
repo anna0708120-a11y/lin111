@@ -1623,6 +1623,7 @@ async function confirmImageSend() {
   
   try {
     const currentSessionId = sessionManager.currentSessionId;
+    console.trace("[WATCH SEND]", { activity: txt || "看圖片", image: true, from: "confirmImageSend()" });
     const response = await fetch(AU + '/watch', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
@@ -1788,6 +1789,7 @@ async function send(){
   
   try{
     const currentSessionId = sessionManager.currentSessionId;
+    console.trace("[WATCH SEND]", { activity: txt, from: "send()" });
     const response = await fetch(AU+'/watch', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},

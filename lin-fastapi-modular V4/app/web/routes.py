@@ -824,49 +824,59 @@ def create_chat_session(payload: dict):
         "session_id": new_session["id"],
         "session": new_session
     }
-
-@router.get("/chat-sessions/{session_id}")
-def get_chat_session(sessionId: str):
+@router.get("/chat-sessions/{session_id}")  # ← 注意参数名是 session_id 不是 sessionId
+def get_chat_session(session_id: str):
     """获取指定聊天会话的详细信息（包含完整消息列表）"""
-    print(f"[SESSION TRACE] GET /chat-sessions/{sessionId}")
-    from app import session as session_module
-    from datetime import datetime
-    
-    def _display_time(iso_str):
-        if not iso_str:
-            return ""
-        try:
-            return datetime.fromisoformat(iso_str.replace("Z", "+00:00")).strftime("%H:%M")
-        except Exception:
-            return ""
-    
-    session_info = session_module.get_session_by_id(sessionId)
-    if not session_info:
-        return {"status": "Error", "message": "聊天室不存在"}
-    
-    conversations = db.load_conversations(limit=5000, session_id=sessionId)
-    
-    # 统一字段映射：与 /conversation 接口保持一致
-    messages = []
-    for idx, turn in enumerate(conversations):
-        entry = {
-            "r": "anna" if turn.get("role") == "anna" else "lin",
-            "t": turn.get("content", ""),
-            "iso": turn.get("created_at", ""),
-            "time": _display_time(turn.get("created_at", "")),
-            "message_id": turn.get("id") if turn.get("id") is not None else f"idx-{idx}",
+    try:
+        print(f"[SESSION TRACE] GET /chat-sessions/{session_id}")
+        print(f"[DEBUG] 函数已进入，session_id={session_id}")
+        
+        from app import session as session_module
+        
+        # 获取 session 基本信息
+        session_info = session_module.get_session_by_id(session_id)
+        if not session_info:
+            print(f"[DEBUG] session_info 为空")
+            return {"status": "Error", "message": "聊天室不存在"}
+        
+        print(f"[DEBUG] session_info 获取成功: {session_info}")
+        
+        # 加载该 session 的所有消息
+        conversations = db.load_conversations(limit=5000, session_id=session_id)
+        print(f"[DEBUG] conversations count: {len(conversations)}")
+        
+        if conversations:
+            print(f"[DEBUG] last conversation: {conversations[-1]}")
+        
+        # 原始逻辑，不修改字段映射
+        messages = []
+        for turn in conversations:
+            messages.append({
+                "role": turn.get("role"),
+                "content": turn.get("content"),
+                "thinking": turn.get("thinking"),
+                "time": turn.get("created_at"),
+                "message_id": turn.get("id"),
+                "trace": turn.get("trace"),
+            })
+        
+        if messages:
+            print(f"[DEBUG] last message: {messages[-1]}")
+        
+        print(f"[SESSION TRACE] 返回 messages.length: {len(messages)}")
+        
+        return {
+            "session": session_info,
+            "messages": messages
         }
-        if turn.get("thinking"):
-            entry["think"] = turn["thinking"]
-        if turn.get("trace"):
-            entry["trace"] = turn["trace"]
-        messages.append(entry)
     
-    print(f"[SESSION TRACE] 返回 messages.length: {len(messages)}")
-    return {
-        "session": session_info,
-        "messages": messages
-    }
+    except Exception as e:
+        print(f"[ERROR] get_chat_session 异常:")
+        import traceback
+        traceback.print_exc()
+        raise
+        
+
 
 
 @router.delete("/chat-sessions/{session_id}")

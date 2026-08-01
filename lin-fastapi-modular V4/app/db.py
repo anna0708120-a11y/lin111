@@ -13,8 +13,18 @@ _client = None
 if config.SUPABASE_URL and config.SUPABASE_KEY:
     try:
         from supabase import create_client
-        _client = create_client(config.SUPABASE_URL, config.SUPABASE_KEY)
-        print("[db] Supabase 已连接")
+        # 增加连接池配置，避免 Errno 11
+        _client = create_client(
+            config.SUPABASE_URL, 
+            config.SUPABASE_KEY,
+            options={
+                "postgrest": {
+                    "timeout": 10,
+                    "max_retries": 2
+                }
+            }
+        )
+        print("[db] Supabase 已连接（带连接池配置）")
     except Exception as e:
         print(f"[db] Supabase 连接失败，退回内存模式: {e}")
         _client = None
@@ -251,7 +261,10 @@ def load_conversations(limit=500, session_id=None):
         rows.reverse()  # 转回时间正序（旧->新），跟内存 deque 的顺序一致
         return rows
     except Exception as e:
+        import traceback
+        caller = traceback.extract_stack()[-3].name
         print(f"[db] 读取对话历史失败: {e}")
+        print(f"[DB TRACE] load_conversation_history failed, caller={caller}")
         return []
 
 def insert_conversation_turn(role, content, thinking=None, image_data=None, session_id=None, trace=None):

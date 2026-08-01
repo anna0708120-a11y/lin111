@@ -54,7 +54,10 @@ def get_session_list(limit: int = 20) -> list:
         )
         return res.data or []
     except Exception as e:
+        import traceback
+        caller = traceback.extract_stack()[-3].name
         print(f"[session] 读取 session 列表失败: {e}")
+        print(f"[DB TRACE] list_sessions failed, caller={caller}")
         return []
 
 def toggle_star_session(session_id: str) -> bool:

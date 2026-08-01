@@ -83,6 +83,11 @@ def call_deepseek_stream(system_prompt, temperature=0.95, max_tokens=None, top_p
         - ("done", usage_info) - 結束標記
     """
     
+     # ========== 添加这两行 ==========
+    from app.web.routes import increment_deepseek
+    increment_deepseek()
+     # ========== END ==========
+    
     # ========== DEEPSEEK TRACE ==========
     caller = inspect.stack()[1].function if len(inspect.stack()) > 1 else "unknown"
     request_id = str(uuid.uuid4())[:8]

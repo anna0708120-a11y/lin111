@@ -785,7 +785,7 @@ def get_chat_sessions():
         
         # 如果标题还是默认的，尝试从第一条消息生成
         if title == "新对话":
-            conversations = db.load_conversations(limit=1, session_id=s["id"])
+            # conversations = db.load_conversations(limit=1, session_id=s["id"])  # 暂时禁用：避免 N+1 查询
             if conversations and len(conversations) > 0:
                 first_msg = conversations[0]
                 content = first_msg.get("content", "")

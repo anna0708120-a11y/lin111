@@ -21,6 +21,31 @@ from app.state import state
 from app.web.pwa import MANIFEST_JSON, SERVICE_WORKER_JS
 from app.web.diagnose import DIAGNOSE_HTML
 
+# ========== 调用计数器 ==========
+import threading
+import time
+_counters = {"watch": 0, "deepseek": 0, "lock": threading.Lock()}
+
+def increment_watch():
+    with _counters["lock"]:
+        _counters["watch"] += 1
+
+def increment_deepseek():
+    with _counters["lock"]:
+        _counters["deepseek"] += 1
+
+def _counter_reporter():
+    from datetime import datetime
+    while True:
+        time.sleep(60)
+        with _counters["lock"]:
+            w, d = _counters["watch"], _counters["deepseek"]
+        print(f"[COUNTER] {datetime.now().strftime('%H:%M:%S')} WATCH={w} DEEPSEEK={d}")
+
+threading.Thread(target=_counter_reporter, daemon=True).start()
+# ========== END COUNTERS ==========
+
+router = APIRouter()
 router = APIRouter()
 
 class TTSPayload(BaseModel):
@@ -131,6 +156,7 @@ def observe_anna(activity: Activity):
     # ========== END TRACE ==========
     
     """
+    increment_watch()  # ← 添加这一行
     target_session_id = activity.session_id or state.current_session_id
     
     if activity.app_name and activity.app_name != "聊天界面":

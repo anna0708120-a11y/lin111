@@ -17,6 +17,15 @@ from app.agent.proactive import run_proactive_check, run_memory_review
 from app.web.frontend import HTML_CONTENT
 from app.web.routes import router
 from app.state import state
+from app import db
+
+# 启动时立即检查 db 状态
+print("=" * 60)
+print("[STARTUP] app/main.py 正在加载...")
+print(f"[STARTUP] db 模块 ID: {id(db)}")
+print(f"[STARTUP] db._client: {db._client}")
+print(f"[STARTUP] db.is_connected(): {db.is_connected()}")
+print("=" * 60)
 
 app = FastAPI()
 

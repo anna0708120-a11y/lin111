@@ -207,6 +207,11 @@ def generate_reply(context, app_name=None, use_cache=True):
         memory_trace.record_model_output(reasoning_text=reasoning, raw_decision_block=None)
         
         decision = parse_memory_decision(reasoning)
+        
+        # Fallback: 如果 reasoning 没有 MEMORY_DECISION，尝试从 content 提取
+        if not decision and content:
+            decision = parse_memory_decision(content)
+        
         if decision:
             # 記錄 parse 成功
             memory_trace.record_parse_result(success=True, parsed_decision=decision)

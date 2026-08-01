@@ -30,7 +30,15 @@ RETENTION_DAYS = {
 MEMORY_CATEGORIES = ["长期记忆", "短期记忆", "Relationship", "Reflection"]
 
 MEMORY_DECISION_INSTRUCTION = """
-## 【强制输出项】记忆判定 —— 每一轮都必须输出，不可省略
+## 【强制输出项 - MANDATORY】记忆判定
+
+**CRITICAL: 每一轮回复必须在思考结束时输出 [MEMORY_DECISION] 区块，不可省略。**
+**即使 worth_remembering=no，也必须输出完整区块。**
+**缺少此区块视为格式错误，回复无效。**
+
+---
+
+## 输出规则
 这不是可选步骤，是每一轮思考结束前的强制规定动作。不管这一轮内容是不是寒暄、不管
 worth_remembering 最后是 yes 还是 no，[MEMORY_DECISION] 这个区块本身都必须完整出现在
 思考内容的最后面，一个字都不能少。规则如下：

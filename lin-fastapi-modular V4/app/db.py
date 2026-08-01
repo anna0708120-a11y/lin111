@@ -252,20 +252,6 @@ def load_conversations(limit=500, session_id=None):
         return rows
     except Exception as e:
         print(f"[db] 读取对话历史失败: {e}")
-        # Errno 11: 数据库锁，重试一次
-        if "Resource temporarily unavailable" in str(e) or "Errno 11" in str(e):
-            import time
-            time.sleep(0.1)
-            try:
-                query = _client.table("conversation_history").select("id, role, content, thinking, image_data, created_at, session_id, trace")
-                if session_id:
-                    query = query.eq("session_id", session_id)
-                res = query.order("created_at", desc=True).limit(limit).execute()
-                rows = res.data or []
-                rows.reverse()
-                return rows
-            except Exception as retry_e:
-                print(f"[db] 重试后仍失败: {retry_e}")
         return []
 
 def insert_conversation_turn(role, content, thinking=None, image_data=None, session_id=None, trace=None):

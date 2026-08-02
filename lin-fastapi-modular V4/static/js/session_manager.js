@@ -54,7 +54,7 @@ class SessionManager {
       console.log(`[SESSION TRACE ${traceId}] STEP3: after fetch, status:`, res.status, res.statusText);
       
       const data = await res.json();
-      console.log(`[SESSION TRACE ${traceId}] STEP4: after jso data);
+      console.log(`[SESSION TRACE ${traceId}] STEP4: after json(), data:`, data);
       console.log(`[SESSION TRACE ${traceId}] STEP5: data.messages length:`, data.messages ? data.messages.length : 'undefined');
       console.log(`[SESSION TRACE ${traceId}] RETURN length:`, data.messages?.length ?? 0);
       

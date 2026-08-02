@@ -406,12 +406,19 @@ def generate_reply_stream(context, app_name=None, use_cache=True, session_id=Non
                 state.mark_reply()
                 state.add_log("AI回复", f"成功：{full_content[:40]}...")
                 
+                print(f"[DEBUG brain.py] full_content 长度: {len(full_content) if full_content else 0}")
+                print(f"[DEBUG brain.py] full_content 前80字: {full_content[:80] if full_content else 'EMPTY'}")
+                print(f"[DEBUG brain.py] 是否在排除列表: {full_content in ('信号不好。', '今天额度用完了，或者刚刚问太快了，等一下再说。')}")
+                
                 if full_content and full_content not in ("信号不好。", "今天额度用完了，或者刚刚问太快了，等一下再说。"):
+                    print(f"[DEBUG brain.py] ✅ 准备保存 Lin 回复到数据库")
                     thinking_display = strip_hidden_blocks(full_reasoning) if full_reasoning else None
                     state.add_conversation_turn("lin", full_content, thinking=thinking_display, session_id=target_session, trace=collector.export())
                     
                     from app.notify.bark import send_to_bark
                     send_to_bark(full_content)
+                else:
+                    print(f"[DEBUG brain.py] ❌ Lin 回复未保存到数据库（full_content={bool(full_content)}, 在排除列表={full_content in ('信号不好。', '今天额度用完了，或者刚刚问太快了，等一下再说。')}）")
                 
                 state.mark_conversation_anchor()
                 yield "event: done\ndata: {}\n\n"

@@ -162,6 +162,14 @@ def call_deepseek_stream(system_prompt, temperature=0.95, max_tokens=None, top_p
             timeout=45,
             stream=True  # 🔥 關鍵
         )
+        
+        # 檢查 HTTP 狀態碼
+        if response.status_code != 200:
+            error_body = response.text
+            print(f"[deepseek_client] API 錯誤 {response.status_code}: {error_body}")
+            yield ("error", f"API返回錯誤: {response.status_code}")
+            return
+        
         reasoning_buffer = []  # 用於過濾 [MEMORY_DECISION] 等隱藏標籤
         
         for line in response.iter_lines():

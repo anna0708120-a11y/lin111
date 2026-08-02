@@ -891,7 +891,8 @@ def get_chat_session(session_id: str):
         print(f"[DEBUG] conversations count: {len(conversations)}")
         
         if conversations:
-            print(f"[DEBUG] 数据库 role 值: {set(t.get('role') for t in conversations)}")
+            print(f"[DEBUG] 数据库 role 值(set): {set(t.get('role') for t in conversations)}")
+            print(f"[DEBUG] 所有 role 列表: {[t.get('role') for t in conversations]}")
             print(f"[DEBUG] last conversation (数据库原始): {conversations[-1]}")
         
         messages = []

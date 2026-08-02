@@ -313,8 +313,10 @@ def load_conversations(limit=500, session_id=None):
         return []
 
 def insert_conversation_turn(role, content, thinking=None, image_data=None, session_id=None, trace=None):
+    print(f"[DEBUG db.insert_conversation_turn] role={role}, content前50字={content[:50] if content else 'EMPTY'}, session_id={session_id}")
     _log_query("insert_conversation_turn")
     if not _client:
+        print(f"[DEBUG db.insert_conversation_turn] ❌ _client 为 None，未保存")
         return
     try:
         _client.table("conversation_history").insert({
@@ -325,8 +327,10 @@ def insert_conversation_turn(role, content, thinking=None, image_data=None, sess
             "session_id": session_id,
             "trace": trace,
         }).execute()
+        print(f"[DEBUG db.insert_conversation_turn] ✅ 保存成功")
     except Exception as e:
         print(f"[db] 写入对话历史失败: {e}")
+        print(f"[DEBUG db.insert_conversation_turn] ❌ 保存失败: {e}")
 
 # ---------- Lin 的碎碎念 ----------
 def load_notes(limit=50):

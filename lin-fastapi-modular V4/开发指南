@@ -39,11 +39,3 @@
 - trace 只能读取已有变量。
 - trace 自己不能导致 500。
 
-File Status:
-| 檔案 | 狀態 | 說明 |
-| `frontend.py` |  |  |
-| `routes.py` | ✅ 確認正常 | SSE 轉發邏輯正常運作 |
-| `brain.py` | ✅ 確認正常 | 不處理圖片,純文字對話邏輯正常 |
-| `deepseek_client.py` | ✅ 確認正常 | 串流邏輯正常 |
-| `provider.py` | ✅ 確認正常 | HTTP 請求層正常 |
-| `state.py` | ✅ 確認正常 | 對話歷史存儲正常 |

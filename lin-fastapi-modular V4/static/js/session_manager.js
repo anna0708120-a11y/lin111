@@ -43,13 +43,24 @@ class SessionManager {
   }
 
   async getMessages(sessionId) {
-        console.log("[SESSION TRACE] sessionManager.getMessages called, sessionId:", sessionId);
+    const traceId = Date.now() + "-" + Math.random().toString(36).slice(2,6);
+    console.log(`[SESSION TRACE ${traceId}] STEP1: getMessages called, sessionId:`, sessionId);
+    const url = this.apiBase + '/chat-sessions/' + sessionId;
+    console.log(`[SESSION TRACE ${traceId}] URL:`, url);
+    
     try {
-      const res = await fetch(this.apiBase + '/chat-sessions/' + sessionId);
+      console.log(`[SESSION TRACE ${traceId}] STEP2: before fetch`);
+      const res = await fetch(url);
+      console.log(`[SESSION TRACE ${traceId}] STEP3: after fetch, status:`, res.status, res.statusText);
+      
       const data = await res.json();
+      console.log(`[SESSION TRACE ${traceId}] STEP4: after jso data);
+      console.log(`[SESSION TRACE ${traceId}] STEP5: data.messages length:`, data.messages ? data.messages.length : 'undefined');
+      console.log(`[SESSION TRACE ${traceId}] RETURN length:`, data.messages?.length ?? 0);
+      
       return data.messages || [];
     } catch (err) {
-      console.error('Failed to load messages:', err);
+      console.error(`[SESSION TRACE ${traceId}] ERROR:`, err);
       return [];
     }
   }

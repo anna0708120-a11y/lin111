@@ -2363,7 +2363,7 @@ async function renderActiveSession(sessionId, { fresh = false, skipFeedback = fa
   
   if (fresh) {
     console.log("[SESSION TRACE] STEP4a: fresh=true, rendering empty history");
-    renderHistory([]);  // ← 直接渲染空历史，不清空全局缓存
+    chatView.renderHistory([]);  // ← 直接渲染空历史，不清空全局缓存
     console.log("[SESSION TRACE] STEP4b: renderHistory([]) finished");
   } else {
     console.log("[SESSION TRACE] STEP4a: fresh=false, fetching messages");

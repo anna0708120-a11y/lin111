@@ -83,10 +83,13 @@ def call_deepseek_stream(system_prompt, temperature=0.95, max_tokens=None, top_p
         - ("done", usage_info) - 結束標記
     """
     
-     # ========== 添加这两行 ==========
+    print("[ENTRY 1] call_deepseek_stream: function entered")
+    # ========== 添加这两行 ==========
     from app.web.routes import increment_deepseek
+    print("[ENTRY 2] call_deepseek_stream: import increment_deepseek successful")
     increment_deepseek()
-     # ========== END ==========
+    print("[ENTRY 3] call_deepseek_stream: increment_deepseek() called")
+    # ========== END ==========
     
     # ========== DEEPSEEK TRACE ==========
     caller = inspect.stack()[1].function if len(inspect.stack()) > 1 else "unknown"

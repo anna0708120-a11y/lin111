@@ -1354,7 +1354,24 @@ function renderMessages(history){
   // Wrapper: 委托给 ChatView，保持旧代码调用兼容性
   if (typeof chatView !== 'undefined' && chatView.renderMessages) {
     chatView.renderMessages(history);
+    addVoiceButtons();
   }
+}
+
+function addVoiceButtons(){
+  document.querySelectorAll('#cm .msg.lin').forEach(el=>{
+    const meta=el.querySelector('.mtime2');
+    if(!meta||meta.querySelector('.voice-btn'))return;
+    const slot=el.querySelector('.dt-slot');
+    const mid=slot?slot.dataset.messageId:null;
+    const idx=chatMemoryCache.findIndex(m=>m.r==='lin'&&(!mid||m.message_id==mid));
+    if(idx<0)return;
+    const btn=document.createElement('button');
+    btn.className='voice-btn';
+    btn.textContent='🔊';
+    btn.onclick=e=>{e.stopPropagation();playVoice(idx);};
+    meta.prepend(btn);
+  });
 }
 
 function lchat(){
@@ -1386,6 +1403,7 @@ function renderOnly(history){
   if (typeof chatView !== 'undefined' && chatView.renderMessages) {
     chatView.renderMessages(chatMemoryCache);
   }
+  addVoiceButtons();
 }
 
 async function syncChat(){
@@ -1409,8 +1427,6 @@ function smsg(role,text,think,trace){
   }
   return chatMemoryCache;
 }
-
-
 
 function addMsg(role, text, think) {
   // Wrapper: 保持旧接口，内部调用 smsg (已委托给 ChatView)
@@ -1548,13 +1564,12 @@ async function confirmImageSend() {
     
     function processChunk({done, value}) {
       if (done) {
-        console.log('[DEBUG] Image stream done. contentBuffer:', contentBuffer, 'reasoningBuffer:', reasoningBuffer);
         if(contentBuffer){
-          const entry = { 
-            r: 'lin', 
-            t: contentBuffer, 
-            time: ts(), 
-            iso: new Date().toISOString() 
+          const entry = {
+            r: 'lin',
+            t: contentBuffer,
+            time: ts(),
+            iso: new Date().toISOString()
           };
           if(reasoningBuffer) entry.think = reasoningBuffer;
           if(currentDevTrace && currentDevTrace.lastPayload) entry.trace = currentDevTrace.lastPayload;
@@ -1711,11 +1726,11 @@ async function send(){
       if(done){
         console.log('[DEBUG] Stream done. contentBuffer:', contentBuffer, 'reasoningBuffer:', reasoningBuffer);
         if(contentBuffer){
-          const entry = { 
-            r: 'lin', 
-            t: contentBuffer, 
-            time: ts(), 
-            iso: new Date().toISOString() 
+          const entry = {
+            r: 'lin',
+            t: contentBuffer,
+            time: ts(),
+            iso: new Date().toISOString()
           };
           if(reasoningBuffer) entry.think = reasoningBuffer;
           if(currentDevTrace && currentDevTrace.lastPayload) entry.trace = currentDevTrace.lastPayload;

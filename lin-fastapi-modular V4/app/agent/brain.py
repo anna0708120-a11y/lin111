@@ -297,7 +297,9 @@ def generate_reply_stream(context, app_name=None, use_cache=True, session_id=Non
     target_session = session_id or state.current_session_id
     
     if not state.check_rate_limit():
-        err_msg = "今天额度用完了，或者刚刚问太快了，ata: {}\n\n"
+        err_msg = "今天额度用完了，或者刚刚问太快了，等一下再说。"
+        yield f"event: error\ndata: {json.dumps({'message': err_msg})}\n\n"
+        yield "event: done\ndata: {}\n\n"
         return
     
     if use_cache and state.last_context_cache == context and state.last_reply_at:

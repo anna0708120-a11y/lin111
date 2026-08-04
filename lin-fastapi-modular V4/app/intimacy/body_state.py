@@ -10,6 +10,11 @@
 
 from typing import Dict
 
+# ========================================
+# 數值變化速率配置（可調參數）
+# ========================================
+APPROACH_FACTOR = 0.3  # 每小時趨近目標的百分比（原 0.15 → 0.3，加快變化速度）
+
 
 def calculate_body_state(mood: dict, cycle, body_values: dict, elapsed_hours: float) -> Dict[str, float]:
     """
@@ -94,7 +99,7 @@ def approach(current: float, target: float, rate: float, elapsed_hours: float) -
     # 則使用更平滑的趨近公式
     if (target - current) * rate > 0:
         # 平滑趨近：越接近目標，變化越慢
-        approach_factor = 0.15  # 每小時趨近 15%
+        approach_factor = APPROACH_FACTOR  # 使用全局配置
         return current + (target - current) * approach_factor * elapsed_hours
     else:
         # 線性變化

@@ -251,7 +251,9 @@ def load_conversations(limit=500, session_id=None):
         rows.reverse()  # 转回时间正序（旧->新），跟内存 deque 的顺序一致
         return rows
     except Exception as e:
+        import traceback
         print(f"[db] 读取对话历史失败: {e}")
+        traceback.print_exc()
         return []
 
 def insert_conversation_turn(role, content, thinking=None, image_data=None, session_id=None, trace=None):

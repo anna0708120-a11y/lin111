@@ -13,18 +13,44 @@ from collections import deque
 from datetime import datetime, timedelta
 
 
+# ========================================
+# 收益遞減配置（Diminishing Returns）
+# ========================================
+DIMINISHING_RETURNS = {
+    "attachment": [
+        {"threshold": 0.70, "multiplier": 0.6},   # >0.7 時效果降到 60%
+        {"threshold": 0.85, "multiplier": 0.3},   # >0.85 時效果降到 30%
+    ],
+    "libido": [
+        {"threshold": 0.65, "multiplier": 0.6},
+        {"threshold": 0.80, "multiplier": 0.3},
+    ],
+    "curiosity": [
+        {"threshold": 0.70, "multiplier": 0.6},
+        {"threshold": 0.85, "multiplier": 0.3},
+    ],
+    "social": [
+        {"threshold": 0.70, "multiplier": 0.6},
+        {"threshold": 0.85, "multiplier": 0.3},
+    ],
+    "possessiveness": [
+        {"threshold": 0.70, "multiplier": 0.6},
+        {"threshold": 0.85, "multiplier": 0.3},
+    ],
+}
+
 # V2.1: 事件冷却机制（Phase 2）
 # 每个事件独立冷却时间（秒）；同一事件在冷却期内拒绝触发，不打折扣
 EVENT_COOLDOWNS = {
-    "PRAISE": 180,           # 3 分钟
-    "COMFORT": 240,          # 4 分钟
+    "PRAISE": 600,           # 3 分钟 → 10 分钟
+    "COMFORT": 900,          # 4 分钟 → 15 分钟
     "THANKS": 120,           # 2 分钟
-    "JOKE": 180,             # 3 分钟
+    "JOKE": 600,             # 3 分钟 → 10 分钟
     "APOLOGY": 300,          # 5 分钟
     "IGNORE": 600,           # 10 分钟
     "LONG_IGNORE": 1200,     # 20 分钟
     "GOODBYE": 180,          # 3 分钟
-    "LONG_CHAT": 300,        # 5 分钟（高频事件，较长冷却）
+    "LONG_CHAT": 1200,       # 5 分钟 → 20 分钟（高频事件，需要更长冷却）
     "SHORT_REPLY": 180,      # 3 分钟
     "LATE_NIGHT": 3600,      # 1 小时（低频事件）
     "NONE": 60,              # 1 分钟
@@ -32,6 +58,10 @@ EVENT_COOLDOWNS = {
 
 # 事件最近触发时间记录：{event_name: last_triggered_datetime}
 _event_last_triggered = {}
+
+# V2.2: 單一主事件限制（借鑒 Eventide，防止事件堆疊）
+_active_mood_event = None
+_active_mood_event_expires_at = None
 
 # 重複事件追蹤（用於遞減效果 - Phase 1 遗留，Phase 2 后弃用）
 _recent_events = deque(maxlen=10)
@@ -199,27 +229,28 @@ EVENT_EFFECTS = {
             "social": -0.08,
         },
     },
-    "LONG_CHAT": {
+    
+"LONG_CHAT": {
         "LOW": {
-            "attachment": +0.02,
+            "attachment": +0.01,
             "social": +0.01,
             "curiosity": +0.01,
-            "fatigue": +0.02,
+            "fatigue": +0.01,
             "libido": +0.01,
         },
         "MEDIUM": {
-            "attachment": +0.06,
-            "social": +0.04,
-            "curiosity": +0.03,
-            "fatigue": +0.07,
-            "libido": +0.04,
+            "attachment": +0.04,
+            "social": +0.03,
+            "curiosity": +0.02,
+            "fatigue": +0.05,
+            "libido": +0.03,
         },
         "HIGH": {
-            "attachment": +0.15,
-            "social": +0.10,
-            "curiosity": +0.08,
-            "fatigue": +0.18,
-            "libido": +0.10,
+            "attachment": +0.10,  # 0.15 → 0.10（-33%）
+            "social": +0.07,      # 0.10 → 0.07（-30%）
+            "curiosity": +0.06,   # 0.08 → 0.06（-25%）
+            "fatigue": +0.12,     # 0.18 → 0.12（-33%）
+            "libido": +0.07,      # 0.10 → 0.07（-30%）
         },
     },
     "SHORT_REPLY": {
@@ -299,6 +330,18 @@ def apply_event(event, level="MEDIUM", line=None):
         apply_event("PRAISE", "HIGH")  # 強烈稱讚
         apply_event("LONG_IGNORE", "MEDIUM", line="在等妳的消息")
     """
+    from datetime import datetime, timedelta
+    
+    # V2.2: 單一主事件檢查（Phase 3）
+    # 如果已有未過期的主事件，拒絕新事件（Eventide 風格）
+    global _active_mood_event, _active_mood_event_expires_at
+    now = datetime.now()
+    
+    if _active_mood_event and _active_mood_event_expires_at:
+        if now < _active_mood_event_expires_at:
+            print(f"[mood_engine] 拒絕事件 {event}：主事件 {_active_mood_event} 尚未過期")
+            return  # 直接拒絕，不累積
+    
     # 未知事件安全跳過，不報錯
     if event not in EVENT_EFFECTS:
         return
@@ -318,6 +361,10 @@ def apply_event(event, level="MEDIUM", line=None):
     
     # 記錄這次觸發時間
     _event_last_triggered[event] = now
+    
+    # V2.2: 啟動主事件鎖定期（10分鐘）
+    _active_mood_event = event
+    _active_mood_event_expires_at = now + timedelta(minutes=20)  # V3: 延長到 20 分鐘降低觸發頻率
     multiplier = 1.0  # Phase 2: 冷却機制取代遞減係數，通過冷却的事件效果不打折
     
     # 取得當前 mood（深拷貝避免直接修改）
@@ -331,7 +378,13 @@ def apply_event(event, level="MEDIUM", line=None):
         if key in current_mood:
             adjusted_delta = delta * multiplier
             
-            # 動態調整：根據當前 mood 值微調效果
+            # 動態調整
+            
+            # V3: 收益遞減（Diminishing Returns）
+            if key in DIMINISHING_RETURNS:
+                for rule in DIMINISHING_RETURNS[key]:
+                    if current_value > rule["threshold"]:
+                        adjusted_delta *= rule["multiplier"]
             # 規則：越接近極端（0.0 或 1.0），變化幅度越小
             current_value = current_mood[key]
             

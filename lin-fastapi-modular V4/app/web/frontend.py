@@ -1365,9 +1365,7 @@ function lchat(){
 }
 
 function renderOnly(history){
-  // 把資料庫回來的歷史畫到畫面上，並整批寫入內存快取。
-  // 專門給 Session 切換 / 新建 / 頁面初次載入時的 replay 用。
-  const mapped = (history || []).map(m => {
+  const serverMessages = (history || []).map(m => {
     const iso = m.iso || m.time || new Date().toISOString();
     let display = '';
     try {
@@ -1384,8 +1382,7 @@ function renderOnly(history){
       trace: m.trace
     };
   });
-  chatMemoryCache = mapped;
-  // 委托给 ChatView.renderMessages()
+  chatMemoryCache = serverMessages;
   if (typeof chatView !== 'undefined' && chatView.renderMessages) {
     chatView.renderMessages(chatMemoryCache);
   }
@@ -1551,8 +1548,19 @@ async function confirmImageSend() {
     
     function processChunk({done, value}) {
       if (done) {
-        if (contentBuffer) {
-          smsg('lin', contentBuffer, reasoningBuffer || null, currentDevTrace ? currentDevTrace.lastPayload : null);
+        console.log('[DEBUG] Image stream done. contentBuffer:', contentBuffer, 'reasoningBuffer:', reasoningBuffer);
+        if(contentBuffer){
+          const entry = { 
+            r: 'lin', 
+            t: contentBuffer, 
+            time: ts(), 
+            iso: new Date().toISOString() 
+          };
+          if(reasoningBuffer) entry.think = reasoningBuffer;
+          if(currentDevTrace && currentDevTrace.lastPayload) entry.trace = currentDevTrace.lastPayload;
+          chatMemoryCache.push(entry);
+          if(chatMemoryCache.length > 200) chatMemoryCache = chatMemoryCache.slice(-200);
+          syncChat().catch(e => console.error('[DEBUG] Failed to sync image chat:', e));
         }
         scrollDown();
         pendingImageDataUrl = null;
@@ -1703,7 +1711,17 @@ async function send(){
       if(done){
         console.log('[DEBUG] Stream done. contentBuffer:', contentBuffer, 'reasoningBuffer:', reasoningBuffer);
         if(contentBuffer){
-          smsg('lin', contentBuffer, reasoningBuffer || null, currentDevTrace ? currentDevTrace.lastPayload : null);
+          const entry = { 
+            r: 'lin', 
+            t: contentBuffer, 
+            time: ts(), 
+            iso: new Date().toISOString() 
+          };
+          if(reasoningBuffer) entry.think = reasoningBuffer;
+          if(currentDevTrace && currentDevTrace.lastPayload) entry.trace = currentDevTrace.lastPayload;
+          chatMemoryCache.push(entry);
+          if(chatMemoryCache.length > 200) chatMemoryCache = chatMemoryCache.slice(-200);
+          syncChat().catch(e => console.error('[DEBUG] Failed to sync chat:', e));
         }
         scrollDown();
         return;

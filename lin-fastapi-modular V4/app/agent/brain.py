@@ -373,6 +373,7 @@ def generate_reply_stream(context, app_name=None, use_cache=True, session_id=Non
                     # 正式邏輯仍只用既有的 parse_memory_decision，不依賴 traced 版本的回傳值，
                     # 避免診斷用的包裝函式影響到正式的記憶寫入行為。
                     decision = parse_memory_decision(parse_source)
+                    print(f"[DONE-1] parse_memory_decision 完成, decision={decision is not None}")
                     if decision:
                         action = decision.get("action", "create")
                         if action == "update":
@@ -384,6 +385,7 @@ def generate_reply_stream(context, app_name=None, use_cache=True, session_id=Non
                         else:
                             _result = state.remember_or_reinforce(decision)
                             yield collector.record_backend("passed", backend_action="remember_or_reinforce", action_taken=_result.get("action_taken") if _result else None)
+                        print(f"[DONE-2] 記憶寫入動作完成, action={action}, action_taken={_result.get('action_taken') if _result else None}")
 
                         if _result and _result.get("action_taken") != "skipped":
                             yield collector.record_db("passed", memory_id=_result.get("memory_id"))
@@ -402,19 +404,25 @@ def generate_reply_stream(context, app_name=None, use_cache=True, session_id=Non
                 detected_events = _auto_detect_mood_events(context, full_content)
                 for event_name, event_level in detected_events:
                     mood_engine.apply_event(event_name, level=event_level)
+                print(f"[DONE-3] mood_engine.apply_event 完成, detected_events={detected_events}")
                 
                 state.last_context_cache = context
                 state.mark_reply()
+                print("[DONE-4] state.mark_reply 完成")
                 state.add_log("AI回复", f"成功：{full_content[:40]}...")
+                print("[DONE-5] state.add_log 完成")
                 
                 if full_content and full_content not in ("信号不好。", "今天额度用完了，或者刚刚问太快了，等一下再说。"):
                     thinking_display = strip_hidden_blocks(full_reasoning) if full_reasoning else None
                     state.add_conversation_turn("lin", full_content, thinking=thinking_display, session_id=target_session, trace=collector.export())
+                    print("[DONE-6] state.add_conversation_turn 完成")
                     
                     from app.notify.bark import send_to_bark
                     send_to_bark(full_content)
+                    print("[DONE-7] send_to_bark 完成")
                 
                 state.mark_conversation_anchor()
+                print("[DONE-8] state.mark_conversation_anchor 完成")
                 yield "event: done\ndata: {}\n\n"
     
     except Exception as e:

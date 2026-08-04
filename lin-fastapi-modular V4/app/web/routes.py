@@ -755,15 +755,6 @@ def get_chat_sessions():
         # 从数据库加载该 session 的第一条消息作为标题
         title = s.get("title", "新对话")
         
-        # 如果标题还是默认的，尝试从第一条消息生成
-        if title == "新对话":
-            conversations = db.load_conversations(limit=1, session_id=s["id"])
-            if conversations and len(conversations) > 0:
-                first_msg = conversations[0]
-                content = first_msg.get("content", "")
-                if content:
-                    title = content[:30] + ("..." if len(content) > 30 else "")
-        
         # 格式化时间显示
         created_at = s.get("created_at", "")
         time_display = ""

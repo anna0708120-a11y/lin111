@@ -287,6 +287,7 @@ def generate_reply_stream(context, app_name=None, use_cache=True, session_id=Non
     """
     流式生成回覆，yield SSE 格式的事件。
     """
+    print("[TRACE] generate_reply_stream entered")
     from app.llm.deepseek_client import call_deepseek_stream
     from app.memory_rules import parse_memory_decision, parse_memory_decision_traced, parse_mood_event, strip_hidden_blocks
     from app import mood_engine
@@ -333,8 +334,12 @@ def generate_reply_stream(context, app_name=None, use_cache=True, session_id=Non
     raw_reasoning = ""
     full_content = ""
     
+    print("[TRACE] before call_deepseek_stream")
     try:
-        for event_type, data in call_deepseek_stream(system_prompt, max_tokens=config.DEEPSEEK_MAX_TOKENS):
+        generator = call_deepseek_stream(system_prompt, max_tokens=config.DEEPSEEK_MAX_TOKENS)
+        print("[TRACE] generator created")
+        for event_type, data in generator:
+            print(f"[TRACE] event received: {event_type}")
             if event_type == "reasoning":
                 full_reasoning += data
                 yield f"event: reasoning\ndata: {json.dumps({'content': data})}\n\n"

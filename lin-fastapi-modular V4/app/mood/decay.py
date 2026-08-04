@@ -16,6 +16,82 @@ Mood 应该依靠「事件 + 时间自然恢复」来变化，而不是大量互
 
 from typing import Dict
 
+
+# ========================================
+# V3: 動態 Target System（借鑒 Eventide）
+# ========================================
+def get_mood_targets(cycle_key: str = "stable") -> Dict[str, float]:
+    """
+    根據當前周期返回 Mood 目標值（取代固定 baseline）
+    
+    設計理念：
+    - 平穩期：低 libido、中等 attachment
+    - 蓄積期：libido 開始上升
+    - 易感期：libido、attachment 都偏高
+    - 退潮期/恢復期：逐步回落
+    
+    這讓角色有「今天就是想黏人」的動態感，而不是永遠回到同一個數字。
+    """
+    targets_by_cycle = {
+        "stable": {
+            "attachment": 0.6,
+            "curiosity": 0.5,
+            "social": 0.6,
+            "stress": 0.2,
+            "fatigue": 0.3,
+            "libido": 0.4,
+            "possessiveness": 0.3,
+        },
+        "building": {
+            "attachment": 0.65,
+            "curiosity": 0.6,
+            "social": 0.65,
+            "stress": 0.25,
+            "fatigue": 0.35,
+            "libido": 0.55,
+            "possessiveness": 0.35,
+        },
+        "preheat": {
+            "attachment": 0.7,
+            "curiosity": 0.65,
+            "social": 0.7,
+            "stress": 0.3,
+            "fatigue": 0.4,
+            "libido": 0.65,
+            "possessiveness": 0.4,
+        },
+        "sensitive": {
+            "attachment": 0.75,
+            "curiosity": 0.7,
+            "social": 0.75,
+            "stress": 0.35,
+            "fatigue": 0.45,
+            "libido": 0.75,
+            "possessiveness": 0.5,
+        },
+        "ebb": {
+            "attachment": 0.7,
+            "curiosity": 0.6,
+            "social": 0.65,
+            "stress": 0.3,
+            "fatigue": 0.5,
+            "libido": 0.6,
+            "possessiveness": 0.45,
+        },
+        "recovery": {
+            "attachment": 0.65,
+            "curiosity": 0.55,
+            "social": 0.6,
+            "stress": 0.2,
+            "fatigue": 0.35,
+            "libido": 0.45,
+            "possessiveness": 0.35,
+        },
+    }
+    
+    return targets_by_cycle.get(cycle_key, targets_by_cycle["stable"])
+
+
 # ========================================
 # Mood 基线配置（未来迁移到 config.py）
 # ========================================
@@ -30,25 +106,49 @@ MOOD_BASELINES = {
 }
 
 # ========================================
+# 高值維護成本配置（High Value Maintenance Cost）
+# ========================================
+# 數值越高，Decay 速度越快，讓系統自然穩定在 0.7-0.85
+HIGH_VALUE_MULTIPLIERS = {
+    "attachment": [
+        {"threshold": 0.80, "multiplier": 1.5},   # >0.8 時 Decay 加速 1.5 倍
+        {"threshold": 0.90, "multiplier": 2.5},   # >0.9 時 Decay 加速 2.5 倍
+    ],
+    "libido": [
+        {"threshold": 0.75, "multiplier": 1.5},
+        {"threshold": 0.85, "multiplier": 2.5},
+    ],
+    "curiosity": [
+        {"threshold": 0.80, "multiplier": 1.5},
+        {"threshold": 0.90, "multiplier": 2.5},
+    ],
+    "social": [
+        {"threshold": 0.80, "multiplier": 1.5},
+        {"threshold": 0.90, "multiplier": 2.5},
+    ],
+}
+
+# ========================================
 # Mood 衰减速率配置（每小时向基线靠近的速度）
 # ========================================
 MOOD_DECAY_RATES = {
-    "attachment": 0.01,     # 依恋感慢慢回落
-    "curiosity": 0.02,      # 好奇心较快回落
-    "social": 0.02,         # 社交欲较快回落
+    "attachment": 0.03,     # 0.01 → 0.03（3倍，每天回落 -0.12）     # 依恋感慢慢回落
+    "curiosity": 0.04,      # 0.02 → 0.04（2倍）      # 好奇心较快回落
+    "social": 0.04,        # 0.02 → 0.04（2倍）         # 社交欲较快回落
     "stress": 0.02,         # 压力较快消退
-    "fatigue": 0.015,       # 疲惫感慢慢恢复
-    "libido": 0.015,        # 性欲慢慢回落
-    "possessiveness": 0.01, # 占有欲慢慢消退
+    "fatigue": 0.03,       # 0.015 → 0.03（2倍）       # 疲惫感慢慢恢复
+    "libido": 0.05,        # 0.015 → 0.05（3倍，每天回落 -0.50）        # 性欲慢慢回落
+    "possessiveness": 0.02, # 0.01 → 0.02（2倍） # 占有欲慢慢消退
 }
 
 
-def apply_mood_decay(mood: Dict[str, float], elapsed_hours: float, enabled: bool = True) -> Dict[str, float]:
+def apply_mood_decay(mood: Dict[str, float], elapsed_hours: float, enabled: bool = True, cycle_key: str = "stable") -> Dict[str, float]:
     """
     应用 Mood 自然衰减（纯函数，不修改输入）
     
     使用渐近回归方式：
     delta = (baseline - current) * rate * elapsed_hours
+        
     
     特点：
     - 离基线越远，回归速度越快
@@ -70,7 +170,10 @@ def apply_mood_decay(mood: Dict[str, float], elapsed_hours: float, enabled: bool
     # 创建新 dict，不修改原值
     result = dict(mood)
     
-    for key, baseline in MOOD_BASELINES.items():
+    # V3: 使用動態 target 取代固定 baseline
+    targets = get_mood_targets(cycle_key)
+    
+    for key, baseline in targets.items():
         if key not in result:
             continue
         
@@ -79,7 +182,14 @@ def apply_mood_decay(mood: Dict[str, float], elapsed_hours: float, enabled: bool
         
         # 计算向基线靠近的变化量（渐近回归）
         # 公式：delta = (baseline - current) * rate * elapsed_hours
+        
         delta = (baseline - current) * rate * elapsed_hours
+        
+        # V4: 高值維護成本（數值越高，回落越快）
+        if key in HIGH_VALUE_MULTIPLIERS:
+            for rule in HIGH_VALUE_MULTIPLIERS[key]:
+                if current > rule["threshold"]:
+                    delta *= rule["multiplier"]
         
         # 应用变化
         result[key] = current + delta
@@ -102,7 +212,10 @@ def get_decay_summary(mood: Dict[str, float]) -> str:
     """
     deviations = []
     
-    for key, baseline in MOOD_BASELINES.items():
+    # V3: 使用動態 target 取代固定 baseline
+    targets = get_mood_targets(cycle_key)
+    
+    for key, baseline in targets.items():
         if key not in mood:
             continue
         

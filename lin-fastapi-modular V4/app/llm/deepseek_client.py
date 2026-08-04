@@ -41,8 +41,9 @@ def call_deepseek(system_prompt, temperature=0.95, max_tokens=None, top_p=0.95, 
         payload["reasoning_effort"] = config.DEEPSEEK_REASONING_EFFORT
 
     try:
+        url = f"{config.DEEPSEEK_BASE_URL}/chat/completions"
         response = requests.post(
-            config.DEEPSEEK_BASE_URL,
+            url,
             headers={
                 "Authorization": f"Bearer {config.DEEPSEEK_API_KEY}",
                 "Content-Type": "application/json",
@@ -86,8 +87,9 @@ def call_deepseek_stream(system_prompt, temperature=0.95, max_tokens=None, top_p
         payload["reasoning_effort"] = config.DEEPSEEK_REASONING_EFFORT
     
     try:
+        url = f"{config.DEEPSEEK_BASE_URL}/chat/completions"
         response = requests.post(
-            config.DEEPSEEK_BASE_URL,
+            url,
             headers={
                 "Authorization": f"Bearer {config.DEEPSEEK_API_KEY}",
                 "Content-Type": "application/json",

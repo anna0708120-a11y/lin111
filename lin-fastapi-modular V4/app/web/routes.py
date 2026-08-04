@@ -809,37 +809,28 @@ def create_chat_session(payload: dict):
 def get_chat_session(session_id: str):
     """获取指定会话的消息"""
     try:
-        print(f"[SESSION TRACE] GET /chat-sessions/{session_id}")
+        # 从数据库加载该 session 的所有消息
+        conversations = db.load_conversations(limit=1000, session_id=session_id)
         
-        from app import session as session_module
-        session_info = session_module.get_session_by_id(session_id)
-        if not session_info:
-            return {"status": "Error", "message": "聊天室不存在"}
-        
-        conversations = db.load_conversations(limit=5000, session_id=session_id)
-        
+        # 格式化消息
         messages = []
-        for turn in conversations:
+        for conv in conversations:
             messages.append({
-                "role": turn.get("role"),
-                "content": turn.get("content"),
-                "thinking": turn.get("thinking"),
-                "time": turn.get("created_at"),
-                "message_id": turn.get("id"),
-                "trace": turn.get("trace"),
+                "message_id": conv.get("id"),
+                "role": conv.get("role", ""),
+                "content": conv.get("content", ""),
+                "thinking": conv.get("thinking"),
+                "time": conv.get("created_at", ""),
+                "trace": conv.get("trace")
             })
         
-        print(f"[SESSION TRACE] 返回 messages.length: {len(messages)}")
-        
         return {
-            "session": session_info,
+            "status": "Success",
             "messages": messages
         }
     except Exception as e:
-        print(f"[ERROR] get_chat_session 异常:")
-        import traceback
-        traceback.print_exc()
-        raise
+        print(f"[get_chat_session] Error: {e}")
+        return {"status": "Error", "message": "加载会话失败"}
 
 @router.delete("/chat-sessions/{session_id}")
 def delete_chat_session(session_id: str):

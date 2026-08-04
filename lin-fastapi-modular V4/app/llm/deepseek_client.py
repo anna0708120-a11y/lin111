@@ -31,7 +31,10 @@ def call_deepseek(system_prompt, temperature=0.95, max_tokens=None, top_p=0.95, 
 
     payload = {
         "model": config.DEEPSEEK_MODEL,
-        "messages": [{"role": "system", "content": system_prompt}],
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": "请根据以上人设与情境，给出你的回应。"},
+        ],
         "temperature": temperature,
         "max_tokens": max_tokens or config.DEEPSEEK_MAX_TOKENS,
         "top_p": top_p,
@@ -76,7 +79,10 @@ def call_deepseek_stream(system_prompt, temperature=0.95, max_tokens=None, top_p
     """
     payload = {
         "model": config.DEEPSEEK_MODEL,
-        "messages": [{"role": "system", "content": system_prompt}],
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": "请根据以上人设与情境，给出你的回应。"},
+        ],
         "temperature": temperature,
         "max_tokens": max_tokens or config.DEEPSEEK_MAX_TOKENS,
         "top_p": top_p,

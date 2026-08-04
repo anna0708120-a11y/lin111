@@ -28,6 +28,7 @@ def tick_and_update(state, now: datetime):
     from app.intimacy.cycle import advance_cycle, get_current_cycle
     from app.intimacy.body_state import calculate_body_state
     from app.intimacy.event import get_event
+    from app.intimacy.event_log import log_event
     from app.intimacy.after_effect import apply_after_effects, cleanup_expired_effects
     from app.intimacy.silence import detect_silence, calculate_silence_pressure
     from app.intimacy.influence import apply_influence
@@ -122,7 +123,9 @@ def tick_and_update(state, now: datetime):
             state.body_values = apply_influence(state.body_values, enabled=True)
             
             # V4.3: 應用 Mood 自然衰減
-            state.mood = apply_mood_decay(state.mood, elapsed_hours, enabled=True)
+            # V4.3: 傳入當前周期，使用動態 target
+            cycle = get_current_cycle(state)
+            state.mood = apply_mood_decay(state.mood, elapsed_hours, enabled=True, cycle_key=cycle.key)
             
             # clamp 到 0-100
             for key in state.body_values:
@@ -165,6 +168,15 @@ def start_event(state, event_key: str, now: datetime) -> bool:
     state.active_event_key = event.key
     state.active_event_started_at = now
     state.active_event_expires_at = now + timedelta(minutes=duration_minutes)
+    
+    # V4: 寫入事件日誌
+    log_event(
+        event_type="event",
+        title=event.label,
+        timestamp=now,
+        duration_minutes=duration_minutes,
+        metadata={"event_key": event.key}
+    )
     
     return True
 

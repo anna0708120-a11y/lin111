@@ -26,7 +26,12 @@ def synth_speech(text):
             timeout=30,
         )
         if response.status_code != 200:
-            print(f"[tts_client] ElevenLabs API returned {response.status_code}")
+            print(f"[tts_client] Status: {response.status_code}")
+            print(f"[tts_client] Body: {response.text}")
+            try:
+                print(response.json())
+            except Exception:
+                pass
             return None
         return response.content
     except Exception as e:

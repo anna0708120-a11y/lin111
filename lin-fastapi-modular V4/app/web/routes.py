@@ -299,6 +299,7 @@ def get_conversation():
     手机 dock / 电脑 dock / 网页版打开页面时都打这个接口，看到的是同一份记录，
     这样才能做到跨装置同步。
     """
+    print("[CHAT-ID-2]", id(state.conversation_history))
     from datetime import datetime as _dt
 
     def _display_time(iso_str):

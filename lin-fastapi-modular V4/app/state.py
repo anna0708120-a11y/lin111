@@ -173,6 +173,7 @@ class AppState:
         """加载指定 session 的对话历史到缓存"""
         if session_id in self.session_conversations:
             self.conversation_history = self.session_conversations[session_id]
+            print("[CHAT-ID-3]", id(self.conversation_history))
             return
         
         # 从数据库加载
@@ -200,6 +201,7 @@ class AppState:
         
         self.session_conversations[session_id] = conversations
         self.conversation_history = conversations
+        print("[CHAT-ID-3]", id(self.conversation_history))
     
     def switch_session(self, session_id):
         """切换到指定的聊天室"""
@@ -465,6 +467,7 @@ class AppState:
         trace：Developer Panel 用的版本化 trace dict（TraceCollector.export()），可选，
         只有 lin 的回覆会带，不影响既有呼叫端（不传就是 None）。
         """
+        print("[CHAT-ID-1]", id(self.conversation_history))
         target_session = session_id or self.current_session_id
         
         turn = {

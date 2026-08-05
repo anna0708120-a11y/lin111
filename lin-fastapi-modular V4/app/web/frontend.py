@@ -30,7 +30,7 @@ HTML_CONTENT = """<!DOCTYPE html>
 let voiceLoadingIdx=null;
 const CK='lin_audio_urls';
 async function playVoice(idx){
-  if(voiceLoadingIdx===idx)return;
+  console.log('[TTS] playVoice clicked, idx:', idx);
   const m=chatMemoryCache[idx];
   if(!m||m.r!=='lin')return;
   if(m.audioUrl){
@@ -49,6 +49,8 @@ async function playVoice(idx){
   }catch(e){}
   voiceLoadingIdx=null;
 }
+
+window.playVoice = playVoice;
 
 // 页面加载完成后,如果当前在Mine tab,立即加载经期数据
 document.addEventListener('DOMContentLoaded', () => {
@@ -1394,7 +1396,12 @@ function addVoiceButtons(){
     const btn=document.createElement('button');
     btn.className='voice-btn';
     btn.textContent='🔊';
-    btn.onclick=e=>{e.stopPropagation();playVoice(idx);};
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('[TTS] voice button clicked, idx:', idx);
+      window.playVoice(idx);
+    });
     meta.prepend(btn);
   });
 }

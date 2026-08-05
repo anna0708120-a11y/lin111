@@ -426,6 +426,9 @@ def generate_reply_stream(context, app_name=None, use_cache=True, session_id=Non
                 yield "event: done\ndata: {}\n\n"
     
     except Exception as e:
+        import traceback
+        print("[EXCEPTION] generate_reply_stream 捕获到异常:")
+        traceback.print_exc()
         state.add_log("AI回复", f"失败：{str(e)}")
         fallback_payload = json.dumps({'delta': '信号不好。'})
         yield "event: content\ndata: " + fallback_payload + "\n\n"

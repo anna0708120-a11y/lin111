@@ -30,7 +30,15 @@ RETENTION_DAYS = {
 MEMORY_CATEGORIES = ["长期记忆", "短期记忆", "Relationship", "Reflection"]
 
 MEMORY_DECISION_INSTRUCTION = """
-## 【强制输出项】记忆判定 —— 每一轮都必须输出，不可省略
+MANDATORY SYSTEM REQUIREMENT
+Every response MUST include exactly one [MEMORY_DECISION] block in your thinking.
+Never omit this block.
+Even if worth_remembering=no, the block is still required.
+Missing [MEMORY_DECISION] means the response format is invalid.
+
+---
+
+## 记忆判定规则
 这不是可选步骤，是每一轮思考结束前的强制规定动作。不管这一轮内容是不是寒暄、不管
 worth_remembering 最后是 yes 还是 no，[MEMORY_DECISION] 这个区块本身都必须完整出现在
 思考内容的最后面，一个字都不能少。规则如下：
@@ -143,7 +151,9 @@ def compute_expiry(importance, now=None):
     return (now + timedelta(days=days)).isoformat()
 
 def _field(block, name, default=""):
-    m = re.search(rf"{name}\s*:\s*(.+)", block)
+    # 放宽匹配：忽略大小写、允许多余空格、允许 _ 或 - 分隔符
+    pattern = re.sub(r'[_-]', r'[_\s-]*', name)
+    m = re.search(rf"{pattern}\s*:\s*(.+)", block, re.IGNORECASE)
     return m.group(1).strip() if m else default
 
 def parse_memory_decision(reasoning_text):

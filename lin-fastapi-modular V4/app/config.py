@@ -88,16 +88,12 @@ CALENDAR_CACHE_MINUTES = int(os.getenv("CALENDAR_CACHE_MINUTES", 15))
 # ---- Supabase Storage 图片桶名字 ----
 PHOTO_BUCKET = os.getenv("PHOTO_BUCKET", "photos")
 
-
-
-
-
-# ---- ElevenLabs 语⾳（免费额度，非商⽤，⽤现成⾳⾊不是克隆）----
+# ---- ElevenLabs 语音（免费额度，非商用，用现成音色不是克隆）----
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "")
-# 去 ElevenLabs ⽹站的 Voice Library 挑⼀个⾳⾊，⽹址或后台能看到 voice_id，填这⾥
+# 去 ElevenLabs 网站的 Voice Library 挑一个音色，网址或后台能看到 voice_id，填这里
 ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "")
 ELEVENLABS_MODEL = os.getenv("ELEVENLABS_MODEL", "eleven_multilingual_v2")
-# 免费额度只有10,000字/⽉，单条message别送太⻓，超过这个⻓度直接拒绝，避免⼀条訊息就把额度花光
+# 免费额度只有10,000字/月，单条message别送太长，超过这个长度直接拒绝，避免一条訊息就把额度花光
 TTS_MAX_CHARS = int(os.getenv("TTS_MAX_CHARS", 200))
-# Supabase Storage 放语⾳档的桶名字
+# Supabase Storage 放语音档的桶名字
 VOICE_BUCKET = os.getenv("VOICE_BUCKET", "voices")

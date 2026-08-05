@@ -5,6 +5,7 @@
 以后 Flutter app 要接进来，看这个文件就知道有哪些接口能打。
 """
 from typing import Optional
+import uuid
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import Response, StreamingResponse
@@ -21,6 +22,9 @@ from app.web.pwa import MANIFEST_JSON, SERVICE_WORKER_JS
 from app.web.diagnose import DIAGNOSE_HTML
 
 router = APIRouter()
+
+class TTSPayload(BaseModel):
+    text: str
 
 class Activity(BaseModel):
     activity: str
@@ -857,3 +861,18 @@ def star_chat_session(session_id: str):
 
     new_state = session_module.toggle_star_session(session_id)
     return {"status": "Success", "starred": new_state}
+
+
+@router.post("/tts")
+def text_to_speech(payload: TTSPayload):
+    """按需生成语音并回传公开音档 URL。"""
+    from app.llm.tts_client import synth_speech
+
+    audio_bytes = synth_speech(payload.text)
+    if not audio_bytes:
+        return {"status": "Failed", "url": None}
+    filename = f"{uuid.uuid4().hex}.mp3"
+    url = db.upload_voice(filename, audio_bytes)
+    if not url:
+        return {"status": "Failed", "url": None}
+    return {"status": "Success", "url": url}

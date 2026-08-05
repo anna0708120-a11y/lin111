@@ -558,3 +558,18 @@ def get_memory_trace_stats(days=7):
     except Exception as e:
         print(f"[db] 取得 memory trace 統計失敗: {e}")
         return {}
+
+
+# ---------- 语音（Supabase Storage） ----------
+def upload_voice(filename, audio_bytes):
+    """把 mp3 bytes 上传到 Storage，回传公开访问网址。"""
+    if not _client or not audio_bytes:
+        return None
+    try:
+        _client.storage.from_(config.VOICE_BUCKET).upload(
+            filename, audio_bytes, {"content-type": "audio/mpeg"}
+        )
+        return _client.storage.from_(config.VOICE_BUCKET).get_public_url(filename)
+    except Exception as e:
+        print(f"[db] 上传语音失败: {e}")
+        return None

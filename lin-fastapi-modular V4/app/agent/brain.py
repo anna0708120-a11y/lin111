@@ -164,8 +164,6 @@ def generate_reply(context, app_name=None, use_cache=True):
     if reasoning:
         # Phase 2: 開始 trace
         memory_trace.start_trace(session_id=None, message_id=None)
-        memory_trace.record_model_output(reasoning_text=reasoning, raw_decision_block=None)
-        
         decision = parse_memory_decision(reasoning)
         if decision:
             # 記錄 parse 成功
@@ -317,7 +315,7 @@ def generate_reply_stream(context, app_name=None, use_cache=True, session_id=Non
     world_context = format_context_for_prompt(get_context())
     system_prompt = build_system_prompt(context, memory_summary, world_context, conversation_history)
 
-    yield collector.record_prompt(
+    collector.record_prompt(
         "passed",
         prompt_version=getattr(config, "PROMPT_VERSION", None),
         total_tokens=len(system_prompt),
@@ -348,22 +346,28 @@ def generate_reply_stream(context, app_name=None, use_cache=True, session_id=Non
             elif event_type == "error":
                 state.add_log("AI回复", f"API失败：{data}")
                 yield 'event: content\ndata: ' + json.dumps({'delta': '信号不好。'}) + '\n\n'
-                yield collector.record_reasoning("failed", reasoning_text=None)
+                collector.record_reasoning("failed", reasoning_text=None)
                 yield "event: done\ndata: {}\n\n"
                 return
             elif event_type == "done":
                 parse_source = raw_reasoning or full_reasoning
-                yield collector.record_reasoning("passed" if parse_source else "failed", reasoning_text=parse_source)
+                collector.record_reasoning("passed" if parse_source else "failed", reasoning_text=parse_source)
 
+                memory_trace.start_trace(session_id=target_session, message_id=None)
                 if parse_source:
                     _trace_start = time.time()
                     traced = parse_memory_decision_traced(parse_source)
                     _parse_time_ms = int((time.time() - _trace_start) * 1000)
+                    memory_trace.record_parse_result(
+                        success=traced["status"] == "passed",
+                        parsed_decision=traced["decision"],
+                        error=None if traced["status"] == "passed" else traced["reason"],
+                    )
 
-                    yield collector.record_memory_decision(
+                    collector.record_memory_decision(
                         traced["status"], parsed_decision=traced["decision"], reason=traced["reason"]
                     )
-                    yield collector.record_parser(traced["status"], reason=traced["reason"], parse_time_ms=_parse_time_ms)
+                    collector.record_parser(traced["status"], reason=traced["reason"], parse_time_ms=_parse_time_ms)
 
                     # 正式邏輯仍只用既有的 parse_memory_decision，不依賴 traced 版本的回傳值，
                     # 避免診斷用的包裝函式影響到正式的記憶寫入行為。
@@ -373,28 +377,39 @@ def generate_reply_stream(context, app_name=None, use_cache=True, session_id=Non
                         action = decision.get("action", "create")
                         if action == "update":
                             _result = state.update_memory(decision)
-                            yield collector.record_backend("passed", backend_action="update_memory", action_taken=_result.get("action_taken") if _result else None)
+                            memory_trace.record_backend_action("update_memory", _result or {})
+                            collector.record_backend("passed", backend_action="update_memory", action_taken=_result.get("action_taken") if _result else None)
                         elif action == "archive":
                             _result = state.archive_memory(decision)
-                            yield collector.record_backend("passed", backend_action="archive_memory", action_taken=_result.get("action_taken") if _result else None)
+                            memory_trace.record_backend_action("archive_memory", _result or {})
+                            collector.record_backend("passed", backend_action="archive_memory", action_taken=_result.get("action_taken") if _result else None)
                         else:
                             _result = state.remember_or_reinforce(decision)
-                            yield collector.record_backend("passed", backend_action="remember_or_reinforce", action_taken=_result.get("action_taken") if _result else None)
+                            memory_trace.record_backend_action("remember_or_reinforce", _result or {})
+                            collector.record_backend("passed", backend_action="remember_or_reinforce", action_taken=_result.get("action_taken") if _result else None)
                         print(f"[DONE-2] 記憶寫入動作完成, action={action}, action_taken={_result.get('action_taken') if _result else None}")
 
                         if _result and _result.get("memory_id") is not None and _result.get("action_taken") != "skipped":
-                            yield collector.record_db("passed", memory_id=_result.get("memory_id"))
+                            memory_trace.record_db_result(success=True)
+                            collector.record_db("passed", memory_id=_result.get("memory_id"))
                         else:
-                            yield collector.record_db("failed", db_error=_result.get("skip_reason") if _result else "handler_failed")
-                            yield collector.emit("error", message="記憶寫入失敗")
+                            memory_trace.record_db_result(success=False, error=_result.get("skip_reason") if _result else "handler_failed")
+                            collector.record_db("failed", db_error=_result.get("skip_reason") if _result else "handler_failed")
+                            state.add_log("記憶", "寫入失敗")
                     else:
-                        yield collector.record_backend("not_executed")
-                        yield collector.record_db("not_executed")
+                        collector.record_backend("not_executed")
+                        collector.record_db("not_executed")
                 else:
-                    yield collector.record_memory_decision("failed", reason="reasoning 為空，無法解析")
-                    yield collector.record_parser("failed", reason="reasoning 為空，無法解析")
-                    yield collector.record_backend("not_executed")
-                    yield collector.record_db("not_executed")
+                    memory_trace.record_parse_result(
+                        success=False,
+                        error="reasoning 為空，無法解析",
+                    )
+                    collector.record_memory_decision("failed", reason="reasoning 為空，無法解析")
+                    collector.record_parser("failed", reason="reasoning 為空，無法解析")
+                    collector.record_backend("not_executed")
+                    collector.record_db("not_executed")
+
+                    memory_trace.save_trace()
 
                 # Auto-detect mood events from user + Lin content
                 detected_events = _auto_detect_mood_events(context, full_content)
@@ -463,8 +478,7 @@ def generate_reply_stream(context, app_name=None, use_cache=True, session_id=Non
                 print("[DONE-5] state.add_log 完成")
                 
                 if full_content and full_content not in ("信号不好。", "今天额度用完了，或者刚刚问太快了，等一下再说。"):
-                    thinking_display = strip_hidden_blocks(full_reasoning) if full_reasoning else None
-                    state.add_conversation_turn("lin", full_content, thinking=thinking_display, session_id=target_session, trace=collector.export())
+                    state.add_conversation_turn("lin", full_content, session_id=target_session, trace=None)
                     print("[DONE-6] state.add_conversation_turn 完成")
                     
                     from app.notify.bark import send_to_bark

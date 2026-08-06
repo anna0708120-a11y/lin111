@@ -16,6 +16,7 @@ HTML_CONTENT = """<!DOCTYPE html>
 <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
 <title>Lin</title>
 <script>
+window.LinChatPolicy = window.LinChatPolicy || { showThinking: false };
 (function(){
   try{
     var t=localStorage.getItem('lin_theme');
@@ -1437,8 +1438,7 @@ function renderOnly(history){
       iso: iso,
       time: display,
       think: m.thinking || m.think,
-      message_id: m.message_id,
-      trace: m.trace
+      message_id: m.message_id
     };
   });
   chatMemoryCache = serverMessages;
@@ -1594,11 +1594,11 @@ async function confirmImageSend() {
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     
+    const showThinking = window.LinChatPolicy?.showThinking === true;
     let reasoningBuffer = '';
     let contentBuffer = '';
     let currentMsgDiv = null;
     let thinkDiv = null;
-    let currentDevTrace = null;
     let currentEvent = null;
     let sseBuffer = '';
     
@@ -1614,11 +1614,11 @@ async function confirmImageSend() {
             iso: new Date().toISOString()
           };
           if(reasoningBuffer) entry.think = reasoningBuffer;
-          if(currentDevTrace && currentDevTrace.lastPayload) entry.trace = currentDevTrace.lastPayload;
           chatMemoryCache.push(entry);
           if(chatMemoryCache.length > 200) chatMemoryCache = chatMemoryCache.slice(-200);
           syncChat().catch(e => console.error('[DEBUG] Failed to sync image chat:', e));
         }
+        if(document.getElementById('tb-memory')?.classList.contains('active')) rmem();
         scrollDown();
         pendingImageDataUrl = null;
         return;
@@ -1642,23 +1642,20 @@ async function confirmImageSend() {
             const data = JSON.parse(line.slice(6));
             
             if (currentEvent === 'reasoning' && data.content !== undefined) {
+              if (!showThinking) continue;
               reasoningBuffer += data.content;
-              
               if (!thinkDiv) {
                 const msgDiv = document.createElement('div');
                 msgDiv.className = 'msg lin';
-                
                 thinkDiv = document.createElement('div');
                 thinkDiv.className = 'think-box';
                 thinkDiv.textContent = reasoningBuffer;
-                
                 const toggle = document.createElement('div');
                 toggle.className = 'think-toggle';
                 toggle.innerHTML = '💭 思考過程';
                 toggle.onclick = () => {
-                  thinkDiv.style.display = thinkDiv.style.display==='none'?'block':'none';
+                  thinkDiv.style.display = thinkDiv.style.display === 'none' ? 'block' : 'none';
                 };
-                
                 msgDiv.appendChild(toggle);
                 msgDiv.appendChild(thinkDiv);
                 document.getElementById('cm').appendChild(msgDiv);
@@ -1686,7 +1683,6 @@ async function confirmImageSend() {
                 rowDiv.appendChild(bubDiv);
                 msgDiv.appendChild(rowDiv);
                 document.getElementById('cm').appendChild(msgDiv);
-                console.log('[DEBUG] Content msgDiv appended to #cm');
                 
                 currentMsgDiv = bubDiv;
               } else {
@@ -1704,14 +1700,6 @@ async function confirmImageSend() {
 
             else if (currentEvent === 'body_state') {
               renderIntimacy(data);
-            }
-
-            else if (currentEvent === 'agent_event') {
-              const msgLinEl = currentMsgDiv ? currentMsgDiv.closest('.msg.lin') : null;
-              if (msgLinEl) {
-                if (!currentDevTrace) currentDevTrace = window.ActivityTimeline.createForContainer(msgLinEl);
-                currentDevTrace.ingest(data);
-              }
             }
             
           } catch(e) {
@@ -1757,20 +1745,18 @@ async function send(){
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     
+    const showThinking = window.LinChatPolicy?.showThinking === true;
     let reasoningBuffer = '';
     let contentBuffer = '';
     let currentMsgDiv = null;
     let thinkDiv = null;
-    let currentDevTrace = null;
     let currentEvent = null;
     let sseBuffer = '';
     
     typing(false);
     
     function processChunk({done, value}){
-      console.log('[DEBUG] processChunk called, done:', done);
       if(done){
-        console.log('[DEBUG] Stream done. contentBuffer:', contentBuffer, 'reasoningBuffer:', reasoningBuffer);
         if(contentBuffer){
           const entry = {
             r: 'lin',
@@ -1779,11 +1765,11 @@ async function send(){
             iso: new Date().toISOString()
           };
           if(reasoningBuffer) entry.think = reasoningBuffer;
-          if(currentDevTrace && currentDevTrace.lastPayload) entry.trace = currentDevTrace.lastPayload;
           chatMemoryCache.push(entry);
           if(chatMemoryCache.length > 200) chatMemoryCache = chatMemoryCache.slice(-200);
           syncChat().catch(e => console.error('[DEBUG] Failed to sync chat:', e));
         }
+        if(document.getElementById('tb-memory')?.classList.contains('active')) rmem();
         scrollDown();
         return;
       }
@@ -1806,25 +1792,20 @@ async function send(){
             const data = JSON.parse(line.slice(6));
             
             if(currentEvent === 'reasoning' && data.content !== undefined){
-              console.log('[DEBUG] ✅ REASONING event received, data.content:', data.content);
+              if(!showThinking) continue;
               reasoningBuffer += data.content;
-              
               if(!thinkDiv){
-                console.log('[DEBUG] Creating thinking msgDiv');
                 const msgDiv = document.createElement('div');
                 msgDiv.className = 'msg lin';
-                
                 thinkDiv = document.createElement('div');
                 thinkDiv.className = 'think-box';
                 thinkDiv.textContent = reasoningBuffer;
-                
                 const toggle = document.createElement('div');
                 toggle.className = 'think-toggle';
                 toggle.innerHTML = '💭 思考過程';
                 toggle.onclick = () => {
-                  thinkDiv.style.display = thinkDiv.style.display==='none'?'block':'none';
+                  thinkDiv.style.display = thinkDiv.style.display === 'none' ? 'block' : 'none';
                 };
-                
                 msgDiv.appendChild(toggle);
                 msgDiv.appendChild(thinkDiv);
                 document.getElementById('cm').appendChild(msgDiv);
@@ -1835,11 +1816,9 @@ async function send(){
             }
             
             else if(currentEvent === 'content' && data.delta !== undefined){
-              console.log('[DEBUG] ✅ CONTENT event received, data.delta:', data.delta);
               contentBuffer += data.delta;
               
               if(!currentMsgDiv){
-                console.log('[DEBUG] Creating content msgDiv');
                 const msgDiv = document.createElement('div');
                 msgDiv.className = 'msg lin';
                 
@@ -1871,14 +1850,6 @@ async function send(){
 
             else if(currentEvent === 'body_state'){
               renderIntimacy(data);
-            }
-
-            else if(currentEvent === 'agent_event'){
-              const msgLinEl = currentMsgDiv ? currentMsgDiv.closest('.msg.lin') : null;
-              if (msgLinEl) {
-                if (!currentDevTrace) currentDevTrace = window.ActivityTimeline.createForContainer(msgLinEl);
-                currentDevTrace.ingest(data);
-              }
             }
             
           }catch(e){

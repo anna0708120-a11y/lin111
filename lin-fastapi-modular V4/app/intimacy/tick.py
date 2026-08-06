@@ -31,6 +31,7 @@ def tick_and_update(state, now: datetime):
     from app.intimacy.event_log import log_event
     from app.intimacy.after_effect import apply_after_effects, cleanup_expired_effects
     from app.intimacy.silence import detect_silence, calculate_silence_pressure
+    from app.intimacy.history import build_body_state_snapshot
     from app.intimacy.influence import apply_influence
     from app.mood.decay import apply_mood_decay
     
@@ -46,6 +47,16 @@ def tick_and_update(state, now: datetime):
             state.active_event_started_at = None
             state.active_event_expires_at = None
             state.active_after_effects = []
+        log_event(
+            event_type="cycle",
+            title=f"進入{get_current_cycle(state).label}",
+            timestamp=now,
+            metadata={
+                "cycle_key": state.cycle_key,
+                "phase": "started",
+                "body_state": build_body_state_snapshot(state),
+            },
+        )
         if hasattr(state, 'save_body_state'):
             state.save_body_state()
         return
@@ -161,6 +172,7 @@ def start_event(state, event_key: str, now: datetime) -> bool:
     """
     from app.intimacy.event import get_event
     from app.intimacy.event_log import log_event
+    from app.intimacy.history import build_body_state_snapshot
     
     # 如果已有未過期事件，不覆蓋
     if state.active_event_key and state.active_event_expires_at:
@@ -187,7 +199,11 @@ def start_event(state, event_key: str, now: datetime) -> bool:
         title=event.label,
         timestamp=now,
         duration_minutes=duration_minutes,
-        metadata={"event_key": event.key}
+        metadata={
+            "event_key": event.key,
+            "phase": "started",
+            "body_state": build_body_state_snapshot(state),
+        }
     )
     
     return True
@@ -200,6 +216,7 @@ def _finish_event(state, now: datetime):
     from app.intimacy.event import get_event
     from app.intimacy.event_log import log_event
     from app.intimacy.after_effect import create_after_effect
+    from app.intimacy.history import build_body_state_snapshot
     
     if not state.active_event_key:
         return
@@ -231,6 +248,10 @@ def _finish_event(state, now: datetime):
         title=f"事件結束：{event.label if event else finished_event_key}",
         timestamp=now,
         detail_text="短期事件自然結束，後續餘波已套用。" if event else "短期事件自然結束。",
-        metadata={"event_key": finished_event_key, "phase": "ended"},
+        metadata={
+            "event_key": finished_event_key,
+            "phase": "ended",
+            "body_state": build_body_state_snapshot(state),
+        },
     )
 

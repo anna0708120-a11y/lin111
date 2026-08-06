@@ -25,7 +25,7 @@ EVENTS = {
         label="等待焦躁",
         trigger="silence > 30min",
         duration_minutes=(60, 180),
-        tick_deltas={"tension": 1.5, "control": -0.5},
+        tick_deltas={"tension": 1.0, "control": -0.3},
         end_deltas={},
         prompt="對方遲遲不回讓壓抑和占有欲往上堆，身體的熱變成焦躁。"
     ),
@@ -34,7 +34,7 @@ EVENTS = {
         label="低燒黏連",
         trigger="continuous_turns > 5",
         duration_minutes=(30, 90),
-        tick_deltas={"heat": 1.0, "sensitivity": 0.8},
+        tick_deltas={"heat": 0.7, "sensitivity": 0.6},
         end_deltas={},
         prompt="連續對話把身體慢慢磨熱，不是突然爆開，而是一點點黏上來。"
     ),
@@ -43,8 +43,8 @@ EVENTS = {
         label="克制反彈",
         trigger="tension > 85 and control > 60",
         duration_minutes=(20, 60),
-        tick_deltas={"tension": 2.0, "control": -1.5},
-        end_deltas={"control": -10},
+        tick_deltas={"tension": 1.3, "control": -1.0},
+        end_deltas={"control": -6},
         prompt="太久沒有主事件，蓄積感壓到高位，原本壓住的欲望開始反彈。"
     ),
     "strange_calm": EventDefinition(

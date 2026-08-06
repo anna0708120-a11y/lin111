@@ -1,4 +1,3 @@
-"""Focused regression tests for Phase 3 event and SSE integration."""
 import asyncio
 import json
 import unittest
@@ -7,6 +6,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from app.intimacy.after_effect import AfterEffect
+from app.intimacy.body_state import calculate_body_state
 from app.intimacy.settlement import apply_settlement_result, build_settlement_result
 from app.intimacy.status import build_intimacy_status_payload
 from app.intimacy.tick import _finish_event, start_event
@@ -29,6 +29,9 @@ class EventAndSettlementTests(unittest.TestCase):
         self.assertEqual(state.active_event_started_at, now)
         self.assertGreater(state.active_event_expires_at, now)
         log_event.assert_called_once()
+        metadata = log_event.call_args.kwargs["metadata"]
+        self.assertEqual(metadata["phase"], "started")
+        self.assertEqual(metadata["body_state"]["active_event_key"], "low_fever_cling")
 
     def test_status_payload_uses_live_cycle_event_and_after_effect(self):
         now = datetime(2026, 8, 6, 12, 0, 0)
@@ -54,6 +57,28 @@ class EventAndSettlementTests(unittest.TestCase):
         self.assertEqual(payload["active_event"]["key"], "low_fever_cling")
         self.assertEqual(payload["active_event"]["remaining_seconds"], 25 * 60)
         self.assertEqual(payload["after_effects"][0]["source_event"], "post_waiting")
+
+    def test_status_payload_prefers_after_effect_when_event_is_inactive(self):
+        now = datetime(2026, 8, 6, 12, 0, 0)
+        state = SimpleNamespace(
+            mood={},
+            body_values={"tension": 30, "heat": 30, "sensitivity": 30, "control": 70},
+            cycle_key="stable",
+            cycle_started_at=now,
+            cycle_expires_at=now + timedelta(hours=72),
+            active_event_key=None,
+            active_event_started_at=None,
+            active_event_expires_at=None,
+            active_after_effects=[AfterEffect(
+                "post_waiting", 30, {"tension": 2}, "等待後的餘溫", now, now + timedelta(minutes=15)
+            )],
+            last_tick_at=now,
+        )
+
+        payload = build_intimacy_status_payload(state, now)
+
+        self.assertIsNone(payload["active_event"])
+        self.assertEqual(payload["after_effects"][0]["remaining_text"], "剩 15m")
 
     def test_event_finish_clears_active_event_and_keeps_after_effect(self):
         now = datetime(2026, 8, 6, 12, 0, 0)
@@ -91,10 +116,28 @@ class EventAndSettlementTests(unittest.TestCase):
 
         self.assertEqual(next_turns, 1)
 
+    def test_mood_mapping_adjusts_targets_without_overriding_cycle(self):
+        cycle = SimpleNamespace(
+            targets={"tension": 20, "heat": 30, "sensitivity": 25, "control": 80},
+            growth_rates={"tension": 1, "heat": 1, "sensitivity": 1, "control": -1},
+        )
+        current = {"tension": 20, "heat": 30, "sensitivity": 25, "control": 80}
+        baseline = calculate_body_state({}, cycle, current, 1)
+        adjusted = calculate_body_state(
+            {"libido": 0.5, "attachment": 0.9, "possessiveness": 0.9, "stress": 0.2, "fatigue": 0.1},
+            cycle,
+            current,
+            1,
+        )
+
+        self.assertGreater(adjusted["tension"], baseline["tension"])
+        self.assertGreater(adjusted["heat"], baseline["heat"])
+        self.assertGreater(adjusted["sensitivity"], baseline["sensitivity"])
+        self.assertLess(adjusted["control"], 100)
+
 
 class WatchSseTests(unittest.TestCase):
     def test_watch_stream_emits_content_body_state_and_done(self):
-        import app.agent.brain as brain
         import app.llm.deepseek_client as deepseek_client
         from app.web import routes
 
@@ -148,7 +191,10 @@ class WatchSseTests(unittest.TestCase):
         self.assertIn("event: body_state", payload)
         self.assertIn("event: done", payload)
         body_data = payload.split("event: body_state\ndata: ", 1)[1].split("\n\n", 1)[0]
-        self.assertIn("body_values", json.loads(body_data))
+        rendered = json.loads(body_data)
+        self.assertIn("body_values", rendered)
+        self.assertIn("cycle", rendered)
+        self.assertIn("after_effects", rendered)
 
 
 if __name__ == "__main__":

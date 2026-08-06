@@ -47,6 +47,12 @@ def log_event(event_type: str, title: str, timestamp: datetime = None,
 
 def get_current_event():
     """回傳當前事件 + 持續時間"""
+    if supabase is None:
+        return {
+            "event": "無",
+            "duration_hours": 0,
+            "duration_minutes": 0,
+        }
     try:
         result = supabase.table("intimacy_events") \
             .select("*") \
@@ -75,11 +81,9 @@ def get_current_event():
 
 
 def get_event_timeline(filter_type="all"):
-    """
-    回傳事件時間軸（真實資料）
-    
-    filter_type: "all" | "cycle" | "event" | "settlement"
-    """
+    """回傳事件時間軸（真實資料）"""
+    if supabase is None:
+        return []
     try:
         query = supabase.table("intimacy_events").select("*").order("timestamp", desc=True).limit(50)
         
@@ -101,6 +105,8 @@ def get_event_timeline(filter_type="all"):
                 event["duration_minutes"] = row["duration_minutes"]
             if row.get("detail_text"):
                 event["detail_text"] = row["detail_text"]
+            if isinstance(row.get("metadata"), dict):
+                event["metadata"] = row["metadata"]
             
             events.append(event)
         

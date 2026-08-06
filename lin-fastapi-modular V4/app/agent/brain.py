@@ -436,6 +436,7 @@ def generate_reply_stream(context, app_name=None, use_cache=True, session_id=Non
                 if settlement["result"] != "neutral":
                     try:
                         from app.intimacy.event_log import log_event
+                        from app.intimacy.history import build_body_state_snapshot
                         log_event(
                             event_type="settlement",
                             title=f"互動結算：{settlement['result']}",
@@ -444,6 +445,7 @@ def generate_reply_stream(context, app_name=None, use_cache=True, session_id=Non
                             metadata={
                                 "applied_deltas": settlement["applied_deltas"],
                                 "continuous_turns": getattr(state, "continuous_turns", 0),
+                                "body_state": build_body_state_snapshot(state),
                             },
                         )
                     except Exception as e:

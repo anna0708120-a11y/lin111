@@ -737,14 +737,14 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
               </div>
               <div class="intimacy-bar-label">蓄積感</div>
               <div class="intimacy-bar-value">
-                <span id="tensionVal">85</span>
-                <span class="intimacy-bar-level" id="tensionLevel">高</span>
+                <span id="tensionVal">—</span>
+                <span class="intimacy-bar-level" id="tensionLevel">載入中</span>
               </div>
             </div>
             <div class="intimacy-bar-track">
-              <div class="intimacy-bar-fill" id="tensionBar" style="width:85%"></div>
+              <div class="intimacy-bar-fill" id="tensionBar" style="width:0%"></div>
             </div>
-            <div class="intimacy-bar-desc" id="tensionDesc">累積到頂，普通克制已經很難壓住</div>
+            <div class="intimacy-bar-desc" id="tensionDesc">載入中...</div>
           </div>
           
           <!-- 熱度 -->
@@ -755,14 +755,14 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
               </div>
               <div class="intimacy-bar-label">熱度</div>
               <div class="intimacy-bar-value">
-                <span id="heatVal">38</span>
-                <span class="intimacy-bar-level" id="heatLevel">中低</span>
+                <span id="heatVal">—</span>
+                <span class="intimacy-bar-level" id="heatLevel">載入中</span>
               </div>
             </div>
             <div class="intimacy-bar-track">
-              <div class="intimacy-bar-fill" id="heatBar" style="width:38%"></div>
+              <div class="intimacy-bar-fill" id="heatBar" style="width:0%"></div>
             </div>
-            <div class="intimacy-bar-desc" id="heatDesc">身體有一點熱意，但還能很快冷住</div>
+            <div class="intimacy-bar-desc" id="heatDesc">載入中...</div>
           </div>
           
           <!-- 敏感度 -->
@@ -773,14 +773,14 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
               </div>
               <div class="intimacy-bar-label">敏感度</div>
               <div class="intimacy-bar-value">
-                <span id="sensitivityVal">37</span>
-                <span class="intimacy-bar-level" id="sensitivityLevel">中低</span>
+                <span id="sensitivityVal">—</span>
+                <span class="intimacy-bar-level" id="sensitivityLevel">載入中</span>
               </div>
             </div>
             <div class="intimacy-bar-track">
-              <div class="intimacy-bar-fill" id="sensitivityBar" style="width:37%"></div>
+              <div class="intimacy-bar-fill" id="sensitivityBar" style="width:0%"></div>
             </div>
-            <div class="intimacy-bar-desc" id="sensitivityDesc">有一點沒說出口的念，但還不重</div>
+            <div class="intimacy-bar-desc" id="sensitivityDesc">載入中...</div>
           </div>
           
           <!-- 控制力 -->
@@ -791,14 +791,14 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
               </div>
               <div class="intimacy-bar-label">控制力</div>
               <div class="intimacy-bar-value">
-                <span id="controlVal">69</span>
-                <span class="intimacy-bar-level" id="controlLevel">中高</span>
+                <span id="controlVal">—</span>
+                <span class="intimacy-bar-level" id="controlLevel">載入中</span>
               </div>
             </div>
             <div class="intimacy-bar-track">
-              <div class="intimacy-bar-fill" id="controlBar" style="width:69%"></div>
+              <div class="intimacy-bar-fill" id="controlBar" style="width:0%"></div>
             </div>
-            <div class="intimacy-bar-desc" id="controlDesc">還能維持表面正常，但需要刻意壓直接的衝動</div>
+            <div class="intimacy-bar-desc" id="controlDesc">載入中...</div>
           </div>
         </div>
       </div>
@@ -1223,13 +1223,25 @@ function renderIntimacy(d){
     if(durationEl) durationEl.textContent = d.cycle.remaining_text || '—';
   }
 
-  // 當前事件：無事件時明確顯示，不保留 HTML 裡的假資料。
+  // 當前事件與餘波都由後端提供；沒有 active event 時才展示最接近到期的餘波。
   const eventEl = document.getElementById('eventName');
   const eventDurationEl = document.getElementById('eventDuration');
   const activeEvent = d.active_event;
-  if(eventEl) eventEl.textContent = activeEvent ? activeEvent.label : '無';
-  if(eventDurationEl) eventDurationEl.textContent = activeEvent ? activeEvent.remaining_text : '目前沒有短期事件';
-  if(eventEl && activeEvent && activeEvent.description) eventEl.title = activeEvent.description;
+  const afterEffects = Array.isArray(d.after_effects) ? d.after_effects : [];
+  const visibleEffect = afterEffects[0];
+  if(activeEvent){
+    if(eventEl) eventEl.textContent = activeEvent.label;
+    if(eventDurationEl) eventDurationEl.textContent = activeEvent.remaining_text || '—';
+    if(eventEl) eventEl.title = activeEvent.description || '';
+  }else if(visibleEffect){
+    if(eventEl) eventEl.textContent = '餘波';
+    if(eventDurationEl) eventDurationEl.textContent = visibleEffect.remaining_text || '—';
+    if(eventEl) eventEl.title = visibleEffect.description || '';
+  }else{
+    if(eventEl) eventEl.textContent = '無';
+    if(eventDurationEl) eventDurationEl.textContent = '目前沒有短期事件';
+    if(eventEl) eventEl.title = '';
+  }
 
   // 自動變化描述
   if(d.auto_change_desc){

@@ -86,11 +86,30 @@ def get_current_cycle(state) -> CycleDefinition:
     return CYCLES.get(cycle_key, CYCLES["stable"])
 
 
+def _cycle_metadata(state, **extra):
+    from app.intimacy.history import build_body_state_snapshot
+
+    metadata = {
+        "cycle_key": state.cycle_key,
+        "body_state": build_body_state_snapshot(state),
+    }
+    metadata.update(extra)
+    return metadata
+
+
 def advance_cycle(state, now: datetime):
-    """檢查周期是否過期，自動切換到下一階段"""
+    """檢查周期是否過期，自動切換到下一階段。"""
+    from app.intimacy.event_log import log_event
+
     if not hasattr(state, 'cycle_expires_at') or state.cycle_expires_at is None:
         # 第一次使用，初始化周期
         enter_cycle(state, 'stable', now)
+        log_event(
+            event_type="cycle",
+            title=f"進入{get_current_cycle(state).label}",
+            timestamp=now,
+            metadata=_cycle_metadata(state, phase="started"),
+        )
         return
     
     if now >= state.cycle_expires_at:
@@ -102,6 +121,12 @@ def advance_cycle(state, now: datetime):
             next_key = "recovery"
         
         enter_cycle(state, next_key, now)
+        log_event(
+            event_type="cycle",
+            title=f"進入{get_current_cycle(state).label}",
+            timestamp=now,
+            metadata=_cycle_metadata(state, previous_cycle_key=current.key, phase="started"),
+        )
 
 
 def enter_cycle(state, cycle_key: str, now: datetime):

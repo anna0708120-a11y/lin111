@@ -160,6 +160,7 @@ def start_event(state, event_key: str, now: datetime) -> bool:
         是否成功啟動（如果已有未過期事件則失敗）
     """
     from app.intimacy.event import get_event
+    from app.intimacy.event_log import log_event
     
     # 如果已有未過期事件，不覆蓋
     if state.active_event_key and state.active_event_expires_at:

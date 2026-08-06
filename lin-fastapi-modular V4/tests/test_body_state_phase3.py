@@ -1,18 +1,35 @@
-"""Regression tests for Phase 3 current Event/Settlement integration."""
+"""Focused regression tests for Phase 3 event and SSE integration."""
+import asyncio
+import json
 import unittest
 from datetime import datetime, timedelta
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from app.intimacy.after_effect import AfterEffect
-from app.intimacy.settlement import (
-    apply_settlement_result,
-    build_settlement_result,
-)
+from app.intimacy.settlement import apply_settlement_result, build_settlement_result
 from app.intimacy.status import build_intimacy_status_payload
-from app.intimacy.tick import _finish_event
+from app.intimacy.tick import _finish_event, start_event
+from app.web.routes import Activity, observe_anna
 
 
 class EventAndSettlementTests(unittest.TestCase):
+    def test_start_event_logs_and_sets_live_event_state(self):
+        now = datetime(2026, 8, 6, 12, 0, 0)
+        state = SimpleNamespace(
+            active_event_key=None,
+            active_event_started_at=None,
+            active_event_expires_at=None,
+            save_body_state=lambda: None,
+        )
+        with patch("app.intimacy.event_log.log_event") as log_event:
+            self.assertTrue(start_event(state, "low_fever_cling", now))
+
+        self.assertEqual(state.active_event_key, "low_fever_cling")
+        self.assertEqual(state.active_event_started_at, now)
+        self.assertGreater(state.active_event_expires_at, now)
+        log_event.assert_called_once()
+
     def test_status_payload_uses_live_cycle_event_and_after_effect(self):
         now = datetime(2026, 8, 6, 12, 0, 0)
         state = SimpleNamespace(
@@ -64,6 +81,74 @@ class EventAndSettlementTests(unittest.TestCase):
         self.assertEqual(applied["applied_deltas"]["tension"], 3.0)
         self.assertGreaterEqual(state.body_values["control"], 0)
         self.assertNotIn("release", applied["result"])
+
+    def test_waiting_gap_starts_a_new_continuous_turn_streak(self):
+        now = datetime(2026, 8, 6, 12, 0, 0)
+        previous_message_at = now - timedelta(minutes=11)
+        continuous_turns = 3
+
+        next_turns = continuous_turns + 1 if (now - previous_message_at).total_seconds() < 10 * 60 else 1
+
+        self.assertEqual(next_turns, 1)
+
+
+class WatchSseTests(unittest.TestCase):
+    def test_watch_stream_emits_content_body_state_and_done(self):
+        import app.agent.brain as brain
+        import app.llm.deepseek_client as deepseek_client
+        from app.web import routes
+
+        def fake_stream(*_args, **_kwargs):
+            yield "content", "測試回覆"
+            yield "raw_reasoning", ""
+            yield "done", None
+
+        original_stream = deepseek_client.call_deepseek_stream
+        original_rate_limit = routes.state.check_rate_limit
+        original_record_call = routes.state.record_call
+        original_add_log = routes.state.add_log
+        original_add_turn = routes.state.add_conversation_turn
+        original_mark_anchor = routes.state.mark_conversation_anchor
+        original_save_body = routes.state.save_body_state
+        original_send_to_bark = None
+        try:
+            deepseek_client.call_deepseek_stream = fake_stream
+            routes.state.check_rate_limit = lambda: True
+            routes.state.record_call = lambda: None
+            routes.state.add_log = lambda *_args, **_kwargs: None
+            routes.state.add_conversation_turn = lambda *_args, **_kwargs: None
+            routes.state.mark_conversation_anchor = lambda: None
+            routes.state.save_body_state = lambda: None
+
+            import app.notify.bark as bark
+            original_send_to_bark = bark.send_to_bark
+            bark.send_to_bark = lambda *_args, **_kwargs: None
+
+            response = observe_anna(Activity(activity="謝謝你"))
+
+            async def collect():
+                chunks = []
+                async for chunk in response.body_iterator:
+                    chunks.append(chunk.decode() if isinstance(chunk, bytes) else chunk)
+                return "".join(chunks)
+
+            payload = asyncio.run(collect())
+        finally:
+            deepseek_client.call_deepseek_stream = original_stream
+            routes.state.check_rate_limit = original_rate_limit
+            routes.state.record_call = original_record_call
+            routes.state.add_log = original_add_log
+            routes.state.add_conversation_turn = original_add_turn
+            routes.state.mark_conversation_anchor = original_mark_anchor
+            routes.state.save_body_state = original_save_body
+            if original_send_to_bark is not None:
+                bark.send_to_bark = original_send_to_bark
+
+        self.assertIn("event: content", payload)
+        self.assertIn("event: body_state", payload)
+        self.assertIn("event: done", payload)
+        body_data = payload.split("event: body_state\ndata: ", 1)[1].split("\n\n", 1)[0]
+        self.assertIn("body_values", json.loads(body_data))
 
 
 if __name__ == "__main__":

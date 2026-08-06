@@ -6,6 +6,8 @@ state.py 透过这个模块存取数据，不直接碰 Supabase。
 返回空结果，整个 app 会自动退回纯内存模式，不会因为没接 Supabase 就跑不起来
 ——这也是为什么可以先部署、之后才补 Supabase，中间不会中断。
 """
+from datetime import datetime, timezone
+
 from app import config
 
 _client = None
@@ -42,9 +44,24 @@ def save_state_value(key, value):
         print(f"[db][state] 保存跳过：Supabase 未连接，key={key!r}, value={value!r}")
         return
     try:
-        print(f"[db][state] 准备保存：key={key!r}, value={value!r}")
-        res = _client.table("app_state").upsert({"key": key, "value": value}).execute()
-        print(f"[db][state] 保存成功：key={key!r}, execute_result={res!r}")
+        updated_at = datetime.now(timezone.utc).isoformat()
+        print(f"[db][state] 准备保存：key={key!r}, value={value!r}, updated_at={updated_at}")
+        res = (
+            _client.table("app_state")
+            .upsert({"key": key, "value": value, "updated_at": updated_at})
+            .execute()
+        )
+        saved = res.data[0] if res.data else None
+        if not saved:
+            print(f"[db][state] 保存未返回记录：key={key!r}, execute_result={res!r}")
+        elif (
+            saved.get("key") != key
+            or saved.get("value") != value
+            or not saved.get("updated_at")
+        ):
+            print(f"[db][state] 保存返回记录不完整：key={key!r}, record={saved!r}")
+        else:
+            print(f"[db][state] 保存成功：key={key!r}, record={saved!r}")
     except Exception as e:
         print(f"[db][state] 保存异常：key={key!r}, value={value!r}, error={e!r}")
 

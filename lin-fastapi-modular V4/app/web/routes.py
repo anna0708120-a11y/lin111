@@ -181,54 +181,14 @@ def get_intimacy():
 
 @router.get("/intimacy/status")
 def get_intimacy_status():
-    """
-    V1：周期 + 身體數值當前狀態（給身體狀態卡片「當前狀態」區塊用）
-    回傳真實計算的數值
-    """
+    """Return the backend-owned current Body State, cycle, event, and after effects."""
     from datetime import datetime
-    from app.intimacy.cycle import get_current_cycle, get_cycle_progress
+    from app.intimacy.status import build_intimacy_status_payload
     from app.intimacy.tick import tick_and_update
-    from app.intimacy.body_state import get_body_level, get_body_description
-    
-    # 先 tick 確保數值最新
-    tick_and_update(state, datetime.now())
-    
-    cycle = get_current_cycle(state)
-    progress = get_cycle_progress(state, datetime.now())
-    body_values = getattr(state, 'body_values', {})
-    
-    # 為每個身體數值添加 level 和 desc
-    body_values_with_meta = {}
-    for key in ["tension", "heat", "sensitivity", "control"]:
-        value = body_values.get(key, 0)
-        body_values_with_meta[key] = {
-            "value": round(value, 1),
-            "level": get_body_level(value),
-            "desc": get_body_description(key, value)
-        }
-    
-    # 計算周期經過時間
-    hours_elapsed = 0
-    if hasattr(state, 'cycle_started_at') and state.cycle_started_at:
-        hours_elapsed = (datetime.now() - state.cycle_started_at).total_seconds() / 3600.0
-    
-    return {
-        "cycle": {
-            "key": cycle.key,
-            "label": cycle.label,
-            "description": cycle.description,
-            "progress": f"{progress * 100:.1f}%",
-            "hours_elapsed": int(hours_elapsed)
-        },
-        "body_values": body_values_with_meta,
-        "auto_change_desc": (
-            f"{cycle.label}基線：\n"
-            f"tension(蓄積感) → {cycle.targets['tension']:.0f} ({cycle.growth_rates['tension']:+.1f}/h)\n"
-            f"heat(熱度) → {cycle.targets['heat']:.0f} ({cycle.growth_rates['heat']:+.1f}/h)\n"
-            f"sensitivity(敏感度) → {cycle.targets['sensitivity']:.0f} ({cycle.growth_rates['sensitivity']:+.1f}/h)\n"
-            f"control(控制力) → {cycle.targets['control']:.0f} ({cycle.growth_rates['control']:+.1f}/h)"
-        )
-    }
+
+    now = datetime.now()
+    tick_and_update(state, now)
+    return build_intimacy_status_payload(state, now)
 
 @router.get("/intimacy/consent")
 def get_consent_dynamics():

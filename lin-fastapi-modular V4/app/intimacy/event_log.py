@@ -37,6 +37,8 @@ def log_event(event_type: str, title: str, timestamp: datetime = None,
     if metadata is not None:
         data["metadata"] = metadata
     
+    if supabase is None:
+        return
     try:
         supabase.table("intimacy_events").insert(data).execute()
     except Exception as e:

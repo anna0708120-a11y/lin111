@@ -197,6 +197,7 @@ def _finish_event(state, now: datetime):
     結束事件並施加 end_deltas
     """
     from app.intimacy.event import get_event
+    from app.intimacy.event_log import log_event
     from app.intimacy.after_effect import create_after_effect
     
     if not state.active_event_key:
@@ -208,15 +209,27 @@ def _finish_event(state, now: datetime):
         for field, delta in event.end_deltas.items():
             state.body_values[field] = state.body_values.get(field, 0) + delta
         
-        # V2: 創建餘波（如果有對應模板）
-        after_effect = create_after_effect(event.key, now)
-        if after_effect:
-            if not hasattr(state, 'active_after_effects'):
-                state.active_after_effects = []
-            state.active_after_effects.append(after_effect)
+        # Event keys and after-effect template keys are intentionally separate.
+        after_effect_key = {
+            "waiting_restless": "post_waiting",
+        }.get(event.key)
+        if after_effect_key:
+            after_effect = create_after_effect(after_effect_key, now)
+            if after_effect:
+                if not hasattr(state, 'active_after_effects'):
+                    state.active_after_effects = []
+                state.active_after_effects.append(after_effect)
     
     # 清空事件
+    finished_event_key = state.active_event_key
     state.active_event_key = None
     state.active_event_started_at = None
     state.active_event_expires_at = None
+    log_event(
+        event_type="event",
+        title=f"事件結束：{event.label if event else finished_event_key}",
+        timestamp=now,
+        detail_text="短期事件自然結束，後續餘波已套用。" if event else "短期事件自然結束。",
+        metadata={"event_key": finished_event_key, "phase": "ended"},
+    )
 

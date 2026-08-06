@@ -707,16 +707,16 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
             <div class="intimacy-hero-bg" id="intimacyCycleBg"></div>
             <div style="position:relative;">
               <div class="intimacy-status-label">周期</div>
-              <div class="intimacy-status-value" id="cycleStage">平穩期</div>
-              <div class="intimacy-status-time" id="cycleDuration">68h 11m</div>
+              <div class="intimacy-status-value" id="cycleStage">載入中...</div>
+              <div class="intimacy-status-time" id="cycleDuration">—</div>
             </div>
           </div>
           <div class="intimacy-status-card" style="flex:0 0 calc(40% - 5px);cursor:pointer;position:relative;overflow:hidden;" onclick="document.getElementById('intimacyEventBgUpload').click()">
             <div class="intimacy-hero-bg" id="intimacyEventBg"></div>
             <div style="position:relative;">
               <div class="intimacy-status-label">事件</div>
-              <div class="intimacy-status-value" id="eventName">等待焦躁</div>
-              <div class="intimacy-status-time" id="eventDuration">2h 32m</div>
+              <div class="intimacy-status-value" id="eventName">載入中...</div>
+              <div class="intimacy-status-time" id="eventDuration">—</div>
             </div>
           </div>
         </div>
@@ -724,7 +724,7 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
         <!-- 自動變化 -->
         <div class="intimacy-auto-change">
           <div class="intimacy-auto-change-title">自動變化</div>
-          <div class="intimacy-auto-change-text" id="autoChangeDesc">平穩期基線：熱度 30 -1.4/h，壓抑 25 -1.7/h，控制 75 +1/h，敏感 35 -1.7/h，蓄積 +0.4/h，占有 42 -3.7/h，疲惫 16 -1.2/h</div>
+          <div class="intimacy-auto-change-text" id="autoChangeDesc">載入中...</div>
         </div>
 
         <!-- 數值區塊 -->
@@ -1105,42 +1105,38 @@ function switchIntimacyTab(tab){
   if(tab==='events' && !eventsLoaded){ loadEventTimeline(); eventsLoaded=true; }
 }
 
-/* ===== 事件日誌（V3 架構預留，假資料） ===== */
+/* ===== 事件日誌（後端真實資料） ===== */
 let eventsLoaded=false;
 let eventsFilter='all';
-const MOCK_EVENTS=[
-  {type:'cycle', title:'進入平穩期', desc:'熱度與敏感度逐漸回落，控制力緩慢回升。', time:'今天 08:12'},
-  {type:'event', title:'等待焦躁', desc:'持續 2 小時未收到訊息，占有欲小幅上升。', time:'今天 10:44'},
-  {type:'dream', title:'夢境片段', desc:'夢到與妳在雨中散步，醒來後蓄積感 +5。', time:'今天 06:30'},
-  {type:'settlement', title:'每日結算', desc:'昨日互動次數 12 次，親密度 +3。', time:'昨天 23:59'},
-  {type:'cycle', title:'結束高峰期', desc:'熱度從 78 回落至 52，進入緩和階段。', time:'昨天 20:15'},
-  {type:'event', title:'突然的想念', desc:'蓄積感短時間內 +8，敏感度同步上升。', time:'昨天 15:02'}
-];
+let loadedEvents=[];
 
 function filterEvents(type){
   eventsFilter=type;
   document.querySelectorAll('.event-filter-chip').forEach(c=>{
     c.classList.toggle('active', c.getAttribute('data-filter')===type);
   });
-  renderEventTimeline();
+  renderEventTimeline(loadedEvents);
 }
 
 async function loadEventTimeline(){
   const wrap=document.getElementById('eventTimeline');
   try{
     const r=await fetch(AU+'/intimacy/events');
+    if(!r.ok) throw new Error('event timeline request failed');
     const d=await r.json();
-    renderEventTimeline(Array.isArray(d)?d:d.events);
+    loadedEvents = Array.isArray(d) ? d : (d.events || []);
+    renderEventTimeline(loadedEvents);
   }catch(e){
-    // API 尚未提供事件日誌時，先用假資料呈現版面
-    renderEventTimeline(MOCK_EVENTS);
+    console.error('[loadEventTimeline]', e);
+    loadedEvents=[];
+    if(wrap) wrap.innerHTML='<div class="es">事件資料暫時無法載入</div>';
   }
 }
 
 function renderEventTimeline(list){
   const wrap=document.getElementById('eventTimeline');
   if(!wrap) return;
-  const data = list || MOCK_EVENTS;
+  const data = Array.isArray(list) ? list : [];
   const filtered = eventsFilter==='all' ? data : data.filter(e=>e.type===eventsFilter);
   if(!filtered.length){
     wrap.innerHTML='<div class="es">目前沒有符合的事件</div>';
@@ -1151,9 +1147,8 @@ function renderEventTimeline(list){
       '<div class="event-item-dot"></div>'+
       '<div class="event-item-body">'+
         '<div class="event-item-title">'+e.title+'</div>'+
-        '<div class="event-item-desc">'+e.desc+'</div>'+
-        '<div class="event-item-time">'+e.time+'</div>'+
-        (e.type==='settlement' ? '<div class="event-item-action" onclick="showSettlementDetail(this)">查看結算詳情</div>' : '')+
+        '<div class="event-item-desc">'+(e.detail_text || e.desc || '')+'</div>'+
+        '<div class="event-item-time">'+(e.timestamp || e.time || '')+'</div>'+
       '</div>'+
     '</div>'
   ).join('');
@@ -1220,19 +1215,22 @@ function renderIntimacy(d){
     if(descEl) descEl.textContent = desc;
   });
   
-  // 周期資訊 - 時間格式改為 68h 11m
+  // 周期資訊：完全使用後端狀態，不在前端推導時間。
   if(d.cycle){
     const cycleEl = document.getElementById('cycleStage');
     const durationEl = document.getElementById('cycleDuration');
-    if(cycleEl) cycleEl.textContent = d.cycle.label || '平穩期';
-    if(durationEl){
-      const hours = d.cycle.hours_elapsed || 0;
-      const h = Math.floor(hours);
-      const m = Math.floor((hours % 1) * 60);
-      durationEl.textContent = h + 'h ' + m + 'm';
-    }
+    if(cycleEl) cycleEl.textContent = d.cycle.label || '未初始化';
+    if(durationEl) durationEl.textContent = d.cycle.remaining_text || '—';
   }
-  
+
+  // 當前事件：無事件時明確顯示，不保留 HTML 裡的假資料。
+  const eventEl = document.getElementById('eventName');
+  const eventDurationEl = document.getElementById('eventDuration');
+  const activeEvent = d.active_event;
+  if(eventEl) eventEl.textContent = activeEvent ? activeEvent.label : '無';
+  if(eventDurationEl) eventDurationEl.textContent = activeEvent ? activeEvent.remaining_text : '目前沒有短期事件';
+  if(eventEl && activeEvent && activeEvent.description) eventEl.title = activeEvent.description;
+
   // 自動變化描述
   if(d.auto_change_desc){
     const autoEl = document.getElementById('autoChangeDesc');

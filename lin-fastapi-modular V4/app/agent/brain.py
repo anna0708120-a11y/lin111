@@ -245,24 +245,9 @@ def write_daily_journal():
 
 
 def _body_state_sse_payload(state):
-    """Serialize the current Body State for the existing SSE client."""
-    from app.intimacy.body_state import get_body_description, get_body_level
-
-    values = getattr(state, "body_values", {})
-    body_values = {}
-    for key in ("tension", "heat", "sensitivity", "control"):
-        value = float(values.get(key, 0))
-        body_values[key] = {
-            "value": round(value, 1),
-            "level": get_body_level(value),
-            "desc": get_body_description(key, value),
-        }
-    return {
-        "body_values": body_values,
-        "cycle_key": getattr(state, "cycle_key", "stable"),
-        "active_event_key": getattr(state, "active_event_key", None),
-        "updated_at": getattr(state, "last_tick_at", None).isoformat() if getattr(state, "last_tick_at", None) else None,
-    }
+    """Use the same backend-owned payload as /intimacy/status."""
+    from app.intimacy.status import build_intimacy_status_payload
+    return build_intimacy_status_payload(state)
 
 
 def generate_reply_stream(context, app_name=None, use_cache=True, session_id=None):
@@ -429,6 +414,41 @@ def generate_reply_stream(context, app_name=None, use_cache=True, session_id=Non
                 )
                 if post_mood_events and not getattr(state, "active_event_key", None):
                     start_event(state, post_mood_events[0], post_mood_now)
+
+                # Phase 3: settle the completed chat with bounded backend rules.
+                # This deliberately does not use the old keyword-based release path.
+                from app.intimacy.settlement import (
+                    apply_settlement_result,
+                    build_settlement_result,
+                    settle_interaction,
+                )
+                settlement = apply_settlement_result(
+                    state,
+                    build_settlement_result(context, full_content, getattr(state, "continuous_turns", 0)),
+                )
+                if hasattr(state, "relationship"):
+                    state.relationship = settle_interaction(
+                        state.relationship,
+                        context,
+                        full_content,
+                        getattr(state, "continuous_turns", 0),
+                    )
+                if settlement["result"] != "neutral":
+                    try:
+                        from app.intimacy.event_log import log_event
+                        log_event(
+                            event_type="settlement",
+                            title=f"互動結算：{settlement['result']}",
+                            timestamp=post_mood_now,
+                            detail_text=settlement["reason"],
+                            metadata={
+                                "applied_deltas": settlement["applied_deltas"],
+                                "continuous_turns": getattr(state, "continuous_turns", 0),
+                            },
+                        )
+                    except Exception as e:
+                        print(f"[settlement] event log skipped: {e}")
+
                 if hasattr(state, "save_body_state"):
                     state.save_body_state()
                 yield f"event: body_state\ndata: {json.dumps(_body_state_sse_payload(state), ensure_ascii=False)}\n\n"

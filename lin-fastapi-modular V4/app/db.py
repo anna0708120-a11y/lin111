@@ -117,7 +117,10 @@ def insert_memory(tag, content, category="长期记忆", importance=3, keyword="
             .execute()
         )
         if res.data:
-            return res.data[0].get("id")
+            memory_id = res.data[0].get("id")
+            if memory_id is not None:
+                return memory_id
+            print("[db] 寫入記憶未返回 memory_id")
     except Exception as e:
         print(f"[db] 写入记忆失败: {e}")
     return None
@@ -163,8 +166,8 @@ def update_memory(memory_id, content=None, importance=None, expires_at=None):
     if not patch:
         return False
     try:
-        _client.table("memory_bank").update(patch).eq("id", memory_id).execute()
-        return True
+        res = _client.table("memory_bank").update(patch).eq("id", memory_id).select("id").execute()
+        return bool(res.data and res.data[0].get("id") == memory_id)
     except Exception as e:
         print(f"[db] 更新记忆失败: {e}")
         return False
@@ -175,8 +178,8 @@ def archive_memory(memory_id):
     if not _client or not memory_id:
         return False
     try:
-        _client.table("memory_bank").update({"archived": True}).eq("id", memory_id).execute()
-        return True
+        res = _client.table("memory_bank").update({"archived": True}).eq("id", memory_id).select("id").execute()
+        return bool(res.data and res.data[0].get("id") == memory_id)
     except Exception as e:
         print(f"[db] 归档记忆失败: {e}")
         return False
@@ -187,12 +190,14 @@ def reinforce_memory(memory_id, importance, expires_at):
     if not _client:
         return
     try:
-        _client.table("memory_bank").update({
+        res = _client.table("memory_bank").update({
             "importance": importance,
             "expires_at": expires_at,
-        }).eq("id", memory_id).execute()
+        }).eq("id", memory_id).select("id").execute()
+        return bool(res.data and res.data[0].get("id") == memory_id)
     except Exception as e:
         print(f"[db] 更新记忆失败: {e}")
+        return False
 
 
 def delete_memory(memory_id):

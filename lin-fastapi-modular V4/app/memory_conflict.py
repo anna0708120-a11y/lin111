@@ -106,6 +106,14 @@ def handle_memory_with_conflict_check(decision):
     
     raw_keyword = decision.get("keyword", "").strip()
     normalized_keyword = normalize_keyword(raw_keyword)
+
+    def failed(reason):
+        return {
+            "memory_id": None,
+            "action_taken": "skipped",
+            "conflict_with": None,
+            "skip_reason": reason,
+        }
     
     # 2. 根據結果決定操作
     if conflict_result["action"] == "reinforce":
@@ -113,11 +121,13 @@ def handle_memory_with_conflict_check(decision):
         existing = conflict_result["conflicting_memory"]
         new_importance = max(existing.get("importance", 3), decision["importance"])
         new_expiry = compute_expiry(new_importance)
-        db.reinforce_memory(existing["id"], new_importance, new_expiry)
+        if not db.reinforce_memory(existing["id"], new_importance, new_expiry):
+            return failed("reinforce_failed")
         return {
             "memory_id": existing["id"],
             "action_taken": "reinforced",
-            "conflict_with": None
+            "conflict_with": None,
+            "skip_reason": None,
         }
     
     elif conflict_result["action"] == "conflict":
@@ -137,8 +147,9 @@ def handle_memory_with_conflict_check(decision):
         )
         return {
             "memory_id": memory_id,
-            "action_taken": "pending_review",
-            "conflict_with": existing["id"]
+            "action_taken": "pending_review" if memory_id is not None else "skipped",
+            "conflict_with": existing["id"] if memory_id is not None else None,
+            "skip_reason": None if memory_id is not None else "insert_failed",
         }
     
     else:
@@ -157,6 +168,7 @@ def handle_memory_with_conflict_check(decision):
         )
         return {
             "memory_id": memory_id,
-            "action_taken": "created",
-            "conflict_with": None
+            "action_taken": "created" if memory_id is not None else "skipped",
+            "conflict_with": None,
+            "skip_reason": None if memory_id is not None else "insert_failed",
         }

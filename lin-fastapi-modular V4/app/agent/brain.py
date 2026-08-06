@@ -382,10 +382,11 @@ def generate_reply_stream(context, app_name=None, use_cache=True, session_id=Non
                             yield collector.record_backend("passed", backend_action="remember_or_reinforce", action_taken=_result.get("action_taken") if _result else None)
                         print(f"[DONE-2] 記憶寫入動作完成, action={action}, action_taken={_result.get('action_taken') if _result else None}")
 
-                        if _result and _result.get("action_taken") != "skipped":
+                        if _result and _result.get("memory_id") is not None and _result.get("action_taken") != "skipped":
                             yield collector.record_db("passed", memory_id=_result.get("memory_id"))
                         else:
-                            yield collector.record_db("skipped", db_error=_result.get("skip_reason") if _result else None)
+                            yield collector.record_db("failed", db_error=_result.get("skip_reason") if _result else "handler_failed")
+                            yield collector.emit("error", message="記憶寫入失敗")
                     else:
                         yield collector.record_backend("not_executed")
                         yield collector.record_db("not_executed")

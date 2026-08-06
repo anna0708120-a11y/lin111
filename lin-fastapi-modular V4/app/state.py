@@ -373,9 +373,9 @@ class AppState:
             # pending_review 的記憶不加入內存
             return {
                 "memory_id": memory_id,
-                "action_taken": "pending_review",
-                "conflict_with": target["id"],
-                "skip_reason": "conflict_detected"
+                "action_taken": "pending_review" if memory_id is not None else "skipped",
+                "conflict_with": target["id"] if memory_id is not None else None,
+                "skip_reason": "conflict_detected" if memory_id is not None else "insert_failed"
             }
         
         # 差異小 -> 直接更新
@@ -394,10 +394,10 @@ class AppState:
                     break
         
         return {
-            "memory_id": target["id"],
-            "action_taken": "updated",
+            "memory_id": target["id"] if ok else None,
+            "action_taken": "updated" if ok else "skipped",
             "conflict_with": None,
-            "skip_reason": None
+            "skip_reason": None if ok else "update_failed"
         }
 
     def archive_memory(self, decision):

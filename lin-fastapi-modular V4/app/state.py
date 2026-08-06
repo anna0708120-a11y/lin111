@@ -99,7 +99,9 @@ class AppState:
         self.anna_avatar = db.load_state_value("anna_avatar")
 
         # Lin 的状态自评：依恋/占有欲/好奇/社交欲/疲惫/压力 + 一句心情
-        self.mood = db.load_state_value("mood_state") or dict(DEFAULT_MOOD)
+        stored_mood = db.load_state_value("mood_state")
+        print(f"[mood] 读取 mood_state: {stored_mood!r}")
+        self.mood = stored_mood or dict(DEFAULT_MOOD)
 
         # 对话历史：最近的聊天记录，用于给模型看上下文，不然模型每次都"失忆"
         # 启动时从 Supabase 读一份进内存，让三端（手机/电脑/网页）打开时看到同一份记录；
@@ -577,6 +579,7 @@ class AppState:
         if not mood_dict:
             return
         self.mood = mood_dict
+        print(f"[mood] 准备保存 mood_state: {self.mood!r}")
         db.save_state_value("mood_state", self.mood)
 
     # ---------- 头像 ----------

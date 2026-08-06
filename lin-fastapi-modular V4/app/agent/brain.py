@@ -243,6 +243,28 @@ def write_daily_journal():
         state.add_note(content)
     state.mark_journal_written()
 
+
+def _body_state_sse_payload(state):
+    """Serialize the current Body State for the existing SSE client."""
+    from app.intimacy.body_state import get_body_description, get_body_level
+
+    values = getattr(state, "body_values", {})
+    body_values = {}
+    for key in ("tension", "heat", "sensitivity", "control"):
+        value = float(values.get(key, 0))
+        body_values[key] = {
+            "value": round(value, 1),
+            "level": get_body_level(value),
+            "desc": get_body_description(key, value),
+        }
+    return {
+        "body_values": body_values,
+        "cycle_key": getattr(state, "cycle_key", "stable"),
+        "active_event_key": getattr(state, "active_event_key", None),
+        "updated_at": getattr(state, "last_tick_at", None).isoformat() if getattr(state, "last_tick_at", None) else None,
+    }
+
+
 def generate_reply_stream(context, app_name=None, use_cache=True, session_id=None):
     """
     流式生成回覆，yield SSE 格式的事件。
@@ -255,6 +277,34 @@ def generate_reply_stream(context, app_name=None, use_cache=True, session_id=Non
 
     collector = TraceCollector()
     target_session = session_id or state.current_session_id
+
+    # The streaming path is the live chat path, so it owns the pre-reply
+    # Body State lifecycle before the prompt is built.
+    from datetime import datetime
+    from app.intimacy.event import check_event_triggers
+    from app.intimacy.silence import detect_silence
+    from app.intimacy.tick import start_event, tick_and_update
+
+    now = datetime.now()
+    tick_and_update(state, now)
+    previous_message_at = getattr(state, "last_user_message_at", None)
+    if previous_message_at:
+        gap_minutes = (now - previous_message_at).total_seconds() / 60.0
+        state.continuous_turns = (getattr(state, "continuous_turns", 0) + 1) if gap_minutes < 10 else 1
+    else:
+        state.continuous_turns = 1
+    state.last_user_message_at = now
+
+    silence_info = detect_silence(previous_message_at, now) if previous_message_at else {}
+    trigger_context = {
+        "silence_minutes": silence_info.get("silence_minutes", 0),
+        "continuous_turns": getattr(state, "continuous_turns", 0),
+    }
+    triggered_events = check_event_triggers(state.body_values, trigger_context)
+    if triggered_events and not getattr(state, "active_event_key", None):
+        start_event(state, triggered_events[0], now)
+    if hasattr(state, "save_body_state"):
+        state.save_body_state()
     
     if not state.check_rate_limit():
         err_msg = "今天额度用完了，或者刚刚问太快了，等一下再说。"
@@ -365,6 +415,23 @@ def generate_reply_stream(context, app_name=None, use_cache=True, session_id=Non
                 for event_name, event_level in detected_events:
                     mood_engine.apply_event(event_name, level=event_level)
                 print(f"[DONE-3] mood_engine.apply_event 完成, detected_events={detected_events}")
+
+                # Reconcile Body State after the latest mood is persisted, then
+                # send the current display payload without changing chat caching.
+                tick_and_update(state, datetime.now())
+                post_mood_now = datetime.now()
+                post_mood_events = check_event_triggers(
+                    state.body_values,
+                    {
+                        "silence_minutes": 0,
+                        "continuous_turns": getattr(state, "continuous_turns", 0),
+                    },
+                )
+                if post_mood_events and not getattr(state, "active_event_key", None):
+                    start_event(state, post_mood_events[0], post_mood_now)
+                if hasattr(state, "save_body_state"):
+                    state.save_body_state()
+                yield f"event: body_state\ndata: {json.dumps(_body_state_sse_payload(state), ensure_ascii=False)}\n\n"
                 
                 state.last_context_cache = context
                 state.mark_reply()

@@ -144,6 +144,10 @@ class AppState:
         self.active_after_effects = []  # List[AfterEffect]
         self.continuous_turns = 0  # 連續對話輪數
         self.last_user_message_at = None  # 用戶最後發消息時間
+
+        # Phase 1: reuse the existing app_state key-value storage for recovery.
+        # A missing or invalid snapshot keeps the previous first-run defaults.
+        self._load_body_state_snapshot()
         
         # V3 新增：Relationship Engine
         from app.relationship.engine import init_relationship
@@ -573,6 +577,96 @@ class AppState:
         if max_minutes is not None:
             self.proactive["max_minutes"] = max_minutes
         db.save_state_value("proactive_settings", self.proactive)
+
+    # ---------- Body State (Phase 1) ----------
+    def _load_body_state_snapshot(self):
+        snapshot = db.load_state_value("body_state")
+        if not isinstance(snapshot, dict):
+            return
+
+        def parse_dt(value):
+            if not value:
+                return None
+            try:
+                parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+                # Existing tick/chat code uses naive datetimes.
+                return parsed.replace(tzinfo=None)
+            except (TypeError, ValueError):
+                return None
+
+        values = snapshot.get("body_values")
+        if isinstance(values, dict):
+            for key in ("tension", "heat", "sensitivity", "control"):
+                try:
+                    self.body_values[key] = max(0.0, min(100.0, float(values.get(key, self.body_values[key]))))
+                except (TypeError, ValueError):
+                    pass
+
+        self.cycle_key = snapshot.get("cycle_key") or self.cycle_key
+        self.cycle_started_at = parse_dt(snapshot.get("cycle_started_at"))
+        self.cycle_expires_at = parse_dt(snapshot.get("cycle_expires_at"))
+        self.last_tick_at = parse_dt(snapshot.get("last_tick_at"))
+        self.active_event_key = snapshot.get("active_event_key")
+        self.active_event_started_at = parse_dt(snapshot.get("active_event_started_at"))
+        self.active_event_expires_at = parse_dt(snapshot.get("active_event_expires_at"))
+        self.last_user_message_at = parse_dt(snapshot.get("last_user_message_at"))
+        try:
+            self.continuous_turns = int(snapshot.get("continuous_turns", 0))
+        except (TypeError, ValueError):
+            self.continuous_turns = 0
+
+        restored_effects = []
+        for raw in snapshot.get("active_after_effects", []):
+            if not isinstance(raw, dict):
+                continue
+            try:
+                from app.intimacy.after_effect import AfterEffect
+
+                started = parse_dt(raw.get("started_at"))
+                expires = parse_dt(raw.get("expires_at"))
+                if not started or not expires:
+                    continue
+                restored_effects.append(AfterEffect(
+                    source_event=str(raw.get("source_event", "")),
+                    duration_minutes=int(raw.get("duration_minutes", 0)),
+                    deltas_per_hour=dict(raw.get("deltas_per_hour") or {}),
+                    description=str(raw.get("description", "")),
+                    started_at=started,
+                    expires_at=expires,
+                ))
+            except (TypeError, ValueError):
+                continue
+        self.active_after_effects = restored_effects
+
+    def save_body_state(self):
+        def iso(value):
+            return value.isoformat() if value else None
+
+        effects = []
+        for effect in getattr(self, "active_after_effects", []) or []:
+            effects.append({
+                "source_event": effect.source_event,
+                "duration_minutes": effect.duration_minutes,
+                "deltas_per_hour": dict(effect.deltas_per_hour),
+                "description": effect.description,
+                "started_at": iso(effect.started_at),
+                "expires_at": iso(effect.expires_at),
+            })
+
+        db.save_state_value("body_state", {
+            "version": 1,
+            "body_values": dict(self.body_values),
+            "cycle_key": self.cycle_key,
+            "cycle_started_at": iso(self.cycle_started_at),
+            "cycle_expires_at": iso(self.cycle_expires_at),
+            "last_tick_at": iso(self.last_tick_at),
+            "active_event_key": self.active_event_key,
+            "active_event_started_at": iso(self.active_event_started_at),
+            "active_event_expires_at": iso(self.active_event_expires_at),
+            "active_after_effects": effects,
+            "last_user_message_at": iso(self.last_user_message_at),
+            "continuous_turns": self.continuous_turns,
+        })
 
     # ---------- 状态自评 ----------
     def update_mood(self, mood_dict):

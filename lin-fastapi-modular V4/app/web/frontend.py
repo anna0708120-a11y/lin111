@@ -1692,6 +1692,10 @@ async function confirmImageSend() {
               }
             }
 
+            else if (currentEvent === 'body_state') {
+              renderIntimacy(data);
+            }
+
             else if (currentEvent === 'agent_event') {
               const msgLinEl = currentMsgDiv ? currentMsgDiv.closest('.msg.lin') : null;
               if (msgLinEl) {
@@ -1853,6 +1857,10 @@ async function send(){
               if(data.message){
                 addMsg('lin', data.message);
               }
+            }
+
+            else if(currentEvent === 'body_state'){
+              renderIntimacy(data);
             }
 
             else if(currentEvent === 'agent_event'){

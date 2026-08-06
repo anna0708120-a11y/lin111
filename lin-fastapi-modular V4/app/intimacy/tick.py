@@ -46,6 +46,8 @@ def tick_and_update(state, now: datetime):
             state.active_event_started_at = None
             state.active_event_expires_at = None
             state.active_after_effects = []
+        if hasattr(state, 'save_body_state'):
+            state.save_body_state()
         return
     
     # 計算時間差
@@ -146,6 +148,8 @@ def tick_and_update(state, now: datetime):
 
     # 更新最後 tick 時間
     state.last_tick_at = now
+    if hasattr(state, 'save_body_state'):
+        state.save_body_state()
 
 
 def start_event(state, event_key: str, now: datetime) -> bool:
@@ -173,6 +177,8 @@ def start_event(state, event_key: str, now: datetime) -> bool:
     state.active_event_key = event.key
     state.active_event_started_at = now
     state.active_event_expires_at = now + timedelta(minutes=duration_minutes)
+    if hasattr(state, 'save_body_state'):
+        state.save_body_state()
     
     # V4: 寫入事件日誌
     log_event(

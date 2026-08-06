@@ -144,46 +144,6 @@ def generate_reply(context, app_name=None, use_cache=True):
     conv_list = state.get_recent_conversation(n=20)
     if conv_list:
         formatted = []
-        for item in conv_list:
-            if item["role"] == "user":
-                formatted.append(f"Anna: {item['content']}")
-            else:
-                formatted.append(f"Lin: {item['content']}")
-        conversation_history = "\n".join(formatted)
-    else:
-        conversation_history = "(无最近对话)"
-
-    persona = Persona.get_system_prompt()
-    final_system = f"{persona}\n\n{memory_summary}\n\n最近对话：\n{conversation_history}"
-
-    messages = [
-        {"role": "system", "content": final_system},
-        {"role": "user", "content": context}
-    ]
-
-    reply, thinking = llm.chat(messages, use_thinking=LLM_THINKING_ENABLED)
-    
-    # V3 新增：對話結束後結算關係
-    if reply and hasattr(state, 'relationship'):
-        from app.intimacy.settlement import settle_interaction
-        state.relationship = settle_interaction(
-            state.relationship,
-            context,
-            reply,
-            getattr(state, 'continuous_turns', 1)
-        )
-    
-    # V3 新增：檢測是否該觸發主事件（親密釋放）
-    from app.intimacy.ephemeral import should_trigger_intimacy_release, trigger_ephemeral_event
-    
-    if should_trigger_intimacy_release(context, reply, state.body_values):
-        trigger_ephemeral_event(state, "intimacy_release", now)
-
-    state.last_reply_at = datetime.now()
-    state.last_context_cache = context
-    return reply, thinking
-    if conv_list:
-        formatted = []
         for turn in conv_list:
             role_name = "Anna" if turn["role"] == "anna" else "Lin"
             formatted.append(f"{role_name}：{turn['content']}")

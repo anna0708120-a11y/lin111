@@ -39,11 +39,14 @@ def load_state_value(key, default=None):
 
 def save_state_value(key, value):
     if not _client:
+        print(f"[db][state] 保存跳过：Supabase 未连接，key={key!r}, value={value!r}")
         return
     try:
-        _client.table("app_state").upsert({"key": key, "value": value}).execute()
+        print(f"[db][state] 准备保存：key={key!r}, value={value!r}")
+        res = _client.table("app_state").upsert({"key": key, "value": value}).execute()
+        print(f"[db][state] 保存成功：key={key!r}, execute_result={res!r}")
     except Exception as e:
-        print(f"[db] 写入 {key} 失败: {e}")
+        print(f"[db][state] 保存异常：key={key!r}, value={value!r}, error={e!r}")
 
 
 def delete_state_value(key):

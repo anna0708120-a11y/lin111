@@ -59,6 +59,7 @@ def tick_and_update(state, now: datetime):
     
     cursor = last_tick
     segments = 0
+    mood_changed = False
     
     while cursor < now and segments < MAX_SEGMENTS:
         # V2: 檢查事件是否過期
@@ -126,6 +127,7 @@ def tick_and_update(state, now: datetime):
             # V4.3: 傳入當前周期，使用動態 target
             cycle = get_current_cycle(state)
             state.mood = apply_mood_decay(state.mood, elapsed_hours, enabled=True, cycle_key=cycle.key)
+            mood_changed = True
             
             # clamp 到 0-100
             for key in state.body_values:
@@ -138,7 +140,10 @@ def tick_and_update(state, now: datetime):
     # V2: 清理過期餘波
     if hasattr(state, 'active_after_effects'):
         state.active_after_effects = cleanup_expired_effects(state.active_after_effects, now)
-    
+
+    if mood_changed:
+        state.update_mood(state.mood)
+
     # 更新最後 tick 時間
     state.last_tick_at = now
 

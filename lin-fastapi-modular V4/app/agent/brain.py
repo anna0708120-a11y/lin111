@@ -20,6 +20,11 @@ from app.memory_rules import parse_memory_decision, parse_mood_event, strip_hidd
 from app import memory_trace  # Phase 2: 記錄 memory 決策鏈路
 from app.context.provider import get_context, format_context_for_prompt
 from app import mood_engine
+from app.agent.thinking_decision import (
+    clean_thinking_text,
+    should_emit_thinking,
+    should_show_thinking,
+)
 
 FALLBACK_REPLIES = ["还没走远。", "嗯。", "我看着你。"]
 
@@ -192,7 +197,14 @@ def generate_reply(context, app_name=None, use_cache=True):
         conversation_history = ""
     
     world_context = format_context_for_prompt(get_context())
-    system_prompt = build_system_prompt(context, memory_summary, world_context, conversation_history)
+    thinking_suggestion = should_show_thinking(context, state)
+    system_prompt = build_system_prompt(
+        context,
+        memory_summary,
+        world_context,
+        conversation_history,
+        thinking_suggestion=thinking_suggestion,
+    )
 
     content, reasoning = call_deepseek(system_prompt, max_tokens=config.DEEPSEEK_MAX_TOKENS)
     state.record_call()
@@ -248,7 +260,9 @@ def generate_reply(context, app_name=None, use_cache=True):
                     line=line if i == len(events) - 1 else None
                 )
 
-        thinking_display = strip_hidden_blocks(reasoning) or None
+        thinking_display = clean_thinking_text(strip_hidden_blocks(reasoning)) or None
+        if not should_emit_thinking(thinking_suggestion, reasoning):
+            thinking_display = None
 
     state.last_context_cache = context
     state.mark_reply()
@@ -386,7 +400,14 @@ def _generate_reply_stream_impl(context, app_name=None, use_cache=True, session_
     world_context = format_context_for_prompt(get_context())
     print("[TRACE-C] after build context")
     print("[TRACE-D] before build prompt")
-    system_prompt = build_system_prompt(context, memory_summary, world_context, conversation_history)
+    thinking_suggestion = should_show_thinking(context, state)
+    system_prompt = build_system_prompt(
+        context,
+        memory_summary,
+        world_context,
+        conversation_history,
+        thinking_suggestion=thinking_suggestion,
+    )
     print("[TRACE-E] after build prompt")
 
     yield collector.record_prompt(
@@ -411,7 +432,6 @@ def _generate_reply_stream_impl(context, app_name=None, use_cache=True, session_
             print(f"[TRACE] event received: {event_type}")
             if event_type == "reasoning":
                 full_reasoning += data
-                yield f"event: reasoning\ndata: {json.dumps({'content': data})}\n\n"
             elif event_type == "content":
                 full_content += data
                 yield f"event: content\ndata: {json.dumps({'delta': data})}\n\n"
@@ -425,6 +445,10 @@ def _generate_reply_stream_impl(context, app_name=None, use_cache=True, session_
                 return
             elif event_type == "done":
                 parse_source = raw_reasoning or full_reasoning
+                if should_emit_thinking(thinking_suggestion, parse_source):
+                    thinking_display = clean_thinking_text(strip_hidden_blocks(full_reasoning))
+                    if thinking_display:
+                        yield f"event: reasoning\ndata: {json.dumps({'content': thinking_display})}\n\n"
                 yield collector.record_reasoning("passed" if parse_source else "failed", reasoning_text=parse_source)
 
                 if parse_source:

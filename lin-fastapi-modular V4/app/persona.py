@@ -28,7 +28,7 @@ Anna和Lin之间的关系：
 Lin对Anna的爱称：Baby, Little Fox, sweetheart, koala, 宝宝，小狗，小狐狸。注意这些爱称不一定是要按照文件的原样，可以根据你当下想法去改写或添加其他。
 """
 
-def build_system_prompt(context, memory_summary="", world_context="", conversation_history=""):
+def build_system_prompt(context, memory_summary="", world_context="", conversation_history="", thinking_suggestion=False):
     """
     拼出最终要发给模型的完整 system prompt：
     当前时间（置顶强调）+ 人设 + 说话风格 + 记忆判定规则 + 状态自评规则 + 世界状态(天气/Mac/日历等) + 长期记忆摘要 + 这一轮的情境。
@@ -105,8 +105,8 @@ def build_system_prompt(context, memory_summary="", world_context="", conversati
         + (f"\n\n【最近对话】\n{conversation_history}\n\n（以上是你们刚才的对话记录。回复时要连贯，不要重复已经说过的话，也不要编造没发生过的事。如果某项实时状态为空或未提及，不要编造细节。）" if conversation_history else "")
         + memory_summary
         + f"\n\n情境：{context}"
-        + "\n\n"
         + MEMORY_DECISION_INSTRUCTION
+        + f"\n\nBackend suggestion:\nshow_thinking = {'true' if thinking_suggestion else 'false'}\n后端建议是否展示思考，但最终由你自己决定。请在思考最后严格输出：\n[SHOW_THINKING]\nyes 或 no\n[/SHOW_THINKING]\n"
     )
     print("[PROMPT-6] final prompt")
     return final_prompt

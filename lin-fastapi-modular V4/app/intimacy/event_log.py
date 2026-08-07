@@ -3,8 +3,49 @@
 
 管理時間軸事件記錄。
 """
+from dataclasses import dataclass
 from datetime import datetime
+from typing import Optional
 from app.db import _client as supabase
+
+
+@dataclass
+class EventRecord:
+    id: Optional[int]
+    event_type: str
+    title: str
+    timestamp: datetime
+    duration_minutes: Optional[int] = None
+    detail_text: Optional[str] = None
+    metadata: Optional[dict] = None
+
+
+def _deserialize_event(row: dict) -> EventRecord:
+    timestamp = datetime.fromisoformat(str(row["timestamp"]).replace("Z", "+00:00"))
+    return EventRecord(
+        id=row.get("id"),
+        event_type=row["event_type"],
+        title=row["title"],
+        timestamp=timestamp,
+        duration_minutes=row.get("duration_minutes"),
+        detail_text=row.get("detail_text"),
+        metadata=row.get("metadata") if isinstance(row.get("metadata"), dict) else None,
+    )
+
+
+def _load_events(filter_type="all", limit=50):
+    if supabase is None:
+        return []
+
+    try:
+        query = supabase.table("intimacy_events").select("*").order("timestamp", desc=True).limit(limit)
+        if filter_type != "all":
+            query = query.eq("event_type", filter_type)
+        result = query.execute()
+        return [_deserialize_event(row) for row in result.data]
+    except Exception as e:
+        print(f"❌ 讀取事件時間軸失敗: {e}")
+        return []
 
 
 def log_event(event_type: str, title: str, timestamp: datetime = None, 
@@ -54,19 +95,13 @@ def get_current_event():
             "duration_minutes": 0,
         }
     try:
-        result = supabase.table("intimacy_events") \
-            .select("*") \
-            .eq("event_type", "event") \
-            .order("timestamp", desc=True) \
-            .limit(1) \
-            .execute()
-        
-        if result.data:
-            event = result.data[0]
-            hours = event.get("duration_minutes", 0) // 60
-            minutes = event.get("duration_minutes", 0) % 60
+        events = _load_events(filter_type="event", limit=1)
+        if events:
+            event = events[0]
+            hours = (event.duration_minutes or 0) // 60
+            minutes = (event.duration_minutes or 0) % 60
             return {
-                "event": event["title"],
+                "event": event.title,
                 "duration_hours": hours,
                 "duration_minutes": minutes
             }
@@ -81,43 +116,21 @@ def get_current_event():
 
 
 def get_event_timeline(filter_type="all"):
-    """回傳事件時間軸（真實資料）"""
-    if supabase is None:
-        return []
-    try:
-        query = supabase.table("intimacy_events").select("*").order("timestamp", desc=True).limit(50)
-        
-        if filter_type != "all":
-            query = query.eq("event_type", filter_type)
-        
-        result = query.execute()
-        
-        events = []
-        for row in result.data:
-            event = {
-                "id": f"evt_{row['id']}",
-                "type": row["event_type"],
-                "title": row["title"],
-                "timestamp": row["timestamp"],
-            }
-            
-            if row.get("duration_minutes"):
-                event["duration_minutes"] = row["duration_minutes"]
-            if row.get("detail_text"):
-                event["detail_text"] = row["detail_text"]
-            if isinstance(row.get("metadata"), dict):
-                event["metadata"] = row["metadata"]
-            
-            events.append(event)
-        
-        return events
-    except Exception as e:
-        print(f"❌ 讀取事件時間軸失敗: {e}")
-        return []
+    """回傳 API 時間軸使用的 JSON-safe event dictionaries。"""
+    return [
+        {
+            "id": f"evt_{event.id}",
+            "type": event.event_type,
+            "title": event.title,
+            "timestamp": event.timestamp.isoformat(),
+            **({"duration_minutes": event.duration_minutes} if event.duration_minutes else {}),
+            **({"detail_text": event.detail_text} if event.detail_text else {}),
+            **({"metadata": event.metadata} if event.metadata else {}),
+        }
+        for event in _load_events(filter_type=filter_type)
+    ]
 
 
 def get_recent_events(limit=5):
-    """
-    回傳最近 N 條事件（別名，供 prompt.py 使用）
-    """
-    return get_event_timeline(filter_type="all")[:limit]
+    """回傳 prompt 使用的反序列化 EventRecord 物件。"""
+    return _load_events(filter_type="all", limit=limit)

@@ -582,10 +582,13 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
   .ci { font-size: 13px !important; }
 }
 
-/* Developer Console compact entry: the same lifecycle model used by /developer. */
-.developer-chat-row{margin:0 0 6px 0!important;align-items:flex-start;}
-.developer-compact{display:flex;align-items:center;gap:7px;min-width:190px;max-width:calc(100% - 34px);padding:7px 9px;border:1px solid var(--border);border-radius:8px;background:var(--white);color:var(--dark);font:11px 'DM Sans',sans-serif;cursor:pointer;text-align:left;box-shadow:0 1px 5px var(--shadow);}
-.developer-compact-title{font-weight:600;color:var(--rose-deep);}.developer-compact-state{flex:1;min-width:0;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.developer-compact-count{font:10px ui-monospace,monospace;color:var(--muted);}.developer-compact-arrow{font-size:18px;line-height:12px;color:var(--muted);}.developer-compact.is-complete{background:var(--blush);}
+/* Agent panel: the only Agent lifecycle surface, rendered before the assistant reply. */
+.agent-panel-slot:empty{display:none;}
+.agent-panel{margin:0 0 6px 32px;max-width:calc(100% - 44px);border:1px solid var(--border);border-radius:8px;background:var(--white);overflow:hidden;box-shadow:0 1px 5px var(--shadow);}
+.agent-panel-header{width:100%;min-height:30px;padding:6px 9px;border:0;background:transparent;color:var(--dark);display:flex;align-items:center;gap:7px;text-align:left;cursor:pointer;font:11px 'DM Sans',sans-serif;}
+.agent-status,.agent-step-dot{width:7px;height:7px;border-radius:50%;flex:0 0 auto;background:var(--muted);}.agent-status.agent-running,.agent-step.agent-running .agent-step-dot{background:#b47b27;animation:agentPulse 1s ease-in-out infinite;}.agent-status.agent-success,.agent-step.agent-success .agent-step-dot{background:#4f9662;}.agent-status.agent-failed,.agent-step.agent-failed .agent-step-dot{background:#bd5b59;}.agent-status.agent-skipped,.agent-step.agent-skipped .agent-step-dot,.agent-status.agent-not_executed,.agent-step.agent-not_executed .agent-step-dot{background:var(--muted);}
+.agent-panel-title{font-weight:600;color:var(--rose-deep);}.agent-panel-summary{flex:1;min-width:0;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.agent-panel-count{font:10px ui-monospace,monospace;color:var(--muted);}.agent-panel-chevron{font-size:16px;line-height:1;color:var(--muted);transition:transform .2s ease;}.agent-panel-expanded .agent-panel-chevron{transform:rotate(180deg);}
+.agent-panel-body{display:none;border-top:1px solid var(--border);padding:4px 8px 7px;}.agent-panel-expanded .agent-panel-body{display:block;}.agent-step{border-radius:5px;}.agent-step-header{width:100%;border:0;background:transparent;display:flex;align-items:center;gap:7px;padding:6px 2px;color:var(--dark);cursor:pointer;text-align:left;font:11px 'DM Sans',sans-serif;}.agent-step-label{font-weight:500;}.agent-step-state{margin-left:auto;font-size:10px;color:var(--muted);text-transform:capitalize;}.agent-step-chevron{font-size:13px;color:var(--muted);transition:transform .2s ease;}.agent-step-detail{display:none;margin:0 0 5px 16px;padding:7px;background:var(--blush);border-radius:5px;color:var(--muted);font:10px/1.5 ui-monospace,monospace;white-space:pre-wrap;overflow-wrap:anywhere;}.agent-step-expanded .agent-step-detail{display:block;}.agent-step-expanded .agent-step-chevron{transform:rotate(180deg);}@keyframes agentPulse{0%,100%{opacity:.45;}50%{opacity:1;}}
 .voice-btn{cursor:pointer;margin-right:6px;opacity:.8;}
 .voice-btn:active{opacity:1;}
 </style>
@@ -1373,9 +1376,7 @@ function addVoiceButtons(){
   document.querySelectorAll('#cm .msg.lin').forEach(el=>{
     const meta=el.querySelector('.mtime2');
     if(!meta||meta.querySelector('.voice-btn'))return;
-    const slot=el.querySelector('.dt-slot');
-    const mid=slot?slot.dataset.messageId:null;
-    const idx=chatMemoryCache.findIndex(m=>m.r==='lin'&&(!mid||m.message_id==mid));
+    const idx=chatMemoryCache.findIndex(m=>m.r==='lin'&&m.t===el.querySelector('.bub')?.textContent);
     if(idx<0)return;
     const btn=document.createElement('button');
     btn.className='voice-btn';
@@ -1567,13 +1568,11 @@ async function confirmImageSend() {
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     
-    const showThinking = window.LinChatPolicy?.showThinking === true;
     let reasoningBuffer = '';
     let contentBuffer = '';
     let currentMsgDiv = null;
-    let thinkDiv = null;
-    const currentDeveloper = window.DeveloperConsole ? window.DeveloperConsole.createCompact(document.getElementById('cm')) : null;
-    publishDevEvent('api_start', {model: 'watch', input: 'image'});
+    const currentDeveloper = window.AgentPanel ? window.AgentPanel.create(document.getElementById('cm')) : null;
+    if (currentDeveloper) currentDeveloper.ingest(window.AgentPanel.fromSse('api_start', {model: 'watch', input: 'image'}));
     let currentEvent = null;
     let sseBuffer = '';
     
@@ -1589,14 +1588,13 @@ async function confirmImageSend() {
             iso: new Date().toISOString()
           };
           if(reasoningBuffer) entry.think = reasoningBuffer;
+          if(currentDeveloper) entry.trace = currentDeveloper.snapshot();
           chatMemoryCache.push(entry);
           if(chatMemoryCache.length > 200) chatMemoryCache = chatMemoryCache.slice(-200);
           syncChat().catch(e => console.error('[DEBUG] Failed to sync image chat:', e));
         }
         if(document.getElementById('tb-memory')?.classList.contains('active')) rmem();
-        publishDevEvent('done', {});
         if (currentDeveloper) currentDeveloper.complete();
-        if (window.DeveloperConsole) window.DeveloperConsole.refreshState();
         scrollDown();
         pendingImageDataUrl = null;
         return;
@@ -1620,34 +1618,13 @@ async function confirmImageSend() {
             const data = JSON.parse(line.slice(6));
             
             if (currentEvent === 'reasoning' && data.content !== undefined) {
-              const developerEvent = publishDevEvent('reasoning', data);
-              if (currentDeveloper) currentDeveloper.ingest(developerEvent);
-              if (!showThinking) continue;
+              if (currentDeveloper) currentDeveloper.ingest(window.AgentPanel.fromSse('reasoning', data));
               reasoningBuffer += data.content;
-              if (!thinkDiv) {
-                const msgDiv = document.createElement('div');
-                msgDiv.className = 'msg lin';
-                thinkDiv = document.createElement('div');
-                thinkDiv.className = 'think-box';
-                thinkDiv.textContent = reasoningBuffer;
-                const toggle = document.createElement('div');
-                toggle.className = 'think-toggle';
-                toggle.innerHTML = '💭 思考過程';
-                toggle.onclick = () => {
-                  thinkDiv.style.display = thinkDiv.style.display === 'none' ? 'block' : 'none';
-                };
-                msgDiv.appendChild(toggle);
-                msgDiv.appendChild(thinkDiv);
-                document.getElementById('cm').appendChild(msgDiv);
-              } else {
-                thinkDiv.textContent = reasoningBuffer;
-              }
               scrollDown();
             }
             
             else if (currentEvent === 'content' && data.delta !== undefined) {
-              const developerEvent = publishDevEvent('content', data);
-              if (currentDeveloper) currentDeveloper.ingest(developerEvent);
+              if (currentDeveloper) currentDeveloper.ingest(window.AgentPanel.fromSse('content', data));
               contentBuffer += data.delta;
               
               if (!currentMsgDiv) {
@@ -1681,11 +1658,11 @@ async function confirmImageSend() {
             }
 
             else if (currentEvent === 'agent_event') {
-              const developerEvent = publishDevEvent('agent_event', data);
-              if (currentDeveloper) currentDeveloper.ingest(developerEvent);
+              if (currentDeveloper) currentDeveloper.ingest(window.AgentPanel.fromSse('agent_event', data));
             }
 
             else if (currentEvent === 'body_state') {
+              if (currentDeveloper) currentDeveloper.ingest(window.AgentPanel.fromSse('body_state', data));
               renderIntimacy(data);
             }
             
@@ -1732,13 +1709,11 @@ async function send(){
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     
-    const showThinking = window.LinChatPolicy?.showThinking === true;
     let reasoningBuffer = '';
     let contentBuffer = '';
     let currentMsgDiv = null;
-    let thinkDiv = null;
-    const currentDeveloper = window.DeveloperConsole ? window.DeveloperConsole.createCompact(document.getElementById('cm')) : null;
-    publishDevEvent('api_start', {model: 'watch'});
+    const currentDeveloper = window.AgentPanel ? window.AgentPanel.create(document.getElementById('cm')) : null;
+    if (currentDeveloper) currentDeveloper.ingest(window.AgentPanel.fromSse('api_start', {model: 'watch'}));
     let currentEvent = null;
     let sseBuffer = '';
     
@@ -1754,14 +1729,13 @@ async function send(){
             iso: new Date().toISOString()
           };
           if(reasoningBuffer) entry.think = reasoningBuffer;
+          if(currentDeveloper) entry.trace = currentDeveloper.snapshot();
           chatMemoryCache.push(entry);
           if(chatMemoryCache.length > 200) chatMemoryCache = chatMemoryCache.slice(-200);
           syncChat().catch(e => console.error('[DEBUG] Failed to sync chat:', e));
         }
         if(document.getElementById('tb-memory')?.classList.contains('active')) rmem();
-        publishDevEvent('done', {});
         if (currentDeveloper) currentDeveloper.complete();
-        if (window.DeveloperConsole) window.DeveloperConsole.refreshState();
         scrollDown();
         return;
       }
@@ -1784,34 +1758,13 @@ async function send(){
             const data = JSON.parse(line.slice(6));
             
             if(currentEvent === 'reasoning' && data.content !== undefined){
-              const developerEvent = publishDevEvent('reasoning', data);
-              if (currentDeveloper) currentDeveloper.ingest(developerEvent);
-              if(!showThinking) continue;
+              if (currentDeveloper) currentDeveloper.ingest(window.AgentPanel.fromSse('reasoning', data));
               reasoningBuffer += data.content;
-              if(!thinkDiv){
-                const msgDiv = document.createElement('div');
-                msgDiv.className = 'msg lin';
-                thinkDiv = document.createElement('div');
-                thinkDiv.className = 'think-box';
-                thinkDiv.textContent = reasoningBuffer;
-                const toggle = document.createElement('div');
-                toggle.className = 'think-toggle';
-                toggle.innerHTML = '💭 思考過程';
-                toggle.onclick = () => {
-                  thinkDiv.style.display = thinkDiv.style.display === 'none' ? 'block' : 'none';
-                };
-                msgDiv.appendChild(toggle);
-                msgDiv.appendChild(thinkDiv);
-                document.getElementById('cm').appendChild(msgDiv);
-              } else {
-                thinkDiv.textContent = reasoningBuffer;
-              }
               scrollDown();
             }
             
             else if(currentEvent === 'content' && data.delta !== undefined){
-              const developerEvent = publishDevEvent('content', data);
-              if (currentDeveloper) currentDeveloper.ingest(developerEvent);
+              if (currentDeveloper) currentDeveloper.ingest(window.AgentPanel.fromSse('content', data));
               contentBuffer += data.delta;
               
               if(!currentMsgDiv){
@@ -1845,11 +1798,11 @@ async function send(){
             }
 
             else if(currentEvent === 'agent_event'){
-              const developerEvent = publishDevEvent('agent_event', data);
-              if (currentDeveloper) currentDeveloper.ingest(developerEvent);
+              if (currentDeveloper) currentDeveloper.ingest(window.AgentPanel.fromSse('agent_event', data));
             }
 
             else if(currentEvent === 'body_state'){
+              if (currentDeveloper) currentDeveloper.ingest(window.AgentPanel.fromSse('body_state', data));
               renderIntimacy(data);
             }
             

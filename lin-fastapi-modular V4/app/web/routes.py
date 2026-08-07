@@ -8,7 +8,7 @@ from typing import Optional
 import uuid
 
 from fastapi import APIRouter, Depends
-from fastapi.responses import FileResponse, Response, StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 
 from app import db
@@ -99,15 +99,6 @@ class DeviceEventPayload(BaseModel):
 def health():
     """给 Render / 之后的监控用的健康检查接口，顺便回报 Supabase 有没有连上。"""
     return {"status": "ok", "supabase_connected": db.is_connected()}
-
-@router.get("/developer")
-def developer_page():
-    """独立 Developer Console。"""
-    return FileResponse("static/developer.html", media_type="text/html")
-
-@router.get("/dev")
-def developer_page_alias():
-    return developer_page()
 
 @router.get("/manifest.json")
 def manifest():

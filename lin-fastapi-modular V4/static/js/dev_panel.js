@@ -1,165 +1,155 @@
 /*
 /*
- * Developer Console is the single UI Agent visualisation surface.
- * It renders a compact, clickable chat entry and the full /developer console
- * from the same event model. It has no dependency on chat message history.
+ * AgentPanel is the only agent lifecycle UI.
+ * It renders existing SSE and collector events without creating synthetic traces.
  */
 (function () {
-  const STORAGE_KEY = 'lin_developer_events';
-  const CHANNEL_NAME = 'lin-ui-agent';
-  const MAX_EVENTS = 500;
-  const channel = 'BroadcastChannel' in window ? new BroadcastChannel(CHANNEL_NAME) : null;
+  const AUTO_COLLAPSE_MS = 2600;
 
-  function escapeHtml(value) {
-    const node = document.createElement('div');
-    node.textContent = value == null ? '' : String(value);
-    return node.innerHTML;
+  function normalizeStatus(status) {
+    if (status === 'passed') return 'success';
+    if (['running', 'success', 'failed', 'skipped', 'not_executed'].includes(status)) return status;
+    return 'running';
   }
 
-  function now() {
-    return new Date().toISOString();
+  function labelFor(event) {
+    const id = String(event.id || event.type || '').toLowerCase();
+    if (id === 'api_start') return 'API Request';
+    if (id === 'prompt') return 'Prompt Building';
+    if (id === 'reasoning') return 'Thinking';
+    if (id === 'memory_decision') return 'Memory Decision';
+    if (id === 'parser') return 'Memory Parser';
+    if (id === 'backend') return 'Memory Write';
+    if (id === 'database') return 'Database';
+    if (id === 'body_state') return 'Body State';
+    if (id === 'mood') return 'Mood';
+    if (id === 'streaming' || id === 'content') return 'Response Streaming';
+    if (id === 'done') return 'Response Complete';
+    if (id.includes('search')) return 'Web Search';
+    if (id.includes('calendar')) return 'Calendar';
+    if (id.includes('github')) return 'GitHub';
+    if (id.includes('voice') || id.includes('tts')) return 'Voice';
+    if (id.includes('image') || id.includes('vision')) return 'Image';
+    if (id.includes('tool')) return 'Tool Calling';
+    return event.summary || event.type || event.id || 'Agent Event';
   }
 
-  function loadEvents() {
-    try {
-      const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-      return Array.isArray(parsed) ? parsed : [];
-    } catch (_) {
-      return [];
-    }
+  function detailFor(event) {
+    if (event.summary) return event.summary;
+    if (event.reason) return event.reason;
+    if (event.payload && Object.keys(event.payload).length) return JSON.stringify(event.payload, null, 2);
+    return '';
   }
 
-  function persist(event) {
-    const events = loadEvents();
-    events.push(event);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(events.slice(-MAX_EVENTS)));
+  function fromSse(type, data) {
+    if (type === 'agent_event') return data && data.event ? data.event : null;
+    if (type === 'api_start') return { id: 'api_start', status: 'running', summary: data.model || 'watch', payload: data };
+    if (type === 'reasoning') return { id: 'reasoning', status: 'running', summary: data.content || '', payload: data };
+    if (type === 'content') return { id: 'streaming', status: 'running', summary: data.delta || '', payload: data };
+    if (type === 'body_state') return { id: 'body_state', status: 'success', summary: 'State updated', payload: data };
+    if (type === 'mood') return { id: 'mood', status: 'success', summary: 'Mood updated', payload: data };
+    if (type === 'done') return { id: 'done', status: 'success', summary: 'Completed', payload: data };
+    if (type === 'error') return { id: 'api_error', status: 'failed', summary: data.message || 'Request failed', payload: data };
+    return { id: type || 'agent_event', status: 'running', summary: '', payload: data || {} };
   }
 
-  function normalize(type, data) {
-    const event = { id: Date.now() + '-' + Math.random().toString(16).slice(2), type, data: data || {}, at: now() };
-    if (type === 'agent_event') {
-      const agentEvent = event.data.event || {};
-      event.status = agentEvent.status || 'unknown';
-      event.label = agentEvent.id || 'agent_event';
-      event.value = agentEvent.summary || agentEvent.reason || '';
-      event.section = agentEvent.id === 'prompt' ? 'Prompt' : agentEvent.id === 'reasoning' ? 'Thinking' : ['memory_decision', 'parser', 'backend', 'database'].includes(agentEvent.id) ? 'Memory' : 'Event';
-    } else if (type === 'reasoning') {
-      event.section = 'Thinking'; event.label = 'reasoning'; event.value = event.data.content || ''; event.status = 'running';
-    } else if (type === 'content') {
-      event.section = 'Chat'; event.label = 'Streaming'; event.value = event.data.delta || ''; event.status = 'running';
-    } else if (type === 'api_start') {
-      event.section = 'Chat'; event.label = 'API Start'; event.value = event.data.model || 'watch'; event.status = 'running';
-    } else if (type === 'mood') {
-      event.section = 'Mood'; event.label = event.data.key || 'mood'; event.value = JSON.stringify(event.data.value); event.status = 'success';
-    } else if (type === 'body_state') {
-      event.section = 'Body State'; event.label = event.data.key || 'body_state'; event.value = JSON.stringify(event.data.value); event.status = 'success';
-    } else if (type === 'done') {
-      event.section = 'SSE'; event.label = 'done'; event.value = 'stream complete'; event.status = 'success';
-    } else {
-      event.section = 'Debug'; event.label = type; event.value = JSON.stringify(event.data); event.status = 'unknown';
-    }
-    return event;
-  }
-
-  function emit(type, data) {
-    const event = normalize(type, data);
-    persist(event);
-    if (channel) channel.postMessage(event);
-    window.dispatchEvent(new CustomEvent('lin:developer-event', { detail: event }));
-    return event;
-  }
-
-  function createCompact(container) {
-    const row = document.createElement('div');
-    row.className = 'msg lin developer-chat-row';
-    row.innerHTML = '<button class="developer-compact" type="button" title="Open Developer Console"><span class="developer-compact-title">Developer</span><span class="developer-compact-state">Starting</span><span class="developer-compact-count">0</span><span class="developer-compact-arrow">›</span></button>';
-    const button = row.querySelector('.developer-compact');
-    const state = row.querySelector('.developer-compact-state');
-    const count = row.querySelector('.developer-compact-count');
-    let total = 0;
-    button.onclick = () => window.open('/developer', '_blank', 'noopener');
-    container.appendChild(row);
-
-    return {
-      ingest(event) {
-        total += 1;
-        count.textContent = String(total);
-        state.textContent = event.label === 'done' ? 'Done' : event.label || 'Streaming';
-        button.classList.toggle('is-complete', event.status === 'success' || event.type === 'done');
-      },
-      complete() {
-        state.textContent = 'Done';
-        button.classList.add('is-complete');
-      },
-    };
-  }
-
-  function mountFull(root) {
-    const sections = ['Chat', 'Thinking', 'Memory', 'Prompt', 'Mood', 'Body State', 'SSE', 'Event', 'Debug'];
-    const lists = {};
-    let paused = false;
-    const statusEl = document.getElementById('stream-state');
-    const badgeEl = document.getElementById('connection-badge');
-
-    sections.forEach((name) => {
-      const section = document.createElement('section');
-      section.className = 'console-section';
-      section.innerHTML = '<div class="section-header"><span class="section-title">' + name + '</span><span class="section-meta"><span class="count">0</span><span class="chevron">▼</span></span></div><div class="section-body"><div class="log-list"><div class="empty">Waiting...</div></div></div>';
-      section.querySelector('.section-header').onclick = () => section.classList.toggle('collapsed');
-      root.appendChild(section);
-      lists[name] = section.querySelector('.log-list');
-    });
-
-    function append(event) {
-      const list = lists[event.section] || lists.Debug;
-      const empty = list.querySelector('.empty');
-      if (empty) empty.remove();
-      const row = document.createElement('div');
-      row.className = 'log-entry ' + (event.status || '');
-      row.innerHTML = '<span class="kind">' + escapeHtml(event.label) + '</span><span class="value">' + escapeHtml(event.value) + '</span>';
-      list.appendChild(row);
-      list.closest('.console-section').querySelector('.count').textContent = String(list.children.length);
-      if (statusEl) statusEl.textContent = 'Streaming · ' + new Date(event.at).toLocaleTimeString();
-      if (badgeEl) { badgeEl.className = 'status-badge live'; badgeEl.textContent = 'LIVE'; }
-      if (!paused) window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+  class AgentPanelInstance {
+    constructor(container) {
+      this.container = container;
+      this.events = new Map();
+      this.order = [];
+      this.expanded = false;
+      this.userToggled = false;
+      this.collapseTimer = null;
+      this.build();
     }
 
-    loadEvents().forEach(append);
-    const receive = (event) => append(event.detail || event.data);
-    window.addEventListener('lin:developer-event', receive);
-    if (channel) channel.onmessage = (event) => append(event.data);
-    window.addEventListener('storage', (event) => {
-      if (event.key === STORAGE_KEY && event.newValue) {
-        const events = loadEvents();
-        const latest = events[events.length - 1];
-        if (latest) append(latest);
+    build() {
+      const root = document.createElement('div');
+      root.className = 'agent-panel agent-panel-collapsed';
+      root.innerHTML = '<button class="agent-panel-header" type="button" aria-expanded="false"><span class="agent-status agent-running"></span><span class="agent-panel-title">Agent</span><span class="agent-panel-summary">Preparing</span><span class="agent-panel-count">0</span><span class="agent-panel-chevron">⌄</span></button><div class="agent-panel-body"></div>';
+      root.querySelector('.agent-panel-header').onclick = () => {
+        this.userToggled = true;
+        this.toggle(!this.expanded);
+      };
+      this.container.appendChild(root);
+      this.root = root;
+      this.header = root.querySelector('.agent-panel-header');
+      this.status = root.querySelector('.agent-status');
+      this.summary = root.querySelector('.agent-panel-summary');
+      this.count = root.querySelector('.agent-panel-count');
+      this.body = root.querySelector('.agent-panel-body');
+    }
+
+    toggle(expanded) {
+      this.expanded = expanded;
+      this.root.classList.toggle('agent-panel-expanded', expanded);
+      this.root.classList.toggle('agent-panel-collapsed', !expanded);
+      this.header.setAttribute('aria-expanded', String(expanded));
+      if (this.collapseTimer) clearTimeout(this.collapseTimer);
+    }
+
+    autoCollapse() {
+      if (this.userToggled || !this.expanded) return;
+      if (this.collapseTimer) clearTimeout(this.collapseTimer);
+      this.collapseTimer = setTimeout(() => this.toggle(false), AUTO_COLLAPSE_MS);
+    }
+
+    ingest(raw) {
+      if (!raw) return;
+      const event = { ...raw, id: String(raw.id || raw.type || 'agent_event'), status: normalizeStatus(raw.status) };
+      const isNew = !this.events.has(event.id);
+      this.events.set(event.id, event);
+      if (isNew) this.order.push(event.id);
+      this.render(event, isNew);
+      if (event.status === 'running' && !this.userToggled) this.toggle(true);
+      if (event.status === 'success' || event.status === 'skipped' || event.status === 'not_executed') this.autoCollapse();
+    }
+
+    render(latest, isNew) {
+      this.status.className = 'agent-status agent-' + latest.status;
+      this.summary.textContent = labelFor(latest) + (latest.summary ? ' · ' + latest.summary : '');
+      this.count.textContent = String(this.order.length);
+      if (isNew) {
+        const row = document.createElement('div');
+        row.className = 'agent-step agent-' + latest.status;
+        row.dataset.eventId = latest.id;
+        row.innerHTML = '<button class="agent-step-header" type="button"><span class="agent-step-dot"></span><span class="agent-step-label"></span><span class="agent-step-state"></span><span class="agent-step-chevron">⌄</span></button><pre class="agent-step-detail"></pre>';
+        row.querySelector('.agent-step-header').onclick = () => row.classList.toggle('agent-step-expanded');
+        this.body.appendChild(row);
       }
-    });
+      const row = this.body.querySelector('[data-event-id="' + CSS.escape(latest.id) + '"]');
+      if (!row) return;
+      row.className = 'agent-step agent-' + latest.status;
+      row.querySelector('.agent-step-label').textContent = labelFor(latest);
+      row.querySelector('.agent-step-state').textContent = latest.status === 'running' ? 'Running' : latest.status;
+      row.querySelector('.agent-step-detail').textContent = detailFor(latest);
+    }
 
-    const pauseButton = document.getElementById('pause-scroll');
-    const resumeButton = document.getElementById('resume-scroll');
-    if (pauseButton) pauseButton.onclick = () => { paused = true; pauseButton.disabled = true; resumeButton.disabled = false; if (statusEl) statusEl.textContent = 'Scroll paused'; };
-    if (resumeButton) resumeButton.onclick = () => { paused = false; pauseButton.disabled = false; resumeButton.disabled = true; window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); };
-    const clearButton = document.getElementById('clear-log');
-    if (clearButton) clearButton.onclick = () => { localStorage.removeItem(STORAGE_KEY); Object.values(lists).forEach((list) => { list.innerHTML = '<div class="empty">Waiting...</div>'; list.closest('.console-section').querySelector('.count').textContent = '0'; }); };
-  }
+    complete() {
+      this.ingest({ id: 'done', status: 'success', summary: 'Completed' });
+    }
 
-  async function refreshState() {
-    try {
-      const [moodResponse, bodyResponse] = await Promise.all([fetch('/mood'), fetch('/intimacy/status')]);
-      if (moodResponse.ok) {
-        const mood = await moodResponse.json();
-        Object.entries(mood.mood || {}).forEach(([key, value]) => emit('mood', { key, value }));
-      }
-      if (bodyResponse.ok) {
-        const body = await bodyResponse.json();
-        Object.entries(body.body_values || {}).forEach(([key, value]) => emit('body_state', { key, value }));
-      }
-    } catch (_) {
-      // The stream remains usable when optional status endpoints are unavailable.
+    snapshot() {
+      return { events: Object.fromEntries(this.events.entries()) };
+    }
+
+    mountSnapshot(snapshot) {
+      const events = snapshot && snapshot.events ? snapshot.events : {};
+      Object.values(events)
+        .sort((a, b) => (a.updated_at || 0) - (b.updated_at || 0))
+        .forEach((event) => this.ingest(event));
+      this.toggle(false);
     }
   }
 
-  window.DeveloperConsole = { emit, createCompact, mountFull, loadEvents, refreshState };
-  window.publishDevEvent = emit;
+  window.AgentPanel = {
+    create(container) { return new AgentPanelInstance(container); },
+    mountHistory(container, snapshot) {
+      const instance = new AgentPanelInstance(container);
+      instance.mountSnapshot(snapshot);
+      return instance;
+    },
+    fromSse,
+  };
 })();

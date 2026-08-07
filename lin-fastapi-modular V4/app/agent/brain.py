@@ -283,11 +283,46 @@ def write_daily_journal():
         state.add_note(content)
     state.mark_journal_written()
 
+def _body_state_sse_payload(state):
+    """Serialize only the current Body State for the existing SSE client."""
+    from app.intimacy.body_state import get_body_level, get_body_description
+    values = getattr(state, "body_values", {})
+    body_values = {}
+    for key in ("tension", "heat", "sensitivity", "control"):
+        value = float(values.get(key, 0))
+        body_values[key] = {
+            "value": round(value, 1),
+            "level": get_body_level(value),
+            "desc": get_body_description(key, value),
+        }
+    return {
+        "body_values": body_values,
+        "cycle_key": getattr(state, "cycle_key", "stable"),
+        "active_event_key": getattr(state, "active_event_key", None),
+        "updated_at": getattr(state, "last_tick_at", None).isoformat() if getattr(state, "last_tick_at", None) else None,
+    }
+
+
 def generate_reply_stream(context, app_name=None, use_cache=True, session_id=None):
+    """Wrap the streaming pipeline so unexpected failures retain their traceback."""
+    try:
+        yield from _generate_reply_stream_impl(
+            context,
+            app_name=app_name,
+            use_cache=use_cache,
+            session_id=session_id,
+        )
+    except Exception:
+        import traceback
+        traceback.print_exc()
+        raise
+
+
+def _generate_reply_stream_impl(context, app_name=None, use_cache=True, session_id=None):
     """
     流式生成回覆，yield SSE 格式的事件。
     """
-    print("[TRACE] generate_reply_stream entered")
+    print("[TRACE-A] enter generate_reply_stream")
     from app.llm.deepseek_client import call_deepseek_stream
     from app.memory_rules import parse_memory_decision, parse_memory_decision_traced, parse_mood_event, strip_hidden_blocks
     from app import mood_engine
@@ -295,6 +330,34 @@ def generate_reply_stream(context, app_name=None, use_cache=True, session_id=Non
 
     collector = TraceCollector()
     target_session = session_id or state.current_session_id
+
+    # Phase 1: SSE 主流程也必须经过与非流式流程相同的 Body State 生命周期。
+    # 顺序：先推进旧状态 -> 更新本轮对话上下文 -> 检查 Body 事件 -> 构造 prompt。
+    from datetime import datetime
+    from app.intimacy.tick import tick_and_update, start_event
+    from app.intimacy.event import check_event_triggers
+    from app.intimacy.silence import detect_silence
+
+    now = datetime.now()
+    tick_and_update(state, now)
+    previous_message_at = getattr(state, 'last_user_message_at', None)
+    if previous_message_at:
+        gap_minutes = (now - previous_message_at).total_seconds() / 60.0
+        state.continuous_turns = (getattr(state, 'continuous_turns', 0) + 1) if gap_minutes < 10 else 1
+    else:
+        state.continuous_turns = 1
+    state.last_user_message_at = now
+
+    silence_info = detect_silence(previous_message_at, now) if previous_message_at else {}
+    trigger_context = {
+        "silence_minutes": silence_info.get("silence_minutes", 0),
+        "continuous_turns": getattr(state, "continuous_turns", 0),
+    }
+    triggered_events = check_event_triggers(state.body_values, trigger_context)
+    if triggered_events and not getattr(state, "active_event_key", None):
+        start_event(state, triggered_events[0], now)
+    if hasattr(state, 'save_body_state'):
+        state.save_body_state()
     
     if not state.check_rate_limit():
         err_msg = "今天额度用完了，或者刚刚问太快了，等一下再说。"
@@ -319,8 +382,12 @@ def generate_reply_stream(context, app_name=None, use_cache=True, session_id=Non
     else:
         conversation_history = ""
     
+    print("[TRACE-B] before build context")
     world_context = format_context_for_prompt(get_context())
+    print("[TRACE-C] after build context")
+    print("[TRACE-D] before build prompt")
     system_prompt = build_system_prompt(context, memory_summary, world_context, conversation_history)
+    print("[TRACE-E] after build prompt")
 
     yield collector.record_prompt(
         "passed",
@@ -336,10 +403,10 @@ def generate_reply_stream(context, app_name=None, use_cache=True, session_id=Non
     raw_reasoning = ""
     full_content = ""
     
-    print("[TRACE] before call_deepseek_stream")
+    print("[TRACE-H] before call_deepseek")
     try:
         generator = call_deepseek_stream(system_prompt, max_tokens=config.DEEPSEEK_MAX_TOKENS)
-        print("[TRACE] generator created")
+        print("[TRACE-I] after call_deepseek")
         for event_type, data in generator:
             print(f"[TRACE] event received: {event_type}")
             if event_type == "reasoning":
@@ -361,6 +428,7 @@ def generate_reply_stream(context, app_name=None, use_cache=True, session_id=Non
                 yield collector.record_reasoning("passed" if parse_source else "failed", reasoning_text=parse_source)
 
                 if parse_source:
+                    print("[TRACE-F] before memory parse")
                     _trace_start = time.time()
                     traced = parse_memory_decision_traced(parse_source)
                     _parse_time_ms = int((time.time() - _trace_start) * 1000)
@@ -373,6 +441,7 @@ def generate_reply_stream(context, app_name=None, use_cache=True, session_id=Non
                     # 正式邏輯仍只用既有的 parse_memory_decision，不依賴 traced 版本的回傳值，
                     # 避免診斷用的包裝函式影響到正式的記憶寫入行為。
                     decision = parse_memory_decision(parse_source)
+                    print("[TRACE-G] after memory parse")
                     print(f"[DONE-1] parse_memory_decision 完成, decision={decision is not None}")
                     if decision:
                         action = decision.get("action", "create")
@@ -387,10 +456,11 @@ def generate_reply_stream(context, app_name=None, use_cache=True, session_id=Non
                             yield collector.record_backend("passed", backend_action="remember_or_reinforce", action_taken=_result.get("action_taken") if _result else None)
                         print(f"[DONE-2] 記憶寫入動作完成, action={action}, action_taken={_result.get('action_taken') if _result else None}")
 
-                        if _result and _result.get("action_taken") != "skipped":
+                        if _result and _result.get("memory_id") is not None and _result.get("action_taken") != "skipped":
                             yield collector.record_db("passed", memory_id=_result.get("memory_id"))
                         else:
-                            yield collector.record_db("skipped", db_error=_result.get("skip_reason") if _result else None)
+                            yield collector.record_db("failed", db_error=_result.get("skip_reason") if _result else "handler_failed")
+                            yield collector.emit("error", message="記憶寫入失敗")
                     else:
                         yield collector.record_backend("not_executed")
                         yield collector.record_db("not_executed")
@@ -405,6 +475,25 @@ def generate_reply_stream(context, app_name=None, use_cache=True, session_id=Non
                 for event_name, event_level in detected_events:
                     mood_engine.apply_event(event_name, level=event_level)
                 print(f"[DONE-3] mood_engine.apply_event 完成, detected_events={detected_events}")
+
+                # Phase 1: mood 已写回后，立即执行一次状态同步。
+                # tick 本身仍遵守 last_tick_at，避免重复计算或覆盖现有缓存修复。
+                tick_and_update(state, datetime.now())
+
+                # mood 更新后再检查一次 Body Event；这样新 mood 不会只能等到下一轮聊天
+                # 才参与事件判断。仍遵守 active event 不覆盖规则。
+                post_mood_now = datetime.now()
+                post_mood_context = {
+                    "silence_minutes": 0,
+                    "continuous_turns": getattr(state, "continuous_turns", 0),
+                }
+                post_mood_events = check_event_triggers(state.body_values, post_mood_context)
+                if post_mood_events and not getattr(state, "active_event_key", None):
+                    start_event(state, post_mood_events[0], post_mood_now)
+
+                if hasattr(state, 'save_body_state'):
+                    state.save_body_state()
+                yield f"event: body_state\ndata: {json.dumps(_body_state_sse_payload(state), ensure_ascii=False)}\n\n"
                 
                 state.last_context_cache = context
                 state.mark_reply()
@@ -425,11 +514,5 @@ def generate_reply_stream(context, app_name=None, use_cache=True, session_id=Non
                 print("[DONE-8] state.mark_conversation_anchor 完成")
                 yield "event: done\ndata: {}\n\n"
     
-    except Exception as e:
-        import traceback
-        print("[EXCEPTION] generate_reply_stream 捕获到异常:")
-        traceback.print_exc()
-        state.add_log("AI回复", f"失败：{str(e)}")
-        fallback_payload = json.dumps({'delta': '信号不好。'})
-        yield "event: content\ndata: " + fallback_payload + "\n\n"
-        yield "event: done\ndata: {}\n\n"
+    except Exception:
+        raise

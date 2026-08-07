@@ -152,7 +152,7 @@ def compute_expiry(importance, now=None):
 
 def _field(block, name, default=""):
     # 放宽匹配：忽略大小写、允许多余空格、允许 _ 或 - 分隔符
-    pattern = re.sub(r'[_-]', r'[_\s-]*', name)
+    pattern = re.sub(r'[_-]', lambda _: r'[_\s-]*', name)
     m = re.search(rf"{pattern}\s*:\s*(.+)", block, re.IGNORECASE)
     return m.group(1).strip() if m else default
 

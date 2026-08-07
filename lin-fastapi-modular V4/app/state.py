@@ -269,8 +269,12 @@ class AppState:
     # ---------- 长期记忆 ----------
     def add_memory(self, tag, content, category="长期记忆", importance=3, keyword="", created_by="user"):
         expires_at = compute_expiry(importance)
-        memory_id = db.insert_memory(tag, content, category=category, importance=importance,
-                                      keyword=keyword, expires_at=expires_at, created_by=created_by)
+        memory_result = db.insert_memory(tag, content, category=category, importance=importance,
+                                          keyword=keyword, expires_at=expires_at, created_by=created_by)
+        memory_id = memory_result.get("memory_id") if memory_result.get("success") else None
+        if not memory_result.get("success"):
+            print(f"[memory] manual write failed: {memory_result['error_reason']}")
+            return None
         self.memory_bank.append({
             "id": memory_id,
             "tag": tag,
@@ -301,9 +305,11 @@ class AppState:
         
         # Phase 1: 使用衝突檢查邏輯
         result = handle_memory_with_conflict_check(decision)
-        
-        # 同步到內存（只有非 pending_review 的才加入）
-        if result["memory_id"] and result["action_taken"] != "pending_review":
+        if not result.get("success"):
+            print(f"[memory] write failed: {result.get('error_reason') or result.get('skip_reason')}")
+
+        # 同步到內存（只有成功且非 pending_review 的才加入）
+        if result.get("success") and result["memory_id"] and result["action_taken"] != "pending_review":
             normalized_keyword = normalize_keyword(raw_keyword)
             
             if result["action_taken"] == "reinforced":
@@ -358,7 +364,7 @@ class AppState:
         
         # 差異大 -> 視為衝突，標記待審核
         if similarity < 0.5:
-            memory_id = db.insert_memory(
+            memory_result = db.insert_memory(
                 tag=decision["tag"],
                 content=new_content,
                 category=decision["category"],
@@ -370,12 +376,13 @@ class AppState:
                 pending_review=True,
                 conflict_with=target["id"]
             )
+            memory_id = memory_result.get("memory_id") if memory_result.get("success") else None
             # pending_review 的記憶不加入內存
             return {
                 "memory_id": memory_id,
                 "action_taken": "pending_review" if memory_id is not None else "skipped",
                 "conflict_with": target["id"] if memory_id is not None else None,
-                "skip_reason": "conflict_detected" if memory_id is not None else "insert_failed"
+                "skip_reason": "conflict_detected" if memory_id is not None else memory_result["error_reason"]
             }
         
         # 差異小 -> 直接更新

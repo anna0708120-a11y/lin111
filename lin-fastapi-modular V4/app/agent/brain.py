@@ -478,7 +478,13 @@ def _generate_reply_stream_impl(context, app_name=None, use_cache=True, session_
                         else:
                             _result = state.remember_or_reinforce(decision)
                             yield collector.record_backend("passed", backend_action="remember_or_reinforce", action_taken=_result.get("action_taken") if _result else None)
-                        print(f"[DONE-2] 記憶寫入動作完成, action={action}, action_taken={_result.get('action_taken') if _result else None}")
+                        print(
+                            "[MESSAGE_MEMORY]\n"
+                            f"action={action}\n"
+                            f"result={'success' if _result and _result.get('success', _result.get('memory_id') is not None) else 'fail'}\n"
+                            f"memory_id={_result.get('memory_id') if _result else None}\n"
+                            f"reason={(_result or {}).get('error_reason') or (_result or {}).get('skip_reason')}"
+                        )
 
                         if _result and _result.get("memory_id") is not None and _result.get("action_taken") != "skipped":
                             yield collector.record_db("passed", memory_id=_result.get("memory_id"))

@@ -96,9 +96,9 @@ def load_memories(limit=200):
 
 def insert_memory(tag, content, category="长期记忆", importance=3, keyword="", expires_at=None,
                    created_by="user", raw_keyword="", pending_review=False, conflict_with=None):
-    """插入一条记忆，成功的话回传 Supabase 分配的 id（前端删除要用），失败回传 None。"""
+    """插入记忆，明确返回 success、memory_id、error_reason。"""
     if not _client:
-        return None
+        return {"success": False, "memory_id": None, "error_reason": "Supabase client missing"}
     try:
         res = (
             _client.table("memory_bank")
@@ -116,14 +116,15 @@ def insert_memory(tag, content, category="长期记忆", importance=3, keyword="
             })
             .execute()
         )
-        if res.data:
-            memory_id = res.data[0].get("id")
-            if memory_id is not None:
-                return memory_id
-            print("[db] 寫入記憶未返回 memory_id")
+        if not res.data:
+            return {"success": False, "memory_id": None, "error_reason": "insert returned no data"}
+        memory_id = res.data[0].get("id")
+        if memory_id is None:
+            return {"success": False, "memory_id": None, "error_reason": "missing id"}
+        return {"success": True, "memory_id": memory_id, "error_reason": None}
     except Exception as e:
         print(f"[db] 写入记忆失败: {e}")
-    return None
+        return {"success": False, "memory_id": None, "error_reason": f"insert failed: {e}"}
 
 
 def find_memory_by_keyword(keyword, created_by=None):

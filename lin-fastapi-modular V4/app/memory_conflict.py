@@ -109,10 +109,12 @@ def handle_memory_with_conflict_check(decision):
 
     def failed(reason):
         return {
+            "success": False,
             "memory_id": None,
             "action_taken": "skipped",
             "conflict_with": None,
             "skip_reason": reason,
+            "error_reason": reason,
         }
     
     # 2. 根據結果決定操作
@@ -124,16 +126,18 @@ def handle_memory_with_conflict_check(decision):
         if not db.reinforce_memory(existing["id"], new_importance, new_expiry):
             return failed("reinforce_failed")
         return {
+            "success": True,
             "memory_id": existing["id"],
             "action_taken": "reinforced",
             "conflict_with": None,
             "skip_reason": None,
+            "error_reason": None,
         }
     
     elif conflict_result["action"] == "conflict":
         # 衝突：標記 pending_review，不進 prompt，等 Anna 審核
         existing = conflict_result["conflicting_memory"]
-        memory_id = db.insert_memory(
+        memory_result = db.insert_memory(
             tag=decision["tag"],
             content=decision["summary"],
             category=decision["category"],
@@ -145,16 +149,19 @@ def handle_memory_with_conflict_check(decision):
             pending_review=True,
             conflict_with=existing["id"]
         )
+        memory_id = memory_result.get("memory_id") if memory_result.get("success") else None
         return {
+            "success": memory_result["success"],
             "memory_id": memory_id,
             "action_taken": "pending_review" if memory_id is not None else "skipped",
             "conflict_with": existing["id"] if memory_id is not None else None,
-            "skip_reason": None if memory_id is not None else "insert_failed",
+            "skip_reason": None if memory_id is not None else memory_result["error_reason"],
+            "error_reason": memory_result["error_reason"],
         }
     
     else:
         # 正常建立新記憶
-        memory_id = db.insert_memory(
+        memory_result = db.insert_memory(
             tag=decision["tag"],
             content=decision["summary"],
             category=decision["category"],
@@ -166,9 +173,12 @@ def handle_memory_with_conflict_check(decision):
             pending_review=False,
             conflict_with=None
         )
+        memory_id = memory_result.get("memory_id") if memory_result.get("success") else None
         return {
+            "success": memory_result["success"],
             "memory_id": memory_id,
             "action_taken": "created" if memory_id is not None else "skipped",
             "conflict_with": None,
-            "skip_reason": None if memory_id is not None else "insert_failed",
+            "skip_reason": None if memory_id is not None else memory_result["error_reason"],
+            "error_reason": memory_result["error_reason"],
         }

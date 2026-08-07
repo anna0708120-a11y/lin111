@@ -150,24 +150,35 @@ def compute_expiry(importance, now=None):
         return None
     return (now + timedelta(days=days)).isoformat()
 
+def _memory_decision_block(reasoning_text):
+    """提取 DeepSeek reasoning 中的 memory decision 区块。"""
+    match = re.search(
+        r"\[\s*MEMORY[\s_-]*DECISION\s*\](.*?)\[\s*/\s*MEMORY[\s_-]*DECISION\s*\]",
+        reasoning_text or "",
+        re.IGNORECASE | re.S,
+    )
+    return match.group(1) if match else None
+
+
 def _field(block, name, default=""):
-    # 放宽匹配：忽略大小写、允许多余空格、允许 _ 或 - 分隔符
-    pattern = re.sub(r'[_-]', lambda _: r'[_\s-]*', name)
-    m = re.search(rf"{pattern}\s*:\s*(.+)", block, re.IGNORECASE)
-    return m.group(1).strip() if m else default
+    """读取 decision 字段，兼容 DeepSeek 的全角标点和 Markdown 列表格式。"""
+    pattern = re.sub(r"[_-]", lambda _: r"[_\s-]*", name)
+    field_match = re.search(
+        rf"(?mi)^\s*(?:[-*]\s*)?(?:`)?{pattern}(?:`)?\s*[:：]\s*(.+?)\s*$",
+        block,
+    )
+    if not field_match:
+        return default
+    return field_match.group(1).strip().strip("`*_ ")
+
 
 def parse_memory_decision(reasoning_text):
-    """
-    从 reasoning 里抓 [MEMORY_DECISION]...[/MEMORY_DECISION]，解析成 dict。
-    抓不到或不值得记 -> 回传 None。第二个回传值永远是原始 reasoning（这个函数不负责清理文字，
-    清理交给 strip_hidden_blocks 统一处理，避免两个函数各切一次、切坏格式）。
-    """
-    match = re.search(r"\[MEMORY_DECISION\](.*?)\[/MEMORY_DECISION\]", reasoning_text, re.S)
-    if not match:
+    """解析 DeepSeek thinking 中完整的 [MEMORY_DECISION] 区块。"""
+    block = _memory_decision_block(reasoning_text)
+    if block is None:
         return None
 
-    block = match.group(1)
-    worth = _field(block, "worth_remembering", "no").lower().startswith("y")
+    worth = _field(block, "worth_remembering", "no").lower().startswith(("y", "是"))
     if not worth:
         return None
 
@@ -201,44 +212,27 @@ def parse_memory_decision(reasoning_text):
         "summary": summary,
     }
 
+
 def parse_memory_decision_traced(reasoning_text):
-    """
-    parse_memory_decision 的诊断包装版，专供 Developer Panel 的 Trace Collector 使用。
-    不改动 parse_memory_decision 本身的行为或既有呼叫端（brain.py 主流程仍用原函数），
-    这个函数只是在外面多做一层"为什么失败"的判断，回传结构固定为：
-
-        {"decision": dict 或 None, "status": "passed"/"failed", "reason": 字符串}
-
-    reason 只在 status 是 failed 时有意义，用来在 Developer Panel 的 Parser Section 里
-    显示具体卡在哪一步（找不到标签 / 缺少收尾标签 / worth_remembering 是 no / 字段缺失等）。
-    """
+    """诊断包装：返回固定的解析状态与失败原因。"""
     if not reasoning_text:
         return {"decision": None, "status": "failed", "reason": "reasoning 为空"}
 
-    has_open = "[MEMORY_DECISION]" in reasoning_text
-    has_close = "[/MEMORY_DECISION]" in reasoning_text
+    block = _memory_decision_block(reasoning_text)
+    if block is None:
+        return {"decision": None, "status": "failed", "reason": "未找到完整 [MEMORY_DECISION] 区块"}
 
-    if not has_open:
-        return {"decision": None, "status": "failed", "reason": "未找到 [MEMORY_DECISION] 開頭標籤"}
-    if not has_close:
-        return {"decision": None, "status": "failed", "reason": "缺少 [/MEMORY_DECISION] 結尾標籤，區塊未閉合"}
-
-    match = re.search(r"\[MEMORY_DECISION\](.*?)\[/MEMORY_DECISION\]", reasoning_text, re.S)
-    if not match:
-        return {"decision": None, "status": "failed", "reason": "標籤存在但區塊格式無法解析"}
-
-    block = match.group(1)
-    worth = _field(block, "worth_remembering", "no").lower().startswith("y")
+    worth = _field(block, "worth_remembering", "no").lower().startswith(("y", "是"))
     if not worth:
-        return {"decision": None, "status": "passed", "reason": "worth_remembering: no（本輪判定不值得記）"}
+        return {"decision": None, "status": "passed", "reason": "worth_remembering: no（本轮判定不值得记）"}
 
     summary = _field(block, "summary", "")
     if not summary:
-        return {"decision": None, "status": "failed", "reason": "worth_remembering 是 yes，但缺少 summary 欄位"}
+        return {"decision": None, "status": "failed", "reason": "worth_remembering 是 yes，但缺少 summary 字段"}
 
     decision = parse_memory_decision(reasoning_text)
     if not decision:
-        return {"decision": None, "status": "failed", "reason": "欄位存在但未通過 parse_memory_decision 的驗證（可能 importance<=1）"}
+        return {"decision": None, "status": "failed", "reason": "字段未通过 memory decision 验证"}
 
     return {"decision": decision, "status": "passed", "reason": None}
 

@@ -16,6 +16,18 @@ summary: Anna 喜欢狗。
 action: create
 [/MEMORY_DECISION]'''
 
+DEEPSEEK_DOG_SAMPLE = """我会记住。
+
+[ MEMORY_DECISION ]
+- worth remembering：是
+- action：create
+- importance：4
+- category：长期记忆
+- tag：喜好
+- keyword：喜欢狗
+- summary：Anna 喜欢狗
+[ / MEMORY_DECISION ]"""
+
 
 class FakeInsert:
     def __init__(self, data):
@@ -47,6 +59,18 @@ class MemoryObservabilityTests(unittest.TestCase):
         decision = parse_memory_decision(SAMPLE)
         self.assertEqual(decision["action"], "create")
         self.assertEqual(decision["summary"], "Anna 喜欢狗。")
+
+
+    def test_parse_deepseek_dog_output_with_fullwidth_markdown_format(self):
+        decision = parse_memory_decision(DEEPSEEK_DOG_SAMPLE)
+        self.assertEqual(decision, {
+            "action": "create",
+            "importance": 4,
+            "category": "长期记忆",
+            "tag": "喜好",
+            "keyword": "喜欢狗",
+            "summary": "Anna 喜欢狗",
+        })
 
     def test_insert_memory_reports_missing_client(self):
         with patch.object(db, "_client", None):

@@ -39,15 +39,19 @@ class ChatView {
       const read = message.r === 'anna' && history.slice(index + 1).some((item) => item.r === 'lin');
       const meta = showMeta ? '<div class="mtime2">' + message.time + (read ? ' · 已讀' : '') + '</div>' : '';
       const messageId = message.message_id != null ? String(message.message_id) : null;
-      const agentSlot = message.r === 'lin' && messageId ? '<div class="agent-panel-slot" data-message-id="' + messageId + '"></div>' : '';
-      if (message.r === 'lin' && messageId && message.trace) agentSlots.push({ messageId, trace: message.trace });
+      const agentSlot = message.r === 'lin' ? '<div class="agent-panel-slot"' +
+        (messageId ? ' data-message-id="' + messageId + '"' : '') + '></div>' : '';
+      if (message.r === 'lin' && message.trace) agentSlots.push({ messageId, trace: message.trace });
       html += '<div class="msg ' + message.r + (showMeta ? '' : ' grouped') + '">' + agentSlot + '<div class="msg-row">' +
         avatarHtml(message.r) + '<div class="bub">' + message.t + '</div></div>' + meta + '</div>';
     });
 
     this.cmEl.innerHTML = html;
     agentSlots.forEach(({ messageId, trace }) => {
-      const slot = this.cmEl.querySelector('.agent-panel-slot[data-message-id="' + CSS.escape(messageId) + '"]');
+      const selector = messageId == null
+        ? '.agent-panel-slot:not([data-message-id])'
+        : '.agent-panel-slot[data-message-id="' + CSS.escape(messageId) + '"]';
+      const slot = this.cmEl.querySelector(selector);
       if (slot && window.AgentPanel) window.AgentPanel.mountHistory(slot, trace);
     });
     this.scrollToBottom();

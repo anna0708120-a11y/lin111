@@ -1412,7 +1412,8 @@ function renderOnly(history){
       iso: iso,
       time: display,
       think: m.thinking || m.think,
-      message_id: m.message_id
+      message_id: m.message_id,
+      trace: m.trace
     };
   });
   chatMemoryCache = serverMessages;
@@ -1571,30 +1572,62 @@ async function confirmImageSend() {
     let reasoningBuffer = '';
     let contentBuffer = '';
     let currentMsgDiv = null;
+    let liveAssistantEntry = null;
     const currentDeveloper = window.AgentPanel ? window.AgentPanel.create(document.getElementById('cm')) : null;
     if (currentDeveloper) currentDeveloper.ingest(window.AgentPanel.fromSse('api_start', {model: 'watch', input: 'image'}));
     let currentEvent = null;
     let sseBuffer = '';
     
     typing(false);
+
+    function ensureLiveAssistantMessage() {
+      if (currentMsgDiv) return currentMsgDiv.closest('.msg.lin');
+
+      const msgDiv = document.createElement('div');
+      msgDiv.className = 'msg lin';
+      const rowDiv = document.createElement('div');
+      rowDiv.className = 'msg-row';
+      rowDiv.innerHTML = avatarHtml('lin');
+      const bubDiv = document.createElement('div');
+      bubDiv.className = 'bub';
+      rowDiv.appendChild(bubDiv);
+      msgDiv.appendChild(rowDiv);
+      document.getElementById('cm').appendChild(msgDiv);
+
+      currentMsgDiv = bubDiv;
+      liveAssistantEntry = {
+        r: 'lin',
+        t: '',
+        time: ts(),
+        iso: new Date().toISOString(),
+        message_id: 'live-' + Date.now()
+      };
+      chatMemoryCache.push(liveAssistantEntry);
+      return msgDiv;
+    }
     
     function processChunk({done, value}) {
       if (done) {
-        if(contentBuffer){
-          const entry = {
+        if (currentDeveloper) currentDeveloper.complete();
+        if (liveAssistantEntry) {
+          liveAssistantEntry.t = contentBuffer;
+          if (reasoningBuffer) liveAssistantEntry.think = reasoningBuffer;
+          if (currentDeveloper) liveAssistantEntry.trace = currentDeveloper.snapshot();
+        } else if (contentBuffer) {
+          chatMemoryCache.push({
             r: 'lin',
             t: contentBuffer,
             time: ts(),
-            iso: new Date().toISOString()
-          };
-          if(reasoningBuffer) entry.think = reasoningBuffer;
-          if(currentDeveloper) entry.trace = currentDeveloper.snapshot();
-          chatMemoryCache.push(entry);
-          if(chatMemoryCache.length > 200) chatMemoryCache = chatMemoryCache.slice(-200);
+            iso: new Date().toISOString(),
+            message_id: 'live-' + Date.now(),
+            think: reasoningBuffer || undefined,
+            trace: currentDeveloper ? currentDeveloper.snapshot() : undefined
+          });
+        }
+        if (contentBuffer || liveAssistantEntry) {
           syncChat().catch(e => console.error('[DEBUG] Failed to sync image chat:', e));
         }
         if(document.getElementById('tb-memory')?.classList.contains('active')) rmem();
-        if (currentDeveloper) currentDeveloper.complete();
         scrollDown();
         pendingImageDataUrl = null;
         return;
@@ -1628,25 +1661,10 @@ async function confirmImageSend() {
               contentBuffer += data.delta;
               
               if (!currentMsgDiv) {
-                const msgDiv = document.createElement('div');
-                msgDiv.className = 'msg lin';
-                
-                const rowDiv = document.createElement('div');
-                rowDiv.className = 'msg-row';
-                rowDiv.innerHTML = avatarHtml('lin');
-                
-                const bubDiv = document.createElement('div');
-                bubDiv.className = 'bub';
-                bubDiv.textContent = contentBuffer;
-                
-                rowDiv.appendChild(bubDiv);
-                msgDiv.appendChild(rowDiv);
-                document.getElementById('cm').appendChild(msgDiv);
-                
-                currentMsgDiv = bubDiv;
-              } else {
-                currentMsgDiv.textContent = contentBuffer;
+                ensureLiveAssistantMessage();
               }
+              currentMsgDiv.textContent = contentBuffer;
+              if (liveAssistantEntry) liveAssistantEntry.t = contentBuffer;
               scrollDown();
             }
             
@@ -1659,6 +1677,10 @@ async function confirmImageSend() {
 
             else if (currentEvent === 'agent_event') {
               if (currentDeveloper) currentDeveloper.ingest(window.AgentPanel.fromSse('agent_event', data));
+              const messageEl = ensureLiveAssistantMessage();
+              if (messageEl && currentDeveloper) {
+                liveAssistantEntry.trace = currentDeveloper.snapshot();
+              }
             }
 
             else if (currentEvent === 'body_state') {
@@ -1712,30 +1734,62 @@ async function send(){
     let reasoningBuffer = '';
     let contentBuffer = '';
     let currentMsgDiv = null;
+    let liveAssistantEntry = null;
     const currentDeveloper = window.AgentPanel ? window.AgentPanel.create(document.getElementById('cm')) : null;
     if (currentDeveloper) currentDeveloper.ingest(window.AgentPanel.fromSse('api_start', {model: 'watch'}));
     let currentEvent = null;
     let sseBuffer = '';
     
     typing(false);
+
+    function ensureLiveAssistantMessage() {
+      if (currentMsgDiv) return currentMsgDiv.closest('.msg.lin');
+
+      const msgDiv = document.createElement('div');
+      msgDiv.className = 'msg lin';
+      const rowDiv = document.createElement('div');
+      rowDiv.className = 'msg-row';
+      rowDiv.innerHTML = avatarHtml('lin');
+      const bubDiv = document.createElement('div');
+      bubDiv.className = 'bub';
+      rowDiv.appendChild(bubDiv);
+      msgDiv.appendChild(rowDiv);
+      document.getElementById('cm').appendChild(msgDiv);
+
+      currentMsgDiv = bubDiv;
+      liveAssistantEntry = {
+        r: 'lin',
+        t: '',
+        time: ts(),
+        iso: new Date().toISOString(),
+        message_id: 'live-' + Date.now()
+      };
+      chatMemoryCache.push(liveAssistantEntry);
+      return msgDiv;
+    }
     
     function processChunk({done, value}){
       if(done){
-        if(contentBuffer){
-          const entry = {
+        if (currentDeveloper) currentDeveloper.complete();
+        if (liveAssistantEntry) {
+          liveAssistantEntry.t = contentBuffer;
+          if (reasoningBuffer) liveAssistantEntry.think = reasoningBuffer;
+          if (currentDeveloper) liveAssistantEntry.trace = currentDeveloper.snapshot();
+        } else if (contentBuffer) {
+          chatMemoryCache.push({
             r: 'lin',
             t: contentBuffer,
             time: ts(),
-            iso: new Date().toISOString()
-          };
-          if(reasoningBuffer) entry.think = reasoningBuffer;
-          if(currentDeveloper) entry.trace = currentDeveloper.snapshot();
-          chatMemoryCache.push(entry);
-          if(chatMemoryCache.length > 200) chatMemoryCache = chatMemoryCache.slice(-200);
+            iso: new Date().toISOString(),
+            message_id: 'live-' + Date.now(),
+            think: reasoningBuffer || undefined,
+            trace: currentDeveloper ? currentDeveloper.snapshot() : undefined
+          });
+        }
+        if (contentBuffer || liveAssistantEntry) {
           syncChat().catch(e => console.error('[DEBUG] Failed to sync chat:', e));
         }
         if(document.getElementById('tb-memory')?.classList.contains('active')) rmem();
-        if (currentDeveloper) currentDeveloper.complete();
         scrollDown();
         return;
       }
@@ -1768,25 +1822,10 @@ async function send(){
               contentBuffer += data.delta;
               
               if(!currentMsgDiv){
-                const msgDiv = document.createElement('div');
-                msgDiv.className = 'msg lin';
-                
-                const rowDiv = document.createElement('div');
-                rowDiv.className = 'msg-row';
-                rowDiv.innerHTML = avatarHtml('lin');
-                
-                const bubDiv = document.createElement('div');
-                bubDiv.className = 'bub';
-                bubDiv.textContent = contentBuffer;
-                
-                rowDiv.appendChild(bubDiv);
-                msgDiv.appendChild(rowDiv);
-                document.getElementById('cm').appendChild(msgDiv);
-                
-                currentMsgDiv = bubDiv;
-              } else {
-                currentMsgDiv.textContent = contentBuffer;
+                ensureLiveAssistantMessage();
               }
+              currentMsgDiv.textContent = contentBuffer;
+              if (liveAssistantEntry) liveAssistantEntry.t = contentBuffer;
               scrollDown();
             }
             
@@ -1799,6 +1838,10 @@ async function send(){
 
             else if(currentEvent === 'agent_event'){
               if (currentDeveloper) currentDeveloper.ingest(window.AgentPanel.fromSse('agent_event', data));
+              const messageEl = ensureLiveAssistantMessage();
+              if (messageEl && currentDeveloper) {
+                liveAssistantEntry.trace = currentDeveloper.snapshot();
+              }
             }
 
             else if(currentEvent === 'body_state'){

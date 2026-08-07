@@ -41,16 +41,25 @@ def build_system_prompt(context, memory_summary="", world_context="", conversati
     conversation_history: 从 state.get_recent_conversation() 拿到的最近对话记录，
                            帮助模型记得你们刚才在聊什么，避免凭空编造。
     """
+    print("[PROMPT-DATA] state.mood", repr(state.mood))
+    if isinstance(state.mood, dict):
+        for key, value in state.mood.items():
+            print("[PROMPT-DATA] mood", key, type(value), repr(value))
+    body_state = getattr(state, "body_state", None)
+    print("[PROMPT-DATA] state.body_state", type(body_state), repr(body_state))
+
     from datetime import datetime
     from zoneinfo import ZoneInfo
     
-    # 提取当前时间（置顶，避免 LLM 编造时间）
-    # 明确使用 Asia/Hong_Kong，不依赖 server 系统时区（Render 预设跑 UTC）
+    print("[PROMPT-1] persona")
     now = datetime.now(ZoneInfo("Asia/Hong_Kong"))
     hour = now.hour
     time_period = "凌晨" if 0 <= hour < 6 else "早上" if 6 <= hour < 12 else "下午" if 12 <= hour < 18 else "晚上"
     current_time = f"【当前真实时间】\n现在是 {now.strftime('%Y年%m月%d日')} {time_period} {now.strftime('%H:%M')}（24小时制，北京时间）\n请在回复中使用准确的时间，不要编造或猜测。"
+
+    print("[PROMPT-2] mood")
     mood = state.mood or {}
+    print("[PROMPT-3] body_state")
     current_mood_text = (
         "\n\n【你现在的状态（由程序根据你判断的事件自动增减，你不用自己打分，只需要参考这些数值自然演出）】\n"
         f"attachment(依恋): {mood.get('attachment', 0.6):.2f}\n"
@@ -63,6 +72,7 @@ def build_system_prompt(context, memory_summary="", world_context="", conversati
         "数值涨跌交给程序处理。）"
     )
 
+    print("[PROMPT-4] willingness")
     # 親密引擎：關係階段 + 互動意願（只讀，不寫入Memory，每次重新計算）
     from app.intimacy.engine import compute_willingness, get_atmosphere
     willingness = compute_willingness(mood)
@@ -80,7 +90,8 @@ def build_system_prompt(context, memory_summary="", world_context="", conversati
     if intimacy_body_text:
         intimacy_text += f"\n\n{intimacy_body_text}"
 
-    return (
+    print("[PROMPT-5] memory prompt")
+    final_prompt = (
         current_time
         + "\n\n"
         + PERSONA_CORE
@@ -97,3 +108,5 @@ def build_system_prompt(context, memory_summary="", world_context="", conversati
         + "\n\n"
         + MEMORY_DECISION_INSTRUCTION
     )
+    print("[PROMPT-6] final prompt")
+    return final_prompt

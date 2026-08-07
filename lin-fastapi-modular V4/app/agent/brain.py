@@ -338,6 +338,7 @@ def _generate_reply_stream_impl(context, app_name=None, use_cache=True, session_
     """
     print("[TRACE-A] enter generate_reply_stream")
     from app.llm.deepseek_client import call_deepseek_stream
+    from app.memory_intent import build_memory_decision
     from app.memory_rules import parse_memory_decision, parse_memory_decision_traced, parse_mood_event, strip_hidden_blocks
     from app import mood_engine
     from app.agent.trace_collector import TraceCollector
@@ -451,7 +452,32 @@ def _generate_reply_stream_impl(context, app_name=None, use_cache=True, session_
                         yield f"event: reasoning\ndata: {json.dumps({'content': thinking_display})}\n\n"
                 yield collector.record_reasoning("passed" if parse_source else "failed", reasoning_text=parse_source)
 
-                if parse_source:
+                explicit_decision = build_memory_decision(context)
+                if explicit_decision:
+                    decision = explicit_decision
+                    action = decision["action"]
+                    yield collector.record_memory_decision("passed", parsed_decision=decision, reason="explicit_user_request")
+                    yield collector.record_parser("passed", reason="backend_intent", parse_time_ms=0)
+                    _result = state.remember_or_reinforce(decision)
+                    yield collector.record_backend(
+                        "passed",
+                        backend_action="remember_or_reinforce",
+                        action_taken=_result.get("action_taken") if _result else None,
+                    )
+                    print(
+                        "[MESSAGE_MEMORY]\n"
+                        "source=explicit_user_request\n"
+                        f"action={action}\n"
+                        f"result={'success' if _result and _result.get('success') else 'fail'}\n"
+                        f"memory_id={_result.get('memory_id') if _result else None}\n"
+                        f"reason={(_result or {}).get('error_reason') or (_result or {}).get('skip_reason')}"
+                    )
+                    if _result and _result.get("memory_id") is not None and _result.get("action_taken") != "skipped":
+                        yield collector.record_db("passed", memory_id=_result.get("memory_id"))
+                    else:
+                        yield collector.record_db("failed", db_error=_result.get("skip_reason") if _result else "handler_failed")
+                        yield collector.emit("error", message="記憶寫入失敗")
+                elif parse_source:
                     print("[TRACE-F] before memory parse")
                     _trace_start = time.time()
                     traced = parse_memory_decision_traced(parse_source)

@@ -144,6 +144,46 @@ def generate_reply(context, app_name=None, use_cache=True):
     conv_list = state.get_recent_conversation(n=20)
     if conv_list:
         formatted = []
+        for item in conv_list:
+            if item["role"] == "user":
+                formatted.append(f"Anna: {item['content']}")
+            else:
+                formatted.append(f"Lin: {item['content']}")
+        conversation_history = "\n".join(formatted)
+    else:
+        conversation_history = "(无最近对话)"
+
+    persona = Persona.get_system_prompt()
+    final_system = f"{persona}\n\n{memory_summary}\n\n最近对话：\n{conversation_history}"
+
+    messages = [
+        {"role": "system", "content": final_system},
+        {"role": "user", "content": context}
+    ]
+
+    reply, thinking = llm.chat(messages, use_thinking=LLM_THINKING_ENABLED)
+    
+    # V3 新增：對話結束後結算關係
+    if reply and hasattr(state, 'relationship'):
+        from app.intimacy.settlement import settle_interaction
+        state.relationship = settle_interaction(
+            state.relationship,
+            context,
+            reply,
+            getattr(state, 'continuous_turns', 1)
+        )
+    
+    # V3 新增：檢測是否該觸發主事件（親密釋放）
+    from app.intimacy.ephemeral import should_trigger_intimacy_release, trigger_ephemeral_event
+    
+    if should_trigger_intimacy_release(context, reply, state.body_values):
+        trigger_ephemeral_event(state, "intimacy_release", now)
+
+    state.last_reply_at = datetime.now()
+    state.last_context_cache = context
+    return reply, thinking
+    if conv_list:
+        formatted = []
         for turn in conv_list:
             role_name = "Anna" if turn["role"] == "anna" else "Lin"
             formatted.append(f"{role_name}：{turn['content']}")
@@ -164,6 +204,8 @@ def generate_reply(context, app_name=None, use_cache=True):
     if reasoning:
         # Phase 2: 開始 trace
         memory_trace.start_trace(session_id=None, message_id=None)
+        memory_trace.record_model_output(reasoning_text=reasoning, raw_decision_block=None)
+        
         decision = parse_memory_decision(reasoning)
         if decision:
             # 記錄 parse 成功
@@ -241,18 +283,46 @@ def write_daily_journal():
         state.add_note(content)
     state.mark_journal_written()
 
-
 def _body_state_sse_payload(state):
-    """Use the same backend-owned payload as /intimacy/status."""
-    from app.intimacy.status import build_intimacy_status_payload
-    return build_intimacy_status_payload(state)
+    """Serialize only the current Body State for the existing SSE client."""
+    from app.intimacy.body_state import get_body_level, get_body_description
+    values = getattr(state, "body_values", {})
+    body_values = {}
+    for key in ("tension", "heat", "sensitivity", "control"):
+        value = float(values.get(key, 0))
+        body_values[key] = {
+            "value": round(value, 1),
+            "level": get_body_level(value),
+            "desc": get_body_description(key, value),
+        }
+    return {
+        "body_values": body_values,
+        "cycle_key": getattr(state, "cycle_key", "stable"),
+        "active_event_key": getattr(state, "active_event_key", None),
+        "updated_at": getattr(state, "last_tick_at", None).isoformat() if getattr(state, "last_tick_at", None) else None,
+    }
 
 
 def generate_reply_stream(context, app_name=None, use_cache=True, session_id=None):
+    """Wrap the streaming pipeline so unexpected failures retain their traceback."""
+    try:
+        yield from _generate_reply_stream_impl(
+            context,
+            app_name=app_name,
+            use_cache=use_cache,
+            session_id=session_id,
+        )
+    except Exception:
+        import traceback
+        traceback.print_exc()
+        raise
+
+
+def _generate_reply_stream_impl(context, app_name=None, use_cache=True, session_id=None):
     """
     流式生成回覆，yield SSE 格式的事件。
     """
-    print("[TRACE] generate_reply_stream entered")
+    print("[TRACE-A] enter generate_reply_stream")
     from app.llm.deepseek_client import call_deepseek_stream
     from app.memory_rules import parse_memory_decision, parse_memory_decision_traced, parse_mood_event, strip_hidden_blocks
     from app import mood_engine
@@ -261,19 +331,19 @@ def generate_reply_stream(context, app_name=None, use_cache=True, session_id=Non
     collector = TraceCollector()
     target_session = session_id or state.current_session_id
 
-    # The streaming path is the live chat path, so it owns the pre-reply
-    # Body State lifecycle before the prompt is built.
+    # Phase 1: SSE 主流程也必须经过与非流式流程相同的 Body State 生命周期。
+    # 顺序：先推进旧状态 -> 更新本轮对话上下文 -> 检查 Body 事件 -> 构造 prompt。
     from datetime import datetime
+    from app.intimacy.tick import tick_and_update, start_event
     from app.intimacy.event import check_event_triggers
     from app.intimacy.silence import detect_silence
-    from app.intimacy.tick import start_event, tick_and_update
 
     now = datetime.now()
     tick_and_update(state, now)
-    previous_message_at = getattr(state, "last_user_message_at", None)
+    previous_message_at = getattr(state, 'last_user_message_at', None)
     if previous_message_at:
         gap_minutes = (now - previous_message_at).total_seconds() / 60.0
-        state.continuous_turns = (getattr(state, "continuous_turns", 0) + 1) if gap_minutes < 10 else 1
+        state.continuous_turns = (getattr(state, 'continuous_turns', 0) + 1) if gap_minutes < 10 else 1
     else:
         state.continuous_turns = 1
     state.last_user_message_at = now
@@ -286,7 +356,7 @@ def generate_reply_stream(context, app_name=None, use_cache=True, session_id=Non
     triggered_events = check_event_triggers(state.body_values, trigger_context)
     if triggered_events and not getattr(state, "active_event_key", None):
         start_event(state, triggered_events[0], now)
-    if hasattr(state, "save_body_state"):
+    if hasattr(state, 'save_body_state'):
         state.save_body_state()
     
     if not state.check_rate_limit():
@@ -312,10 +382,14 @@ def generate_reply_stream(context, app_name=None, use_cache=True, session_id=Non
     else:
         conversation_history = ""
     
+    print("[TRACE-B] before build context")
     world_context = format_context_for_prompt(get_context())
+    print("[TRACE-C] after build context")
+    print("[TRACE-D] before build prompt")
     system_prompt = build_system_prompt(context, memory_summary, world_context, conversation_history)
+    print("[TRACE-E] after build prompt")
 
-    collector.record_prompt(
+    yield collector.record_prompt(
         "passed",
         prompt_version=getattr(config, "PROMPT_VERSION", None),
         total_tokens=len(system_prompt),
@@ -329,10 +403,10 @@ def generate_reply_stream(context, app_name=None, use_cache=True, session_id=Non
     raw_reasoning = ""
     full_content = ""
     
-    print("[TRACE] before call_deepseek_stream")
+    print("[TRACE-H] before call_deepseek")
     try:
         generator = call_deepseek_stream(system_prompt, max_tokens=config.DEEPSEEK_MAX_TOKENS)
-        print("[TRACE] generator created")
+        print("[TRACE-I] after call_deepseek")
         for event_type, data in generator:
             print(f"[TRACE] event received: {event_type}")
             if event_type == "reasoning":
@@ -346,70 +420,55 @@ def generate_reply_stream(context, app_name=None, use_cache=True, session_id=Non
             elif event_type == "error":
                 state.add_log("AI回复", f"API失败：{data}")
                 yield 'event: content\ndata: ' + json.dumps({'delta': '信号不好。'}) + '\n\n'
-                collector.record_reasoning("failed", reasoning_text=None)
+                yield collector.record_reasoning("failed", reasoning_text=None)
                 yield "event: done\ndata: {}\n\n"
                 return
             elif event_type == "done":
                 parse_source = raw_reasoning or full_reasoning
-                collector.record_reasoning("passed" if parse_source else "failed", reasoning_text=parse_source)
+                yield collector.record_reasoning("passed" if parse_source else "failed", reasoning_text=parse_source)
 
-                memory_trace.start_trace(session_id=target_session, message_id=None)
                 if parse_source:
+                    print("[TRACE-F] before memory parse")
                     _trace_start = time.time()
                     traced = parse_memory_decision_traced(parse_source)
                     _parse_time_ms = int((time.time() - _trace_start) * 1000)
-                    memory_trace.record_parse_result(
-                        success=traced["status"] == "passed",
-                        parsed_decision=traced["decision"],
-                        error=None if traced["status"] == "passed" else traced["reason"],
-                    )
 
-                    collector.record_memory_decision(
+                    yield collector.record_memory_decision(
                         traced["status"], parsed_decision=traced["decision"], reason=traced["reason"]
                     )
-                    collector.record_parser(traced["status"], reason=traced["reason"], parse_time_ms=_parse_time_ms)
+                    yield collector.record_parser(traced["status"], reason=traced["reason"], parse_time_ms=_parse_time_ms)
 
                     # 正式邏輯仍只用既有的 parse_memory_decision，不依賴 traced 版本的回傳值，
                     # 避免診斷用的包裝函式影響到正式的記憶寫入行為。
                     decision = parse_memory_decision(parse_source)
+                    print("[TRACE-G] after memory parse")
                     print(f"[DONE-1] parse_memory_decision 完成, decision={decision is not None}")
                     if decision:
                         action = decision.get("action", "create")
                         if action == "update":
                             _result = state.update_memory(decision)
-                            memory_trace.record_backend_action("update_memory", _result or {})
-                            collector.record_backend("passed", backend_action="update_memory", action_taken=_result.get("action_taken") if _result else None)
+                            yield collector.record_backend("passed", backend_action="update_memory", action_taken=_result.get("action_taken") if _result else None)
                         elif action == "archive":
                             _result = state.archive_memory(decision)
-                            memory_trace.record_backend_action("archive_memory", _result or {})
-                            collector.record_backend("passed", backend_action="archive_memory", action_taken=_result.get("action_taken") if _result else None)
+                            yield collector.record_backend("passed", backend_action="archive_memory", action_taken=_result.get("action_taken") if _result else None)
                         else:
                             _result = state.remember_or_reinforce(decision)
-                            memory_trace.record_backend_action("remember_or_reinforce", _result or {})
-                            collector.record_backend("passed", backend_action="remember_or_reinforce", action_taken=_result.get("action_taken") if _result else None)
+                            yield collector.record_backend("passed", backend_action="remember_or_reinforce", action_taken=_result.get("action_taken") if _result else None)
                         print(f"[DONE-2] 記憶寫入動作完成, action={action}, action_taken={_result.get('action_taken') if _result else None}")
 
                         if _result and _result.get("memory_id") is not None and _result.get("action_taken") != "skipped":
-                            memory_trace.record_db_result(success=True)
-                            collector.record_db("passed", memory_id=_result.get("memory_id"))
+                            yield collector.record_db("passed", memory_id=_result.get("memory_id"))
                         else:
-                            memory_trace.record_db_result(success=False, error=_result.get("skip_reason") if _result else "handler_failed")
-                            collector.record_db("failed", db_error=_result.get("skip_reason") if _result else "handler_failed")
-                            state.add_log("記憶", "寫入失敗")
+                            yield collector.record_db("failed", db_error=_result.get("skip_reason") if _result else "handler_failed")
+                            yield collector.emit("error", message="記憶寫入失敗")
                     else:
-                        collector.record_backend("not_executed")
-                        collector.record_db("not_executed")
+                        yield collector.record_backend("not_executed")
+                        yield collector.record_db("not_executed")
                 else:
-                    memory_trace.record_parse_result(
-                        success=False,
-                        error="reasoning 為空，無法解析",
-                    )
-                    collector.record_memory_decision("failed", reason="reasoning 為空，無法解析")
-                    collector.record_parser("failed", reason="reasoning 為空，無法解析")
-                    collector.record_backend("not_executed")
-                    collector.record_db("not_executed")
-
-                    memory_trace.save_trace()
+                    yield collector.record_memory_decision("failed", reason="reasoning 為空，無法解析")
+                    yield collector.record_parser("failed", reason="reasoning 為空，無法解析")
+                    yield collector.record_backend("not_executed")
+                    yield collector.record_db("not_executed")
 
                 # Auto-detect mood events from user + Lin content
                 detected_events = _auto_detect_mood_events(context, full_content)
@@ -417,57 +476,22 @@ def generate_reply_stream(context, app_name=None, use_cache=True, session_id=Non
                     mood_engine.apply_event(event_name, level=event_level)
                 print(f"[DONE-3] mood_engine.apply_event 完成, detected_events={detected_events}")
 
-                # Reconcile Body State after the latest mood is persisted, then
-                # send the current display payload without changing chat caching.
+                # Phase 1: mood 已写回后，立即执行一次状态同步。
+                # tick 本身仍遵守 last_tick_at，避免重复计算或覆盖现有缓存修复。
                 tick_and_update(state, datetime.now())
+
+                # mood 更新后再检查一次 Body Event；这样新 mood 不会只能等到下一轮聊天
+                # 才参与事件判断。仍遵守 active event 不覆盖规则。
                 post_mood_now = datetime.now()
-                post_mood_events = check_event_triggers(
-                    state.body_values,
-                    {
-                        "silence_minutes": 0,
-                        "continuous_turns": getattr(state, "continuous_turns", 0),
-                    },
-                )
+                post_mood_context = {
+                    "silence_minutes": 0,
+                    "continuous_turns": getattr(state, "continuous_turns", 0),
+                }
+                post_mood_events = check_event_triggers(state.body_values, post_mood_context)
                 if post_mood_events and not getattr(state, "active_event_key", None):
                     start_event(state, post_mood_events[0], post_mood_now)
 
-                # Phase 3: settle the completed chat with bounded backend rules.
-                # This deliberately does not use the old keyword-based release path.
-                from app.intimacy.settlement import (
-                    apply_settlement_result,
-                    build_settlement_result,
-                    settle_interaction,
-                )
-                settlement = apply_settlement_result(
-                    state,
-                    build_settlement_result(context, full_content, getattr(state, "continuous_turns", 0)),
-                )
-                if hasattr(state, "relationship"):
-                    state.relationship = settle_interaction(
-                        state.relationship,
-                        context,
-                        full_content,
-                        getattr(state, "continuous_turns", 0),
-                    )
-                if settlement["result"] != "neutral":
-                    try:
-                        from app.intimacy.event_log import log_event
-                        from app.intimacy.history import build_body_state_snapshot
-                        log_event(
-                            event_type="settlement",
-                            title=f"互動結算：{settlement['result']}",
-                            timestamp=post_mood_now,
-                            detail_text=settlement["reason"],
-                            metadata={
-                                "applied_deltas": settlement["applied_deltas"],
-                                "continuous_turns": getattr(state, "continuous_turns", 0),
-                                "body_state": build_body_state_snapshot(state),
-                            },
-                        )
-                    except Exception as e:
-                        print(f"[settlement] event log skipped: {e}")
-
-                if hasattr(state, "save_body_state"):
+                if hasattr(state, 'save_body_state'):
                     state.save_body_state()
                 yield f"event: body_state\ndata: {json.dumps(_body_state_sse_payload(state), ensure_ascii=False)}\n\n"
                 
@@ -478,7 +502,8 @@ def generate_reply_stream(context, app_name=None, use_cache=True, session_id=Non
                 print("[DONE-5] state.add_log 完成")
                 
                 if full_content and full_content not in ("信号不好。", "今天额度用完了，或者刚刚问太快了，等一下再说。"):
-                    state.add_conversation_turn("lin", full_content, session_id=target_session, trace=None)
+                    thinking_display = strip_hidden_blocks(full_reasoning) if full_reasoning else None
+                    state.add_conversation_turn("lin", full_content, thinking=thinking_display, session_id=target_session, trace=collector.export())
                     print("[DONE-6] state.add_conversation_turn 完成")
                     
                     from app.notify.bark import send_to_bark
@@ -489,11 +514,5 @@ def generate_reply_stream(context, app_name=None, use_cache=True, session_id=Non
                 print("[DONE-8] state.mark_conversation_anchor 完成")
                 yield "event: done\ndata: {}\n\n"
     
-    except Exception as e:
-        import traceback
-        print("[EXCEPTION] generate_reply_stream 捕获到异常:")
-        traceback.print_exc()
-        state.add_log("AI回复", f"失败：{str(e)}")
-        fallback_payload = json.dumps({'delta': '信号不好。'})
-        yield "event: content\ndata: " + fallback_payload + "\n\n"
-        yield "event: done\ndata: {}\n\n"
+    except Exception:
+        raise

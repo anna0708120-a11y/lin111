@@ -1,8 +1,5 @@
 """Backend-owned detection for explicit user memory requests."""
-import json
 import re
-
-from app.llm.deepseek_client import call_deepseek
 
 
 _MEMORY_REQUEST_PATTERNS = (
@@ -14,6 +11,8 @@ _MEMORY_REQUEST_PATTERNS = (
     r"幫我記住(?:我|我的)?(?P<fact>.+)",
     r"把(?:我|我的)?(?P<fact>.+)记住",
     r"把(?:我|我的)?(?P<fact>.+)記住",
+    r"(?:以后|以後)(?:别|別|不要)忘记(?:我|我的)?(?P<fact>.+)",
+    r"(?:以后|以後)(?:请|請)?记得(?:我|我的)?(?P<fact>.+)",
 )
 
 
@@ -29,41 +28,18 @@ def detect_memory_intent(user_text):
     return {"explicit": False, "fact": None, "source": text}
 
 
-def _json_object(text):
-    if not text:
-        return None
-    match = re.search(r"\{.*\}", text, re.DOTALL)
-    if not match:
-        return None
-    try:
-        value = json.loads(match.group(0))
-    except (TypeError, ValueError):
-        return None
-    return value if isinstance(value, dict) else None
-
-
 def build_memory_decision(user_text):
-    """Build a create decision; backend intent, not the model, controls execution."""
+    """Build the existing memory decision shape for an explicit user request."""
     intent = detect_memory_intent(user_text)
     if not intent["explicit"]:
         return None
 
     fact = intent["fact"]
-    prompt = (
-        "只为一条用户明确要求保存的记忆生成字段，不要判断是否保存。\n"
-        "只输出 JSON：{\"tag\":\"\",\"keyword\":\"\",\"summary\":\"\"}\n"
-        f"用户原话：{fact}"
-    )
-    content, _ = call_deepseek(prompt, thinking=False, temperature=0.2, max_tokens=256)
-    fields = _json_object(content) or {}
-    tag = str(fields.get("tag") or "偏好").strip()[:30]
-    keyword = str(fields.get("keyword") or fact).strip()[:50]
-    summary = str(fields.get("summary") or fact).strip()
     return {
         "action": "create",
         "importance": 3,
         "category": "长期记忆",
-        "tag": tag,
-        "keyword": keyword,
-        "summary": summary,
+        "tag": "用户明确要求",
+        "keyword": fact[:50],
+        "summary": fact,
     }

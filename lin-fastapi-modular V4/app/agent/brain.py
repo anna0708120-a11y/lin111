@@ -338,7 +338,8 @@ def _generate_reply_stream_impl(context, app_name=None, use_cache=True, session_
     """
     print("[TRACE-A] enter generate_reply_stream")
     from app.llm.deepseek_client import call_deepseek_stream
-    from app.memory_intent import build_memory_decision
+    from app.llm.groq_memory_detector import candidate_to_parser_text, detect_memory_candidate
+    from app.memory_intent import build_memory_decision, detect_memory_intent
     from app.memory_rules import parse_memory_decision, parse_memory_decision_traced, parse_mood_event, strip_hidden_blocks
     from app import mood_engine
     from app.agent.trace_collector import TraceCollector
@@ -452,77 +453,61 @@ def _generate_reply_stream_impl(context, app_name=None, use_cache=True, session_
                         yield f"event: reasoning\ndata: {json.dumps({'content': thinking_display})}\n\n"
                 yield collector.record_reasoning("passed" if parse_source else "failed", reasoning_text=parse_source)
 
-                explicit_decision = build_memory_decision(context)
-                if explicit_decision:
-                    decision = explicit_decision
-                    action = decision["action"]
-                    yield collector.record_memory_decision("passed", parsed_decision=decision, reason="explicit_user_request")
-                    yield collector.record_parser("passed", reason="backend_intent", parse_time_ms=0)
-                    _result = state.remember_or_reinforce(decision)
-                    yield collector.record_backend(
-                        "passed",
-                        backend_action="remember_or_reinforce",
-                        action_taken=_result.get("action_taken") if _result else None,
-                    )
-                    print(
-                        "[MESSAGE_MEMORY]\n"
-                        "source=explicit_user_request\n"
-                        f"action={action}\n"
-                        f"result={'success' if _result and _result.get('success') else 'fail'}\n"
-                        f"memory_id={_result.get('memory_id') if _result else None}\n"
-                        f"reason={(_result or {}).get('error_reason') or (_result or {}).get('skip_reason')}"
-                    )
-                    if _result and _result.get("memory_id") is not None and _result.get("action_taken") != "skipped":
-                        yield collector.record_db("passed", memory_id=_result.get("memory_id"))
+                explicit_intent = detect_memory_intent(context)
+                candidate = None
+                if explicit_intent["explicit"]:
+                    explicit_decision = build_memory_decision(context)
+                    candidate = {
+                        "decision": "remember",
+                        "tag": explicit_decision["tag"],
+                        "keyword": explicit_decision["keyword"],
+                        "summary": explicit_decision["summary"],
+                        "reason": "explicit_intent",
+                    }
+                else:
+                    candidate = detect_memory_candidate(context)
+
+                candidate_parser_text = candidate_to_parser_text(candidate)
+                if candidate_parser_text:
+                    decision = parse_memory_decision(candidate_parser_text)
+                    if not decision:
+                        yield collector.record_memory_decision("failed", reason="detector_candidate_parser_failed")
+                        yield collector.record_parser("failed", reason="detector_candidate_parser_failed", parse_time_ms=0)
+                        yield collector.record_backend("not_executed")
+                        yield collector.record_db("not_executed")
                     else:
-                        yield collector.record_db("failed", db_error=_result.get("skip_reason") if _result else "handler_failed")
-                        yield collector.emit("error", message="記憶寫入失敗")
-                elif parse_source:
-                    print("[TRACE-F] before memory parse")
-                    _trace_start = time.time()
-                    traced = parse_memory_decision_traced(parse_source)
-                    _parse_time_ms = int((time.time() - _trace_start) * 1000)
-
-                    yield collector.record_memory_decision(
-                        traced["status"], parsed_decision=traced["decision"], reason=traced["reason"]
-                    )
-                    yield collector.record_parser(traced["status"], reason=traced["reason"], parse_time_ms=_parse_time_ms)
-
-                    # 正式邏輯仍只用既有的 parse_memory_decision，不依賴 traced 版本的回傳值，
-                    # 避免診斷用的包裝函式影響到正式的記憶寫入行為。
-                    decision = parse_memory_decision(parse_source)
-                    print("[TRACE-G] after memory parse")
-                    print(f"[DONE-1] parse_memory_decision 完成, decision={decision is not None}")
-                    if decision:
-                        action = decision.get("action", "create")
-                        if action == "update":
-                            _result = state.update_memory(decision)
-                            yield collector.record_backend("passed", backend_action="update_memory", action_taken=_result.get("action_taken") if _result else None)
-                        elif action == "archive":
-                            _result = state.archive_memory(decision)
-                            yield collector.record_backend("passed", backend_action="archive_memory", action_taken=_result.get("action_taken") if _result else None)
-                        else:
-                            _result = state.remember_or_reinforce(decision)
-                            yield collector.record_backend("passed", backend_action="remember_or_reinforce", action_taken=_result.get("action_taken") if _result else None)
+                        action = decision["action"]
+                        yield collector.record_memory_decision(
+                            "passed", parsed_decision=decision, reason=candidate.get("reason")
+                        )
+                        yield collector.record_parser("passed", reason="detector_candidate", parse_time_ms=0)
+                        _result = state.remember_or_reinforce(decision)
+                        yield collector.record_backend(
+                            "passed",
+                            backend_action="remember_or_reinforce",
+                            action_taken=_result.get("action_taken") if _result else None,
+                        )
                         print(
                             "[MESSAGE_MEMORY]\n"
+                            f"source={candidate.get('reason')}\n"
                             f"action={action}\n"
-                            f"result={'success' if _result and _result.get('success', _result.get('memory_id') is not None) else 'fail'}\n"
+                            f"result={'success' if _result and _result.get('success') else 'fail'}\n"
                             f"memory_id={_result.get('memory_id') if _result else None}\n"
                             f"reason={(_result or {}).get('error_reason') or (_result or {}).get('skip_reason')}"
                         )
-
                         if _result and _result.get("memory_id") is not None and _result.get("action_taken") != "skipped":
                             yield collector.record_db("passed", memory_id=_result.get("memory_id"))
                         else:
-                            yield collector.record_db("failed", db_error=_result.get("skip_reason") if _result else "handler_failed")
+                            yield collector.record_db(
+                                "failed",
+                                db_error=_result.get("skip_reason") if _result else "handler_failed",
+                            )
                             yield collector.emit("error", message="記憶寫入失敗")
-                    else:
-                        yield collector.record_backend("not_executed")
-                        yield collector.record_db("not_executed")
                 else:
-                    yield collector.record_memory_decision("failed", reason="reasoning 為空，無法解析")
-                    yield collector.record_parser("failed", reason="reasoning 為空，無法解析")
+                    yield collector.record_memory_decision(
+                        "passed", reason=candidate.get("reason", "no_memory_candidate")
+                    )
+                    yield collector.record_parser("not_executed", reason="detector_not_remember", parse_time_ms=0)
                     yield collector.record_backend("not_executed")
                     yield collector.record_db("not_executed")
 

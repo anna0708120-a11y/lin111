@@ -462,13 +462,77 @@ class AppState:
             for r in db.load_memories()
         ]
 
-    def recent_memory_text(self, n=8):
-        """挑最重要的几条塞进 prompt（不是最新的几条——星级高的比刚存的更该被记住）。"""
+    def recent_memory_text(self, n=8, query=""):
+        """Return active memories ranked by lightweight query relevance, then importance."""
         if not self.memory_bank:
             return ""
+
         active = [m for m in self.memory_bank if not m.get("archived")]
-        top = sorted(active, key=lambda m: m.get("importance", 3), reverse=True)[:n]
-        lines = "\n".join(f"[{m['category']}·{m['tag']}·{'⭐'*m.get('importance',3)}] {m['content']}" for m in top)
+        if not active:
+            return ""
+
+        query_text = (query or "").strip()
+        if query_text:
+            from app.keyword_normalizer import get_synonym_map, normalize_keyword
+            import re
+
+            # Remove transport wording so retrieval focuses on the user's message.
+            query_text = re.sub(r"^(?:Anna|用户|用戶)(?:说|說)?[：:]?", "", query_text).strip()
+            normalized_query = normalize_keyword(query_text)
+            query_terms = set(re.findall(r"[a-z0-9_]+|[\u4e00-\u9fff]{2,}", query_text.lower()))
+            synonym_map = get_synonym_map()
+            query_aliases = {
+                normalized
+                for alias, normalized in synonym_map.items()
+                if alias in query_text.lower() or normalized in query_text.lower()
+            }
+            query_chars = set()
+        else:
+            normalized_query = ""
+            query_terms = set()
+            query_chars = set()
+
+        def relevance(memory):
+            if not query_text:
+                return 0
+
+            keyword = str(memory.get("keyword") or "")
+            normalized_keyword = normalize_keyword(keyword)
+            searchable = " ".join(
+                str(memory.get(field) or "")
+                for field in ("keyword", "raw_keyword", "category", "tag", "content")
+            ).lower()
+            score = 0
+
+            if normalized_keyword and normalized_keyword in query_aliases:
+                score += 90
+            if normalized_keyword and normalized_keyword == normalized_query:
+                score += 100
+            if keyword and keyword.lower() in query_text.lower():
+                score += 60
+            if normalized_keyword and normalized_keyword in normalized_query:
+                score += 45
+
+            for term in query_terms:
+                if term in searchable:
+                    score += 12
+            if query_chars:
+                score += min(len(query_chars & set(searchable)), 8) * 2
+            return score
+
+        ranked = sorted(
+            active,
+            key=lambda memory: (relevance(memory), memory.get("importance", 3)),
+            reverse=True,
+        )
+        relevant = [memory for memory in ranked if relevance(memory) > 0]
+        if query_text and not relevant:
+            return ""
+        selected = (relevant or ranked)[:n]
+        lines = "\n".join(
+            f"[{m['category']}·{m['tag']}·{'⭐' * m.get('importance', 3)}] {m['content']}"
+            for m in selected
+        )
         return f"\n\n【Lin对Anna的记忆】\n{lines}"
 
     # ---------- 对话历史 ----------

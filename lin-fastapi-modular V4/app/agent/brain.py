@@ -144,8 +144,7 @@ def generate_reply(context, app_name=None, use_cache=True):
     if not state.check_rate_limit():
         return "今天额度用完了，或者刚刚问太快了，等一下再说。", None
 
-    memory_summary = state.recent_memory_text()
-    memory_summary = state.recent_memory_text()
+    memory_summary = state.recent_memory_text(query=context)
     conv_list = state.get_recent_conversation(n=20)
     if conv_list:
         formatted = []
@@ -290,7 +289,7 @@ def write_daily_journal():
             "可以写你自己的心情、想法、或者对Anna的想念，"
             "但不要编造今天发生了什么具体的事情——因为今天真的什么都没发生。"
         )
-    system_prompt = build_system_prompt(context, state.recent_memory_text())
+    system_prompt = build_system_prompt(context, state.recent_memory_text(query=context))
     content, _ = call_deepseek(system_prompt, max_tokens=config.DEEPSEEK_MAX_TOKENS, thinking=False)
     state.record_call()
     if content:
@@ -387,7 +386,7 @@ def _generate_reply_stream_impl(context, app_name=None, use_cache=True, session_
             yield "data: {\"type\": \"done\"}\n\n"
             return
     
-    memory_summary = state.recent_memory_text()
+    memory_summary = state.recent_memory_text(query=context)
     conv_list = state.get_recent_conversation(n=20)
     if conv_list:
         formatted = []

@@ -449,8 +449,70 @@ class AppState:
             for r in db.load_memories()
         ]
 
+    def relevant_memory_text(self, query, n=5):
+        """用既有 keyword/category/content 做轻量匹配，只注入和本轮相关的记忆。"""
+        if not query or not self.memory_bank:
+            return ""
+
+        try:
+            from app.keyword_normalizer import SYNONYM_MAP, normalize_keyword
+
+            query_text = str(query).strip().lower()
+            if not query_text:
+                return ""
+
+            # 复用 Phase 1 同义词表：例如「咖啡」和已存 keyword="coffee" 会归到同一词。
+            query_terms = set()
+            for alias, normalized in SYNONYM_MAP.items():
+                if alias.lower() in query_text:
+                    query_terms.add(normalized)
+
+            # 英文关键词不依赖同义词表也可以直接匹配。
+            for word in query_text.replace("_", " ").split():
+                if len(word) >= 2:
+                    query_terms.add(normalize_keyword(word))
+
+            if not query_terms:
+                return ""
+
+            ranked = []
+            for memory in self.memory_bank:
+                if memory.get("archived"):
+                    continue
+
+                keyword = normalize_keyword(str(memory.get("keyword", "")))
+                searchable = " ".join(
+                    str(memory.get(field, "")).lower()
+                    for field in ("keyword", "category", "tag", "content")
+                )
+                score = 0
+                for term in query_terms:
+                    if not term:
+                        continue
+                    if keyword == term:
+                        score += 100
+                    elif term in searchable:
+                        score += 40
+
+                if score:
+                    ranked.append((score, memory.get("importance", 3), memory))
+
+            if not ranked:
+                return ""
+
+            ranked.sort(key=lambda item: (item[0], item[1]), reverse=True)
+            lines = "\n".join(
+                f"[{memory['category']}·{memory['tag']}·{'⭐' * memory.get('importance', 3)}] {memory['content']}"
+                for _, _, memory in ranked[:n]
+            )
+            return f"\n\n【Lin对Anna的相关记忆】\n{lines}"
+        except Exception as e:
+            # Retrieval 是增强功能，任何异常都不能影响正常聊天。
+            print(f"[memory] 检索失败，跳过记忆注入: {e}")
+            return ""
+
     def recent_memory_text(self, n=8):
-        """挑最重要的几条塞进 prompt（不是最新的几条——星级高的比刚存的更该被记住）。"""
+        """保留旧接口给非聊天用途使用，按重要度取得记忆。"""
         if not self.memory_bank:
             return ""
         active = [m for m in self.memory_bank if not m.get("archived")]

@@ -139,8 +139,7 @@ def generate_reply(context, app_name=None, use_cache=True):
     if not state.check_rate_limit():
         return "今天额度用完了，或者刚刚问太快了，等一下再说。", None
 
-    memory_summary = state.recent_memory_text()
-    memory_summary = state.recent_memory_text()
+    memory_summary = state.relevant_memory_text(context)
     conv_list = state.get_recent_conversation(n=20)
     if conv_list:
         formatted = []
@@ -371,7 +370,7 @@ def _generate_reply_stream_impl(context, app_name=None, use_cache=True, session_
             yield "data: {\"type\": \"done\"}\n\n"
             return
     
-    memory_summary = state.recent_memory_text()
+    memory_summary = state.relevant_memory_text(context)
     conv_list = state.get_recent_conversation(n=20)
     if conv_list:
         formatted = []

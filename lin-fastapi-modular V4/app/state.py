@@ -350,11 +350,28 @@ class AppState:
         raw_keyword = decision.get("keyword", "")
         normalized_keyword = normalize_keyword(raw_keyword)
         
-        # 查找目標記憶（只找 agent 自己建的）
-        target = db.find_memory_by_keyword(normalized_keyword, created_by="agent")
+        # Lifecycle 會帶 Retrieval 給模型的 candidate id；有 id 時不可退回 keyword，
+        # 避免模型選錯目標後意外修改另一條記憶。舊 Decision 格式仍保留 keyword fallback。
+        target_id = decision.get("memory_id")
+        explicit_target = target_id is not None
+        target = (
+            db.find_memory_by_id(target_id, created_by="agent")
+            if explicit_target else
+            db.find_memory_by_keyword(normalized_keyword, created_by="agent")
+        )
         
         if not target:
-            # 找不到，轉為新建
+            # 明確指定候選但找不到時，寧可不動任何記憶；不能退回建立新條目。
+            if explicit_target:
+                return {
+                    "success": False,
+                    "memory_id": None,
+                    "action_taken": "skipped",
+                    "conflict_with": None,
+                    "skip_reason": "lifecycle_target_not_found",
+                    "error_reason": "lifecycle_target_not_found",
+                }
+            # 舊 Decision 格式保留既有 fallback 行為。
             return self.remember_or_reinforce(decision)
         
         # 檢查內容差異
@@ -362,8 +379,10 @@ class AppState:
         old_content = target.get("content", "").strip()
         similarity = _content_similarity(new_content, old_content)
         
-        # 差異大 -> 視為衝突，標記待審核
-        if similarity < 0.5:
+        # 舊流程沒有候選 id，仍沿用 Phase 1 的保守相似度防線。
+        # Lifecycle 的顯式 target 已由模型基於 Retrieval 判定為「同一事實的狀態變化」，
+        # 因此允許更新，不把「很少喝」誤當成完全不同的記憶。
+        if not explicit_target and similarity < 0.5:
             memory_result = db.insert_memory(
                 tag=decision["tag"],
                 content=new_content,
@@ -379,10 +398,12 @@ class AppState:
             memory_id = memory_result.get("memory_id") if memory_result.get("success") else None
             # pending_review 的記憶不加入內存
             return {
+                "success": memory_result.get("success", False),
                 "memory_id": memory_id,
                 "action_taken": "pending_review" if memory_id is not None else "skipped",
                 "conflict_with": target["id"] if memory_id is not None else None,
-                "skip_reason": "conflict_detected" if memory_id is not None else memory_result["error_reason"]
+                "skip_reason": "conflict_detected" if memory_id is not None else memory_result["error_reason"],
+                "error_reason": memory_result.get("error_reason"),
             }
         
         # 差異小 -> 直接更新
@@ -420,7 +441,12 @@ class AppState:
         raw_keyword = decision.get("keyword", "")
         normalized_keyword = normalize_keyword(raw_keyword)
         
-        target = db.find_memory_by_keyword(normalized_keyword, created_by="agent")
+        target_id = decision.get("memory_id")
+        target = (
+            db.find_memory_by_id(target_id, created_by="agent")
+            if target_id is not None else
+            db.find_memory_by_keyword(normalized_keyword, created_by="agent")
+        )
         if not target:
             return {
                 "memory_id": None,
@@ -439,6 +465,25 @@ class AppState:
             "conflict_with": None,
             "skip_reason": "db_error" if not ok else None
         }
+
+    def apply_memory_decision(self, decision):
+        """Phase 4 的唯一 lifecycle 分派点；模型只给 decision，数据库操作仍在 backend。"""
+        action = decision.get("action", "create")
+        if action == "none":
+            return {
+                "success": True,
+                "memory_id": None,
+                "action_taken": "skipped",
+                "conflict_with": None,
+                "skip_reason": "lifecycle_none",
+                "error_reason": None,
+            }
+        if action == "update":
+            return self.update_memory(decision)
+        if action == "archive":
+            return self.archive_memory(decision)
+        # create / reinforce / conflict 都复用既有 conflict-aware writer。
+        return self.remember_or_reinforce(decision)
 
     def delete_memory(self, memory_id):
         self.memory_bank = [m for m in self.memory_bank if m.get("id") != memory_id]
@@ -461,6 +506,40 @@ class AppState:
             }
             for r in db.load_memories()
         ]
+
+    def relevant_memory_candidates(self, query, n=5):
+        """Return the same lightweight Retrieval matches as structured Lifecycle candidates."""
+        if not query or not self.memory_bank:
+            return []
+        try:
+            from app.keyword_normalizer import get_synonym_map, normalize_keyword
+            import re
+
+            query_text = re.sub(r"^(?:Anna|用户|用戶)(?:说|說)?[：:]?", "", str(query)).strip().lower()
+            aliases = {
+                normalized
+                for alias, normalized in get_synonym_map().items()
+                if alias.lower() in query_text or normalized in query_text
+            }
+            terms = set(re.findall(r"[a-z0-9_]+|[\u4e00-\u9fff]{2,}", query_text))
+            ranked = []
+            for memory in self.memory_bank:
+                if memory.get("archived"):
+                    continue
+                keyword = normalize_keyword(str(memory.get("keyword") or ""))
+                searchable = " ".join(
+                    str(memory.get(field) or "").lower()
+                    for field in ("keyword", "raw_keyword", "category", "tag", "content")
+                )
+                score = 100 if keyword and keyword in aliases else 0
+                score += sum(12 for term in terms if term in searchable)
+                if score:
+                    ranked.append((score, memory.get("importance", 3), memory))
+            ranked.sort(key=lambda item: (item[0], item[1]), reverse=True)
+            return [memory for _, _, memory in ranked[:n]]
+        except Exception as e:
+            print(f"[memory] lifecycle retrieval failed: {e}")
+            return []
 
     def recent_memory_text(self, n=8, query=""):
         """Return active memories ranked by lightweight query relevance, then importance."""

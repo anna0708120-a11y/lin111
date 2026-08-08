@@ -153,6 +153,26 @@ def find_memory_by_keyword(keyword, created_by=None):
         return None
 
 
+def find_memory_by_id(memory_id, created_by=None):
+    """取得一條仍有效的記憶，供 Lifecycle 驗證模型選出的候選記憶。"""
+    if not _client or not memory_id:
+        return None
+    try:
+        query = (
+            _client.table("memory_bank")
+            .select("id, importance, content, created_by, keyword, raw_keyword, category, tag")
+            .eq("id", memory_id)
+            .eq("archived", False)
+        )
+        if created_by is not None:
+            query = query.eq("created_by", created_by)
+        res = query.limit(1).execute()
+        return res.data[0] if res.data else None
+    except Exception as e:
+        print(f"[db] 讀取指定記憶失敗: {e}")
+        return None
+
+
 def update_memory(memory_id, content=None, importance=None, expires_at=None):
     """更新一条已存在的记忆（修正用），只更新有给值的字段。"""
     if not _client or not memory_id:

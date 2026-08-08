@@ -28,6 +28,22 @@ from app.agent.thinking_decision import (
 
 FALLBACK_REPLIES = ["还没走远。", "嗯。", "我看着你。"]
 
+
+def _apply_memory_decision_safely(decision):
+    """Memory Lifecycle is optional; a failure must not interrupt normal chat."""
+    try:
+        return state.apply_memory_decision(decision)
+    except Exception as exc:
+        print(f"[memory] lifecycle failed, skipped: {exc}")
+        return {
+            "success": False,
+            "memory_id": None,
+            "action_taken": "skipped",
+            "conflict_with": None,
+            "skip_reason": "lifecycle_error",
+            "error_reason": "lifecycle_error",
+        }
+
 def _auto_detect_mood_events(user_msg, lin_reply):
     """
     根據 user_msg 和 lin_reply 內容自動偵測情緒事件，不依賴 LLM 標籤。
@@ -452,61 +468,34 @@ def _generate_reply_stream_impl(context, app_name=None, use_cache=True, session_
                         yield f"event: reasoning\ndata: {json.dumps({'content': thinking_display})}\n\n"
                 yield collector.record_reasoning("passed" if parse_source else "failed", reasoning_text=parse_source)
 
+                candidates = state.relevant_memory_candidates(context)
                 explicit_intent = detect_memory_intent(context)
-                candidate = None
                 if explicit_intent["explicit"]:
-                    explicit_decision = build_memory_decision(context)
-                    candidate = {
-                        "decision": "remember",
-                        "tag": explicit_decision["tag"],
-                        "keyword": explicit_decision["keyword"],
-                        "summary": explicit_decision["summary"],
-                        "reason": "explicit_intent",
-                    }
+                    decision = build_memory_decision(context)
+                    candidate_reason = "explicit_intent"
                 else:
-                    candidate = detect_memory_candidate(context)
+                    candidate = detect_memory_candidate(context, candidates=candidates)
+                    candidate_reason = candidate.get("reason")
+                    decision = parse_memory_decision(candidate_to_parser_text(candidate))
 
-                candidate_parser_text = candidate_to_parser_text(candidate)
-                if candidate_parser_text:
-                    decision = parse_memory_decision(candidate_parser_text)
-                    if not decision:
-                        yield collector.record_memory_decision("failed", reason="detector_candidate_parser_failed")
-                        yield collector.record_parser("failed", reason="detector_candidate_parser_failed", parse_time_ms=0)
-                        yield collector.record_backend("not_executed")
-                        yield collector.record_db("not_executed")
-                    else:
-                        action = decision["action"]
-                        yield collector.record_memory_decision(
-                            "passed", parsed_decision=decision, reason=candidate.get("reason")
-                        )
-                        yield collector.record_parser("passed", reason="detector_candidate", parse_time_ms=0)
-                        _result = state.remember_or_reinforce(decision)
-                        yield collector.record_backend(
-                            "passed",
-                            backend_action="remember_or_reinforce",
-                            action_taken=_result.get("action_taken") if _result else None,
-                        )
-                        print(
-                            "[MESSAGE_MEMORY]\n"
-                            f"source={candidate.get('reason')}\n"
-                            f"action={action}\n"
-                            f"result={'success' if _result and _result.get('success') else 'fail'}\n"
-                            f"memory_id={_result.get('memory_id') if _result else None}\n"
-                            f"reason={(_result or {}).get('error_reason') or (_result or {}).get('skip_reason')}"
-                        )
-                        if _result and _result.get("memory_id") is not None and _result.get("action_taken") != "skipped":
-                            yield collector.record_db("passed", memory_id=_result.get("memory_id"))
-                        else:
-                            yield collector.record_db(
-                                "failed",
-                                db_error=_result.get("skip_reason") if _result else "handler_failed",
-                            )
-                            yield collector.emit("error", message="記憶寫入失敗")
-                else:
+                if decision:
                     yield collector.record_memory_decision(
-                        "passed", reason=candidate.get("reason", "no_memory_candidate")
+                        "passed", parsed_decision=decision, reason=candidate_reason
                     )
-                    yield collector.record_parser("not_executed", reason="detector_not_remember", parse_time_ms=0)
+                    yield collector.record_parser("passed", reason="lifecycle_candidate", parse_time_ms=0)
+                    _result = _apply_memory_decision_safely(decision)
+                    yield collector.record_backend(
+                        "passed",
+                        backend_action="apply_memory_decision",
+                        action_taken=_result.get("action_taken") if _result else None,
+                    )
+                    if _result and _result.get("memory_id") is not None and _result.get("action_taken") != "skipped":
+                        yield collector.record_db("passed", memory_id=_result.get("memory_id"))
+                    else:
+                        yield collector.record_db("not_executed", db_error=(_result or {}).get("skip_reason"))
+                else:
+                    yield collector.record_memory_decision("passed", reason=candidate_reason or "no_memory_candidate")
+                    yield collector.record_parser("not_executed", reason="lifecycle_none", parse_time_ms=0)
                     yield collector.record_backend("not_executed")
                     yield collector.record_db("not_executed")
 

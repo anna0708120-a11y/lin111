@@ -88,22 +88,8 @@ def detect_conflict(decision):
 
 
 def handle_memory_with_conflict_check(decision):
-    """
-    處理記憶寫入（含衝突檢查），供 state.remember_or_reinforce() 調用。
-    
-    Args:
-        decision: parse_memory_decision() 的回傳值
-    
-    Returns:
-        dict: {
-            "memory_id": int | None,
-            "action_taken": "created" | "reinforced" | "pending_review",
-            "conflict_with": int | None
-        }
-    """
-    # 1. 偵測衝突
+    """Write a memory while preserving the existing conflict-review path."""
     conflict_result = detect_conflict(decision)
-    
     raw_keyword = decision.get("keyword", "").strip()
     normalized_keyword = normalize_keyword(raw_keyword)
 
@@ -116,10 +102,54 @@ def handle_memory_with_conflict_check(decision):
             "skip_reason": reason,
             "error_reason": reason,
         }
-    
-    # 2. 根據結果決定操作
+
+    def mark_pending_review(existing):
+        memory_result = db.insert_memory(
+            tag=decision["tag"],
+            content=decision["summary"],
+            category=decision["category"],
+            importance=decision["importance"],
+            keyword=normalized_keyword,
+            raw_keyword=raw_keyword,
+            expires_at=compute_expiry(decision["importance"]),
+            created_by="agent",
+            pending_review=True,
+            conflict_with=existing["id"],
+        )
+        memory_id = memory_result.get("memory_id") if memory_result.get("success") else None
+        return {
+            "success": memory_result["success"],
+            "memory_id": memory_id,
+            "action_taken": "pending_review" if memory_id is not None else "skipped",
+            "conflict_with": existing["id"] if memory_id is not None else None,
+            "skip_reason": None if memory_id is not None else memory_result["error_reason"],
+            "error_reason": memory_result["error_reason"],
+        }
+
+    # Lifecycle actions must operate on the Retrieval candidate the model received.
+    # The backend still verifies that it is an active agent-created memory.
+    lifecycle_action = decision.get("action")
+    if lifecycle_action in ("reinforce", "conflict"):
+        target_id = decision.get("memory_id")
+        existing = db.find_memory_by_id(target_id, created_by="agent") if target_id else None
+        if not existing:
+            return failed("lifecycle_target_not_found")
+        if lifecycle_action == "reinforce":
+            new_importance = max(existing.get("importance", 3), decision["importance"])
+            new_expiry = compute_expiry(new_importance)
+            if not db.reinforce_memory(existing["id"], new_importance, new_expiry):
+                return failed("reinforce_failed")
+            return {
+                "success": True,
+                "memory_id": existing["id"],
+                "action_taken": "reinforced",
+                "conflict_with": None,
+                "skip_reason": None,
+                "error_reason": None,
+            }
+        return mark_pending_review(existing)
+
     if conflict_result["action"] == "reinforce":
-        # 強化現有記憶
         existing = conflict_result["conflicting_memory"]
         new_importance = max(existing.get("importance", 3), decision["importance"])
         new_expiry = compute_expiry(new_importance)
@@ -133,52 +163,28 @@ def handle_memory_with_conflict_check(decision):
             "skip_reason": None,
             "error_reason": None,
         }
-    
-    elif conflict_result["action"] == "conflict":
-        # 衝突：標記 pending_review，不進 prompt，等 Anna 審核
-        existing = conflict_result["conflicting_memory"]
-        memory_result = db.insert_memory(
-            tag=decision["tag"],
-            content=decision["summary"],
-            category=decision["category"],
-            importance=decision["importance"],
-            keyword=normalized_keyword,
-            raw_keyword=raw_keyword,
-            expires_at=compute_expiry(decision["importance"]),
-            created_by="agent",
-            pending_review=True,
-            conflict_with=existing["id"]
-        )
-        memory_id = memory_result.get("memory_id") if memory_result.get("success") else None
-        return {
-            "success": memory_result["success"],
-            "memory_id": memory_id,
-            "action_taken": "pending_review" if memory_id is not None else "skipped",
-            "conflict_with": existing["id"] if memory_id is not None else None,
-            "skip_reason": None if memory_id is not None else memory_result["error_reason"],
-            "error_reason": memory_result["error_reason"],
-        }
-    
-    else:
-        # 正常建立新記憶
-        memory_result = db.insert_memory(
-            tag=decision["tag"],
-            content=decision["summary"],
-            category=decision["category"],
-            importance=decision["importance"],
-            keyword=normalized_keyword,
-            raw_keyword=raw_keyword,
-            expires_at=compute_expiry(decision["importance"]),
-            created_by="agent",
-            pending_review=False,
-            conflict_with=None
-        )
-        memory_id = memory_result.get("memory_id") if memory_result.get("success") else None
-        return {
-            "success": memory_result["success"],
-            "memory_id": memory_id,
-            "action_taken": "created" if memory_id is not None else "skipped",
-            "conflict_with": None,
-            "skip_reason": None if memory_id is not None else memory_result["error_reason"],
-            "error_reason": memory_result["error_reason"],
-        }
+
+    if conflict_result["action"] == "conflict":
+        return mark_pending_review(conflict_result["conflicting_memory"])
+
+    memory_result = db.insert_memory(
+        tag=decision["tag"],
+        content=decision["summary"],
+        category=decision["category"],
+        importance=decision["importance"],
+        keyword=normalized_keyword,
+        raw_keyword=raw_keyword,
+        expires_at=compute_expiry(decision["importance"]),
+        created_by="agent",
+        pending_review=False,
+        conflict_with=None,
+    )
+    memory_id = memory_result.get("memory_id") if memory_result.get("success") else None
+    return {
+        "success": memory_result["success"],
+        "memory_id": memory_id,
+        "action_taken": "created" if memory_id is not None else "skipped",
+        "conflict_with": None,
+        "skip_reason": None if memory_id is not None else memory_result["error_reason"],
+        "error_reason": memory_result["error_reason"],
+    }

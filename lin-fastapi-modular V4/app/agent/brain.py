@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 
 from app import config
 from app.state import state
-from app.llm.deepseek_client import call_deepseek
+from app.llm.main_router import chat as chat_main_model
 from app.persona import build_system_prompt
 from app.memory_rules import parse_memory_decision, parse_mood_event, strip_hidden_blocks
 from app import memory_trace  # Phase 2: 記錄 memory 決策鏈路
@@ -221,7 +221,7 @@ def generate_reply(context, app_name=None, use_cache=True):
         thinking_suggestion=thinking_suggestion,
     )
 
-    content, reasoning = call_deepseek(system_prompt, max_tokens=config.DEEPSEEK_MAX_TOKENS)
+    content, reasoning = chat_main_model(system_prompt, max_tokens=config.MAIN_LLM_MAX_TOKENS)
     state.record_call()
 
     if not content:
@@ -306,7 +306,7 @@ def write_daily_journal():
             "但不要编造今天发生了什么具体的事情——因为今天真的什么都没发生。"
         )
     system_prompt = build_system_prompt(context, state.recent_memory_text(query=context))
-    content, _ = call_deepseek(system_prompt, max_tokens=config.DEEPSEEK_MAX_TOKENS, thinking=False)
+    content, _ = chat_main_model(system_prompt, max_tokens=config.MAIN_LLM_MAX_TOKENS, thinking=False)
     state.record_call()
     if content:
         state.add_note(content)
@@ -352,7 +352,7 @@ def _generate_reply_stream_impl(context, app_name=None, use_cache=True, session_
     流式生成回覆，yield SSE 格式的事件。
     """
     print("[TRACE-A] enter generate_reply_stream")
-    from app.llm.deepseek_client import call_deepseek_stream
+    from app.llm.main_router import stream_chat as stream_main_model
     from app.llm.groq_memory_detector import candidate_to_parser_text, detect_memory_candidate
     from app.memory_intent import build_memory_decision, detect_memory_intent
     from app.memory_rules import parse_memory_decision, parse_memory_decision_traced, parse_mood_event, strip_hidden_blocks
@@ -441,10 +441,10 @@ def _generate_reply_stream_impl(context, app_name=None, use_cache=True, session_
     raw_reasoning = ""
     full_content = ""
     
-    print("[TRACE-H] before call_deepseek")
+    print("[TRACE-H] before main model stream")
     try:
-        generator = call_deepseek_stream(system_prompt, max_tokens=config.DEEPSEEK_MAX_TOKENS)
-        print("[TRACE-I] after call_deepseek")
+        generator = stream_main_model(system_prompt, max_tokens=config.MAIN_LLM_MAX_TOKENS)
+        print("[TRACE-I] after main model stream")
         for event_type, data in generator:
             print(f"[TRACE] event received: {event_type}")
             if event_type == "reasoning":

@@ -35,8 +35,8 @@ class OpenAICompatibleProvider(LLMProvider):
         }
         if stream:
             payload["stream"] = True
-        if thinking and self.capabilities.reasoning:
-            # A6API is OpenAI-compatible; keep these optional fields isolated here.
+        if thinking and self.capabilities.reasoning and self.name != "deepseek":
+            # A6API reasoning fields are provider-specific; official DeepSeek keeps its native payload minimal.
             payload["thinking"] = {"type": "enabled"}
             payload["reasoning_effort"] = self.reasoning_effort
         return payload

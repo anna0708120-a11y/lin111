@@ -14,10 +14,12 @@ except ImportError:
     pass
 
 # ---- 主聊天模型 Provider Routing ----
-# 所有主聊天模型都通过第三方 A6API 的 OpenAI-compatible endpoint。
+# DeepSeek 主聊天默认走官方 API；GPT / Claude 可选模型继续走 A6API。
 # Groq Memory Detector 使用独立配置，不经过这个 routing。
 MAIN_LLM_API_KEY = os.getenv("A6API_API_KEY", "")
 MAIN_LLM_BASE_URL = os.getenv("A6API_BASE_URL", "https://api.a6api.com/v1")
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
+DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
 DEFAULT_PROVIDER = os.getenv("DEFAULT_PROVIDER", "deepseek").lower()
 DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "deepseek-v4-flash")
 MAIN_LLM_REASONING_EFFORT = os.getenv("MAIN_LLM_REASONING_EFFORT", "high")
@@ -48,9 +50,7 @@ MAIN_PROVIDERS = {
 }
 
 # 旧 DeepSeek client 的兼容配置；主聊天已由 main_router 负责。
-DEEPSEEK_API_KEY = MAIN_LLM_API_KEY
-DEEPSEEK_BASE_URL = MAIN_LLM_BASE_URL
-DEEPSEEK_MODEL = PROVIDER_MODELS["deepseek"]
+DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-v4-flash")
 DEEPSEEK_REASONING_EFFORT = MAIN_LLM_REASONING_EFFORT
 DEEPSEEK_MAX_TOKENS = MAIN_LLM_MAX_TOKENS
 

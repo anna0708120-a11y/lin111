@@ -15,12 +15,17 @@ class MainProviderRoutingTests(unittest.TestCase):
         self.assertIn("reasoning", resolved["capabilities"])
         self.assertIn("tool_calling", resolved["capabilities"])
 
-    def test_all_main_providers_resolve_through_a6api(self):
-        for provider in ("gpt", "claude", "deepseek"):
+    def test_main_providers_resolve_to_their_configured_endpoints(self):
+        expected_endpoints = {
+            "gpt": "https://api.a6api.com/v1",
+            "claude": "https://api.a6api.com/v1",
+            "deepseek": "https://api.deepseek.com",
+        }
+        for provider, expected_base_url in expected_endpoints.items():
             resolved = get_main_model_config(provider=provider)
             instance = get_main_provider(provider=provider)
-            self.assertEqual(instance.base_url, "https://api.a6api.com/v1")
-            self.assertEqual(instance._url(), "https://api.a6api.com/v1/chat/completions")
+            self.assertEqual(instance.base_url, expected_base_url)
+            self.assertEqual(instance._url(), expected_base_url + "/chat/completions")
             self.assertEqual(resolved["model"], config.PROVIDER_MODELS[provider])
 
     def test_model_override_maps_without_changing_provider(self):

@@ -20,10 +20,24 @@ def get_main_provider(*, provider=None, model=None):
     name, resolved_model = _provider_config(provider, model)
     if name not in config.MAIN_PROVIDERS:
         raise ValueError(f"Unknown main LLM provider: {name}")
+    provider_settings = {
+        "deepseek": {
+            "api_key": config.DEEPSEEK_API_KEY,
+            "base_url": config.DEEPSEEK_BASE_URL,
+        },
+        "gpt": {
+            "api_key": config.MAIN_LLM_API_KEY,
+            "base_url": config.MAIN_LLM_BASE_URL,
+        },
+        "claude": {
+            "api_key": config.MAIN_LLM_API_KEY,
+            "base_url": config.MAIN_LLM_BASE_URL,
+        },
+    }[name]
     return OpenAICompatibleProvider(
         name=name,
-        api_key=config.MAIN_LLM_API_KEY,
-        base_url=config.MAIN_LLM_BASE_URL,
+        api_key=provider_settings["api_key"],
+        base_url=provider_settings["base_url"],
         model=resolved_model,
         reasoning_effort=config.MAIN_LLM_REASONING_EFFORT,
         timeout=config.MAIN_LLM_TIMEOUT,
@@ -39,8 +53,8 @@ def get_main_model_config(*, provider=None, model=None):
         "provider": name,
         "model": resolved_model,
         "capabilities": dict(provider_cfg["capabilities"]),
-        "base_url": config.MAIN_LLM_BASE_URL,
-        "endpoint": f"{config.MAIN_LLM_BASE_URL.rstrip('/')}/chat/completions",
+        "base_url": config.DEEPSEEK_BASE_URL if name == "deepseek" else config.MAIN_LLM_BASE_URL,
+        "endpoint": f"{(config.DEEPSEEK_BASE_URL if name == 'deepseek' else config.MAIN_LLM_BASE_URL).rstrip('/')}/chat/completions",
     }
 
 

@@ -8,6 +8,10 @@ services:
     envVars:
       - key: A6API_API_KEY
         sync: false
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: DEEPSEEK_BASE_URL
+        value: https://api.deepseek.com
       - key: DEFAULT_PROVIDER
         value: deepseek
       - key: DEFAULT_MODEL

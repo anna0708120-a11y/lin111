@@ -129,6 +129,11 @@ class AppState:
             ),
             maxlen=chat_limit,
         )
+
+        stored_model = db.load_context("main_model")
+        self.main_model = self._normalize_main_model(
+            stored_model.get("payload") if stored_model else None
+        )
         
         # Intimacy Engine 狀態（V1 新增）
         self.cycle_key = "stable"
@@ -235,6 +240,32 @@ class AppState:
         # 保存配置到 Supabase
         from app import db
         db.save_context("chat_config", {"limit": new_limit})
+
+    @staticmethod
+    def _normalize_main_model(value=None):
+        from app.llm.main_router import get_main_model_config
+
+        provider = value.get("provider") if isinstance(value, dict) else None
+        model = value.get("model") if isinstance(value, dict) else None
+        try:
+            resolved = get_main_model_config(provider=provider, model=model)
+        except (TypeError, ValueError):
+            resolved = get_main_model_config()
+        return {
+            "provider": resolved["provider"],
+            "model": resolved["model"],
+            "capabilities": resolved["capabilities"],
+        }
+
+    def get_main_model(self):
+        return dict(self.main_model)
+
+    def update_main_model(self, provider=None, model=None):
+        selected = self._normalize_main_model({"provider": provider, "model": model})
+        self.main_model = selected
+        db.save_context("main_model", selected)
+        return dict(selected)
+
 
     def add_log(self, event_type, content):
         # Activity Log 顯示時間固定用香港時區，不依賴 server 系統時區

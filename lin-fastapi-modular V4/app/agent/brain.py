@@ -221,7 +221,13 @@ def generate_reply(context, app_name=None, use_cache=True):
         thinking_suggestion=thinking_suggestion,
     )
 
-    content, reasoning = chat_main_model(system_prompt, max_tokens=config.MAIN_LLM_MAX_TOKENS)
+    selected_model = state.get_main_model()
+    content, reasoning = chat_main_model(
+        system_prompt,
+        max_tokens=config.MAIN_LLM_MAX_TOKENS,
+        provider=selected_model["provider"],
+        model=selected_model["model"],
+    )
     state.record_call()
 
     if not content:
@@ -436,6 +442,9 @@ def _generate_reply_stream_impl(context, app_name=None, use_cache=True, session_
     )
 
     state.record_call()
+
+    selected_model = state.get_main_model()
+    yield f"event: model\ndata: {json.dumps(selected_model, ensure_ascii=False)}\n\n"
     
     full_reasoning = ""
     raw_reasoning = ""
@@ -443,7 +452,12 @@ def _generate_reply_stream_impl(context, app_name=None, use_cache=True, session_
     
     print("[TRACE-H] before main model stream")
     try:
-        generator = stream_main_model(system_prompt, max_tokens=config.MAIN_LLM_MAX_TOKENS)
+        generator = stream_main_model(
+            system_prompt,
+            max_tokens=config.MAIN_LLM_MAX_TOKENS,
+            provider=selected_model["provider"],
+            model=selected_model["model"],
+        )
         print("[TRACE-I] after main model stream")
         for event_type, data in generator:
             print(f"[TRACE] event received: {event_type}")
@@ -532,7 +546,9 @@ def _generate_reply_stream_impl(context, app_name=None, use_cache=True, session_
                 
                 if full_content and full_content not in ("信号不好。", "今天额度用完了，或者刚刚问太快了，等一下再说。"):
                     thinking_display = strip_hidden_blocks(full_reasoning) if full_reasoning else None
-                    state.add_conversation_turn("lin", full_content, thinking=thinking_display, session_id=target_session, trace=collector.export())
+                    conversation_trace = collector.export()
+                    conversation_trace["model"] = selected_model
+                    state.add_conversation_turn("lin", full_content, thinking=thinking_display, session_id=target_session, trace=conversation_trace)
                     print("[DONE-6] state.add_conversation_turn 完成")
                     
                     from app.notify.bark import send_to_bark

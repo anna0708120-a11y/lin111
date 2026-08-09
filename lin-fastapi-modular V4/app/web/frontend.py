@@ -415,7 +415,7 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 .maw{display:flex;flex-direction:column;gap:8px;margin-top:12px;}
 .msel,.minp{border:1.5px solid var(--border);border-radius:10px;padding:8px 12px;font-size:13px;font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);outline:none;}
 .minp{resize:none;min-height:72px;}
-.msel:focus,.minp:focus{border-color:var(--rose);}
+.model-selector-current{font-size:14px;color:var(--dark);margin:8px 0 10px}.model-selector-current span{color:var(--rose-deep);font-weight:600}.model-selector-status{font-size:11px;color:var(--muted);min-height:16px;margin-top:6px}
 .msave{background:var(--rose);color:white;border:none;border-radius:10px;padding:10px;font-size:13px;font-weight:600;cursor:pointer;}
 .cms{flex:1;overflow-y:auto;padding:16px 16px 8px;-webkit-overflow-scrolling:touch;position:relative;transition:opacity .15s ease;}
 .cms.fading{opacity:0;}
@@ -918,10 +918,17 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
       </button>
     </div>
   </div>
+
+  <!-- 模型设置 -->
+  <div class="card model-selector-card" style="max-width: 60%; margin-left: auto; margin-right: auto;">
+    <div class="cl">模型切换</div>
+    <div class="model-selector-current">当前模型：<span id="current-model-label">DeepSeek V4 Flash</span></div>
+    <select id="main-model-select" class="msel" onchange="updateMainModel()" aria-label="选择聊天模型"></select>
+    <div id="main-model-status" class="model-selector-status" aria-live="polite"></div>
+  </div>
 </div>
 
-<div class="tab-bar">
-  <button class="tb active" id="tb-monitor" onclick="stab('monitor')"><span class="ti">🏠</span>Home</button>
+<div class="tab-bar">  <button class="tb active" id="tb-monitor" onclick="stab('monitor')"><span class="ti">🏠</span>Home</button>
   <button class="tb" id="tb-chat" onclick="stab('chat')"><span class="ti">💬</span>Chat</button>
   <button class="tb" id="tb-memory" onclick="stab('memory')"><span class="ti">🧠</span>Memory</button>
   <button class="tb" id="tb-mine" onclick="stab('mine')"><span class="ti">🌙</span>Mine</button>
@@ -1326,10 +1333,10 @@ function stab(tab){
     setTimeout(()=>{const c=document.getElementById('cm');c.scrollTop=c.scrollHeight;},50);
     if(!sessionManager.currentSessionId && sessionManager.sessions.length === 0){sidebar.handleNewChat();}
   }
-  else{pg.style.display='block';pg.classList.add('active');if(tab==='memory')rmem();if(tab==='monitor')loadMood();if(tab==='mine'){loadPeriod();loadChatConfig();loadTogetherDays();}}
+  else{pg.style.display='block';pg.classList.add('active');if(tab==='memory')rmem();if(tab==='monitor')loadMood();if(tab==='mine'){loadPeriod();loadChatConfig();loadMainModelConfig();loadTogetherDays();}}
 }
 // 页面加载时如果是Mine tab,立即展开
-if(document.getElementById('pg-mine')?.classList.contains('active')){loadPeriod();loadChatConfig();}
+if(document.getElementById('pg-mine')?.classList.contains('active')){loadPeriod();loadChatConfig();loadMainModelConfig();}
 loadTogetherDays(); // 页面加载时初始化在一起日子
 
 function toggleThink(el){
@@ -1412,8 +1419,9 @@ function renderOnly(history){
       iso: iso,
       time: display,
       think: m.thinking || m.think,
+      trace: m.trace,
       message_id: m.message_id,
-      trace: m.trace
+      model: m.trace && m.trace.model ? modelDisplayName(m.trace.model.model) : undefined
     };
   });
   chatMemoryCache = serverMessages;
@@ -1573,6 +1581,7 @@ async function confirmImageSend() {
     let contentBuffer = '';
     let currentMsgDiv = null;
     let liveAssistantEntry = null;
+    let activeModelLabel = '';
     const currentDeveloper = window.AgentPanel ? window.AgentPanel.create(document.getElementById('cm')) : null;
     if (currentDeveloper) currentDeveloper.ingest(window.AgentPanel.fromSse('api_start', {model: 'watch', input: 'image'}));
     let currentEvent = null;
@@ -1600,7 +1609,8 @@ async function confirmImageSend() {
         t: '',
         time: ts(),
         iso: new Date().toISOString(),
-        message_id: 'live-' + Date.now()
+        message_id: 'live-' + Date.now(),
+        model: activeModelLabel || undefined
       };
       chatMemoryCache.push(liveAssistantEntry);
       return msgDiv;
@@ -1675,6 +1685,13 @@ async function confirmImageSend() {
               }
             }
 
+            else if (currentEvent === 'model') {
+              const modelLabel = modelDisplayName(data.model || '');
+              activeModelLabel = modelLabel;
+              if (currentDeveloper) currentDeveloper.ingest(window.AgentPanel.fromSse('model', data));
+              if (liveAssistantEntry) liveAssistantEntry.model = modelLabel;
+            }
+
             else if (currentEvent === 'agent_event') {
               if (currentDeveloper) currentDeveloper.ingest(window.AgentPanel.fromSse('agent_event', data));
               const messageEl = ensureLiveAssistantMessage();
@@ -1735,6 +1752,7 @@ async function send(){
     let contentBuffer = '';
     let currentMsgDiv = null;
     let liveAssistantEntry = null;
+    let activeModelLabel = '';
     const currentDeveloper = window.AgentPanel ? window.AgentPanel.create(document.getElementById('cm')) : null;
     if (currentDeveloper) currentDeveloper.ingest(window.AgentPanel.fromSse('api_start', {model: 'watch'}));
     let currentEvent = null;
@@ -1762,7 +1780,8 @@ async function send(){
         t: '',
         time: ts(),
         iso: new Date().toISOString(),
-        message_id: 'live-' + Date.now()
+        message_id: 'live-' + Date.now(),
+        model: activeModelLabel || undefined
       };
       chatMemoryCache.push(liveAssistantEntry);
       return msgDiv;
@@ -1834,6 +1853,13 @@ async function send(){
               if(data.message){
                 addMsg('lin', data.message);
               }
+            }
+
+            else if(currentEvent === 'model') {
+              const modelLabel = modelDisplayName(data.model || '');
+              activeModelLabel = modelLabel;
+              if (currentDeveloper) currentDeveloper.ingest(window.AgentPanel.fromSse('model', data));
+              if (liveAssistantEntry) liveAssistantEntry.model = modelLabel;
             }
 
             else if(currentEvent === 'agent_event'){
@@ -2206,6 +2232,59 @@ async function updateChatLimit() {
 }
 
 
+
+async function loadMainModelConfig() {
+  try {
+    const response = await fetch(AU + '/model-config');
+    const data = await response.json();
+    const select = document.getElementById('main-model-select');
+    const label = document.getElementById('current-model-label');
+    if (!select || !label || !data.current) return;
+    select.innerHTML = (data.models || []).map(item =>
+      '<option value="' + item.model + '">' + modelDisplayName(item.model) + '</option>'
+    ).join('');
+    select.value = data.current.model;
+    label.textContent = modelDisplayName(data.current.model);
+  } catch (err) {
+    console.error('Failed to load main model config:', err);
+  }
+}
+
+function modelDisplayName(model) {
+  const labels = {
+    'gpt-5.6-terra': 'GPT-5.6 Terra',
+    'gpt-5.6-luna': 'GPT-5.6 Luna',
+    'gpt-5.4-mini': 'GPT-5.4 Mini',
+    'claude-sonnet-5': 'Claude Sonnet 5',
+    'claude-haiku-4-5': 'Claude Haiku 4.5',
+    'deepseek-v4-flash': 'DeepSeek V4 Flash'
+  };
+  return labels[model] || model;
+}
+
+async function updateMainModel() {
+  const select = document.getElementById('main-model-select');
+  const label = document.getElementById('current-model-label');
+  const status = document.getElementById('main-model-status');
+  const item = select && select.options[select.selectedIndex];
+  if (!select || !item) return;
+  try {
+    const response = await fetch(AU + '/model-config', {
+      method: 'PATCH',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({model: select.value})
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || '模型设置失败');
+    label.textContent = modelDisplayName(data.current.model);
+    status.textContent = '已保存：' + modelDisplayName(data.current.model);
+    setTimeout(() => { status.textContent = ''; }, 1800);
+  } catch (err) {
+    status.textContent = '保存失败';
+    console.error('Failed to update main model:', err);
+    loadMainModelConfig();
+  }
+}
 
 // ========== 在一起日子 ==========
 async function loadTogetherDays() {

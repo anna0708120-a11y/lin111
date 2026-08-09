@@ -42,7 +42,9 @@ class ChatView {
       const agentSlot = message.r === 'lin' ? '<div class="agent-panel-slot"' +
         (messageId ? ' data-message-id="' + messageId + '"' : '') + '></div>' : '';
       if (message.r === 'lin' && message.trace) agentSlots.push({ messageId, trace: message.trace });
-      html += '<div class="msg ' + message.r + (showMeta ? '' : ' grouped') + '">' + agentSlot + '<div class="msg-row">' +
+      const modelBadge = message.r === 'lin' && message.model
+        ? '<div class="model-badge">' + message.model + '</div>' : '';
+      html += '<div class="msg ' + message.r + (showMeta ? '' : ' grouped') + '">' + agentSlot + modelBadge + '<div class="msg-row">' +
         avatarHtml(message.r) + '<div class="bub">' + message.t + '</div></div>' + meta + '</div>';
     });
 

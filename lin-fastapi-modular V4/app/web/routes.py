@@ -16,7 +16,7 @@ from app.agent.brain import generate_reply, generate_reply_stream
 from app.context.auth import verify_context_token
 from app.context import mac as mac_context
 from app.event_bus import event_bus
-from app.notify.bark import send_to_bark
+from app.llm.main_router import get_main_model_config, list_main_models
 from app.state import state
 from app.web.pwa import MANIFEST_JSON, SERVICE_WORKER_JS
 from app.web.diagnose import DIAGNOSE_HTML
@@ -313,6 +313,36 @@ def remove_memory(memory_id: int):
 def add_note(content: dict):
     state.add_note(content.get("text", ""))
     return {"status": "Success"}
+
+@router.get("/model-config")
+def get_model_config():
+    """Return the persisted main-chat model and selectable catalog."""
+    return {
+        "current": state.get_main_model(),
+        "models": list_main_models(),
+    }
+
+
+class MainModelPayload(BaseModel):
+    provider: Optional[str] = None
+    model: str
+
+
+@router.patch("/model-config")
+def update_model_config(payload: MainModelPayload):
+    """Persist the main-chat provider/model selection."""
+    try:
+        resolved = get_main_model_config(provider=payload.provider, model=payload.model)
+    except ValueError as exc:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    if payload.provider and resolved["provider"] != payload.provider.lower():
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="provider/model mismatch")
+
+    return {"current": state.update_main_model(resolved["provider"], resolved["model"])}
+
 
 @router.get("/settings")
 def get_settings():

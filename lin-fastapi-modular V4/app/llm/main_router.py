@@ -6,6 +6,13 @@ from app.llm.openai_compatible import OpenAICompatibleProvider
 def _provider_config(provider_name, model_override=None):
     name = (provider_name or config.DEFAULT_PROVIDER).lower()
     model = model_override or config.PROVIDER_MODELS.get(name) or config.DEFAULT_MODEL
+    catalog_provider = config.MODEL_CATALOG.get(model)
+    if catalog_provider and provider_name is None:
+        name = catalog_provider
+    if catalog_provider and catalog_provider != name:
+        raise ValueError(f"Model {model} belongs to provider {catalog_provider}, not {name}")
+    if model not in config.MODEL_CATALOG:
+        raise ValueError(f"Unknown main LLM model: {model}")
     return name, model
 
 
@@ -40,13 +47,13 @@ def get_main_model_config(*, provider=None, model=None):
 def list_main_models():
     return [
         {
-            "id": provider,
+            "id": model,
             "provider": provider,
-            "model": config.PROVIDER_MODELS[provider],
+            "model": model,
             "available": bool(config.MAIN_LLM_API_KEY),
             "capabilities": dict(config.MAIN_PROVIDERS[provider]["capabilities"]),
         }
-        for provider in config.MAIN_PROVIDERS
+        for model, provider in config.MODEL_CATALOG.items()
     ]
 
 

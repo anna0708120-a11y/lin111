@@ -52,7 +52,8 @@ def build_system_prompt(context, memory_summary="", world_context="", conversati
     from zoneinfo import ZoneInfo
     
     print("[PROMPT-1] persona")
-    now = datetime.now(ZoneInfo("Asia/Hong_Kong"))
+    # 使用与本地服务一致的时间来源，不额外转换时区
+    now = datetime.now()
     hour = now.hour
     time_period = "凌晨" if 0 <= hour < 6 else "早上" if 6 <= hour < 12 else "下午" if 12 <= hour < 18 else "晚上"
     current_time = f"【当前真实时间】\n现在是 {now.strftime('%Y年%m月%d日')} {time_period} {now.strftime('%H:%M')}（24小时制，北京时间）\n请在回复中使用准确的时间，不要编造或猜测。"

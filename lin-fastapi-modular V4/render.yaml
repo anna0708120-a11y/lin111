@@ -6,12 +6,24 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: python main.py
     envVars:
+      - key: A6API_API_KEY
+        sync: false
       - key: DEEPSEEK_API_KEY
         sync: false
-      - key: BARK_KEY
-        sync: false
+      - key: DEEPSEEK_BASE_URL
+        value: https://api.deepseek.com
+      - key: DEFAULT_PROVIDER
+        value: deepseek
+      - key: DEFAULT_MODEL
+        value: deepseek-v4-flash
+      - key: GPT_MODEL
+        value: gpt-5.6-terra
+      - key: CLAUDE_MODEL
+        value: claude-sonnet-5
       - key: DEEPSEEK_MODEL
         value: deepseek-v4-flash
+      - key: BARK_KEY
+        sync: false
       - key: PROACTIVE_MIN_MINUTES
         value: "90"
       - key: PROACTIVE_MAX_MINUTES

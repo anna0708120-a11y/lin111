@@ -30,7 +30,7 @@ class MemoryTrace:
     message_id: Optional[str] = None
     created_at: Optional[datetime] = None
     
-    # Step 1: 模型輸出
+    # 不保存完整模型推理；只保留解析後的 decision 與執行結果，供 memory 問題排查。
     reasoning_text: Optional[str] = None
     raw_decision_block: Optional[str] = None
     
@@ -100,10 +100,8 @@ def clear_trace():
 
 
 def record_model_output(reasoning_text: str, raw_decision_block: str = None):
-    """記錄模型輸出（Step 1）"""
-    if _current_trace:
-        _current_trace.reasoning_text = reasoning_text
-        _current_trace.raw_decision_block = raw_decision_block
+    """相容舊呼叫端；完整推理不寫入 trace。"""
+    return None
 
 
 def record_parse_result(success: bool, parsed_decision: dict = None, error: str = None):

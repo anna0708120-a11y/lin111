@@ -99,7 +99,9 @@ class AppState:
         self.anna_avatar = db.load_state_value("anna_avatar")
 
         # Lin 的状态自评：依恋/占有欲/好奇/社交欲/疲惫/压力 + 一句心情
-        self.mood = db.load_state_value("mood_state") or dict(DEFAULT_MOOD)
+        stored_mood = db.load_state_value("mood_state")
+        print(f"[mood] 读取 mood_state: {stored_mood!r}")
+        self.mood = stored_mood or dict(DEFAULT_MOOD)
 
         # 对话历史：最近的聊天记录，用于给模型看上下文，不然模型每次都"失忆"
         # 启动时从 Supabase 读一份进内存，让三端（手机/电脑/网页）打开时看到同一份记录；
@@ -127,6 +129,11 @@ class AppState:
             ),
             maxlen=chat_limit,
         )
+
+        stored_model = db.load_context("main_model")
+        self.main_model = self._normalize_main_model(
+            stored_model.get("payload") if stored_model else None
+        )
         
         # Intimacy Engine 狀態（V1 新增）
         self.cycle_key = "stable"
@@ -142,6 +149,10 @@ class AppState:
         self.active_after_effects = []  # List[AfterEffect]
         self.continuous_turns = 0  # 連續對話輪數
         self.last_user_message_at = None  # 用戶最後發消息時間
+
+        # Phase 1: reuse the existing app_state key-value storage for recovery.
+        # A missing or invalid snapshot keeps the previous first-run defaults.
+        self._load_body_state_snapshot()
         
         # V3 新增：Relationship Engine
         from app.relationship.engine import init_relationship
@@ -230,6 +241,32 @@ class AppState:
         from app import db
         db.save_context("chat_config", {"limit": new_limit})
 
+    @staticmethod
+    def _normalize_main_model(value=None):
+        from app.llm.main_router import get_main_model_config
+
+        provider = value.get("provider") if isinstance(value, dict) else None
+        model = value.get("model") if isinstance(value, dict) else None
+        try:
+            resolved = get_main_model_config(provider=provider, model=model)
+        except (TypeError, ValueError):
+            resolved = get_main_model_config()
+        return {
+            "provider": resolved["provider"],
+            "model": resolved["model"],
+            "capabilities": resolved["capabilities"],
+        }
+
+    def get_main_model(self):
+        return dict(self.main_model)
+
+    def update_main_model(self, provider=None, model=None):
+        selected = self._normalize_main_model({"provider": provider, "model": model})
+        self.main_model = selected
+        db.save_context("main_model", selected)
+        return dict(selected)
+
+
     def add_log(self, event_type, content):
         # Activity Log 顯示時間固定用香港時區，不依賴 server 系統時區
         # （Render 預設跑 UTC，naive datetime.now() 會慢 8 小時）
@@ -263,8 +300,12 @@ class AppState:
     # ---------- 长期记忆 ----------
     def add_memory(self, tag, content, category="长期记忆", importance=3, keyword="", created_by="user"):
         expires_at = compute_expiry(importance)
-        memory_id = db.insert_memory(tag, content, category=category, importance=importance,
-                                      keyword=keyword, expires_at=expires_at, created_by=created_by)
+        memory_result = db.insert_memory(tag, content, category=category, importance=importance,
+                                          keyword=keyword, expires_at=expires_at, created_by=created_by)
+        memory_id = memory_result.get("memory_id") if memory_result.get("success") else None
+        if not memory_result.get("success"):
+            print(f"[memory] manual write failed: {memory_result['error_reason']}")
+            return None
         self.memory_bank.append({
             "id": memory_id,
             "tag": tag,
@@ -295,9 +336,11 @@ class AppState:
         
         # Phase 1: 使用衝突檢查邏輯
         result = handle_memory_with_conflict_check(decision)
-        
-        # 同步到內存（只有非 pending_review 的才加入）
-        if result["memory_id"] and result["action_taken"] != "pending_review":
+        if not result.get("success"):
+            print(f"[memory] write failed: {result.get('error_reason') or result.get('skip_reason')}")
+
+        # 同步到內存（只有成功且非 pending_review 的才加入）
+        if result.get("success") and result["memory_id"] and result["action_taken"] != "pending_review":
             normalized_keyword = normalize_keyword(raw_keyword)
             
             if result["action_taken"] == "reinforced":
@@ -338,11 +381,28 @@ class AppState:
         raw_keyword = decision.get("keyword", "")
         normalized_keyword = normalize_keyword(raw_keyword)
         
-        # 查找目標記憶（只找 agent 自己建的）
-        target = db.find_memory_by_keyword(normalized_keyword, created_by="agent")
+        # Lifecycle 會帶 Retrieval 給模型的 candidate id；有 id 時不可退回 keyword，
+        # 避免模型選錯目標後意外修改另一條記憶。舊 Decision 格式仍保留 keyword fallback。
+        target_id = decision.get("memory_id")
+        explicit_target = target_id is not None
+        target = (
+            db.find_memory_by_id(target_id, created_by="agent")
+            if explicit_target else
+            db.find_memory_by_keyword(normalized_keyword, created_by="agent")
+        )
         
         if not target:
-            # 找不到，轉為新建
+            # 明確指定候選但找不到時，寧可不動任何記憶；不能退回建立新條目。
+            if explicit_target:
+                return {
+                    "success": False,
+                    "memory_id": None,
+                    "action_taken": "skipped",
+                    "conflict_with": None,
+                    "skip_reason": "lifecycle_target_not_found",
+                    "error_reason": "lifecycle_target_not_found",
+                }
+            # 舊 Decision 格式保留既有 fallback 行為。
             return self.remember_or_reinforce(decision)
         
         # 檢查內容差異
@@ -350,9 +410,11 @@ class AppState:
         old_content = target.get("content", "").strip()
         similarity = _content_similarity(new_content, old_content)
         
-        # 差異大 -> 視為衝突，標記待審核
-        if similarity < 0.5:
-            memory_id = db.insert_memory(
+        # 舊流程沒有候選 id，仍沿用 Phase 1 的保守相似度防線。
+        # Lifecycle 的顯式 target 已由模型基於 Retrieval 判定為「同一事實的狀態變化」，
+        # 因此允許更新，不把「很少喝」誤當成完全不同的記憶。
+        if not explicit_target and similarity < 0.5:
+            memory_result = db.insert_memory(
                 tag=decision["tag"],
                 content=new_content,
                 category=decision["category"],
@@ -364,12 +426,15 @@ class AppState:
                 pending_review=True,
                 conflict_with=target["id"]
             )
+            memory_id = memory_result.get("memory_id") if memory_result.get("success") else None
             # pending_review 的記憶不加入內存
             return {
+                "success": memory_result.get("success", False),
                 "memory_id": memory_id,
-                "action_taken": "pending_review",
-                "conflict_with": target["id"],
-                "skip_reason": "conflict_detected"
+                "action_taken": "pending_review" if memory_id is not None else "skipped",
+                "conflict_with": target["id"] if memory_id is not None else None,
+                "skip_reason": "conflict_detected" if memory_id is not None else memory_result["error_reason"],
+                "error_reason": memory_result.get("error_reason"),
             }
         
         # 差異小 -> 直接更新
@@ -388,10 +453,10 @@ class AppState:
                     break
         
         return {
-            "memory_id": target["id"],
-            "action_taken": "updated",
+            "memory_id": target["id"] if ok else None,
+            "action_taken": "updated" if ok else "skipped",
             "conflict_with": None,
-            "skip_reason": None
+            "skip_reason": None if ok else "update_failed"
         }
 
     def archive_memory(self, decision):
@@ -407,7 +472,12 @@ class AppState:
         raw_keyword = decision.get("keyword", "")
         normalized_keyword = normalize_keyword(raw_keyword)
         
-        target = db.find_memory_by_keyword(normalized_keyword, created_by="agent")
+        target_id = decision.get("memory_id")
+        target = (
+            db.find_memory_by_id(target_id, created_by="agent")
+            if target_id is not None else
+            db.find_memory_by_keyword(normalized_keyword, created_by="agent")
+        )
         if not target:
             return {
                 "memory_id": None,
@@ -426,6 +496,25 @@ class AppState:
             "conflict_with": None,
             "skip_reason": "db_error" if not ok else None
         }
+
+    def apply_memory_decision(self, decision):
+        """Phase 4 的唯一 lifecycle 分派点；模型只给 decision，数据库操作仍在 backend。"""
+        action = decision.get("action", "create")
+        if action == "none":
+            return {
+                "success": True,
+                "memory_id": None,
+                "action_taken": "skipped",
+                "conflict_with": None,
+                "skip_reason": "lifecycle_none",
+                "error_reason": None,
+            }
+        if action == "update":
+            return self.update_memory(decision)
+        if action == "archive":
+            return self.archive_memory(decision)
+        # create / reinforce / conflict 都复用既有 conflict-aware writer。
+        return self.remember_or_reinforce(decision)
 
     def delete_memory(self, memory_id):
         self.memory_bank = [m for m in self.memory_bank if m.get("id") != memory_id]
@@ -449,75 +538,111 @@ class AppState:
             for r in db.load_memories()
         ]
 
-    def relevant_memory_text(self, query, n=5):
-        """用既有 keyword/category/content 做轻量匹配，只注入和本轮相关的记忆。"""
+    def relevant_memory_candidates(self, query, n=5):
+        """Return the same lightweight Retrieval matches as structured Lifecycle candidates."""
         if not query or not self.memory_bank:
-            return ""
-
+            return []
         try:
-            from app.keyword_normalizer import SYNONYM_MAP, normalize_keyword
+            from app.keyword_normalizer import get_synonym_map, normalize_keyword
+            import re
 
-            query_text = str(query).strip().lower()
-            if not query_text:
-                return ""
-
-            # 复用 Phase 1 同义词表：例如「咖啡」和已存 keyword="coffee" 会归到同一词。
-            query_terms = set()
-            for alias, normalized in SYNONYM_MAP.items():
-                if alias.lower() in query_text:
-                    query_terms.add(normalized)
-
-            # 英文关键词不依赖同义词表也可以直接匹配。
-            for word in query_text.replace("_", " ").split():
-                if len(word) >= 2:
-                    query_terms.add(normalize_keyword(word))
-
-            if not query_terms:
-                return ""
-
+            query_text = re.sub(r"^(?:Anna|用户|用戶)(?:说|說)?[：:]?", "", str(query)).strip().lower()
+            aliases = {
+                normalized
+                for alias, normalized in get_synonym_map().items()
+                if alias.lower() in query_text or normalized in query_text
+            }
+            terms = set(re.findall(r"[a-z0-9_]+|[\u4e00-\u9fff]{2,}", query_text))
             ranked = []
             for memory in self.memory_bank:
                 if memory.get("archived"):
                     continue
-
-                keyword = normalize_keyword(str(memory.get("keyword", "")))
+                keyword = normalize_keyword(str(memory.get("keyword") or ""))
                 searchable = " ".join(
-                    str(memory.get(field, "")).lower()
-                    for field in ("keyword", "category", "tag", "content")
+                    str(memory.get(field) or "").lower()
+                    for field in ("keyword", "raw_keyword", "category", "tag", "content")
                 )
-                score = 0
-                for term in query_terms:
-                    if not term:
-                        continue
-                    if keyword == term:
-                        score += 100
-                    elif term in searchable:
-                        score += 40
-
+                score = 100 if keyword and keyword in aliases else 0
+                score += sum(12 for term in terms if term in searchable)
                 if score:
                     ranked.append((score, memory.get("importance", 3), memory))
-
-            if not ranked:
-                return ""
-
             ranked.sort(key=lambda item: (item[0], item[1]), reverse=True)
-            lines = "\n".join(
-                f"[{memory['category']}·{memory['tag']}·{'⭐' * memory.get('importance', 3)}] {memory['content']}"
-                for _, _, memory in ranked[:n]
-            )
-            return f"\n\n【Lin对Anna的相关记忆】\n{lines}"
+            return [memory for _, _, memory in ranked[:n]]
         except Exception as e:
-            # Retrieval 是增强功能，任何异常都不能影响正常聊天。
-            print(f"[memory] 检索失败，跳过记忆注入: {e}")
-            return ""
+            print(f"[memory] lifecycle retrieval failed: {e}")
+            return []
 
-    def recent_memory_text(self, n=8):
-        """保留旧接口给非聊天用途使用，按重要度取得记忆。"""
+    def recent_memory_text(self, n=8, query=""):
+        """Return active memories ranked by lightweight query relevance, then importance."""
         if not self.memory_bank:
             return ""
+
         active = [m for m in self.memory_bank if not m.get("archived")]
-        top = sorted(active, key=lambda m: m.get("importance", 3), reverse=True)[:n]
-        lines = "\n".join(f"[{m['category']}·{m['tag']}·{'⭐'*m.get('importance',3)}] {m['content']}" for m in top)
+        if not active:
+            return ""
+
+        query_text = (query or "").strip()
+        if query_text:
+            from app.keyword_normalizer import get_synonym_map, normalize_keyword
+            import re
+
+            # Remove transport wording so retrieval focuses on the user's message.
+            query_text = re.sub(r"^(?:Anna|用户|用戶)(?:说|說)?[：:]?", "", query_text).strip()
+            normalized_query = normalize_keyword(query_text)
+            query_terms = set(re.findall(r"[a-z0-9_]+|[\u4e00-\u9fff]{2,}", query_text.lower()))
+            synonym_map = get_synonym_map()
+            query_aliases = {
+                normalized
+                for alias, normalized in synonym_map.items()
+                if alias in query_text.lower() or normalized in query_text.lower()
+            }
+            query_chars = set()
+        else:
+            normalized_query = ""
+            query_terms = set()
+            query_chars = set()
+
+        def relevance(memory):
+            if not query_text:
+                return 0
+
+            keyword = str(memory.get("keyword") or "")
+            normalized_keyword = normalize_keyword(keyword)
+            searchable = " ".join(
+                str(memory.get(field) or "")
+                for field in ("keyword", "raw_keyword", "category", "tag", "content")
+            ).lower()
+            score = 0
+
+            if normalized_keyword and normalized_keyword in query_aliases:
+                score += 90
+            if normalized_keyword and normalized_keyword == normalized_query:
+                score += 100
+            if keyword and keyword.lower() in query_text.lower():
+                score += 60
+            if normalized_keyword and normalized_keyword in normalized_query:
+                score += 45
+
+            for term in query_terms:
+                if term in searchable:
+                    score += 12
+            if query_chars:
+                score += min(len(query_chars & set(searchable)), 8) * 2
+            return score
+
+        ranked = sorted(
+            active,
+            key=lambda memory: (relevance(memory), memory.get("importance", 3)),
+            reverse=True,
+        )
+        relevant = [memory for memory in ranked if relevance(memory) > 0]
+        if query_text and not relevant:
+            return ""
+        selected = (relevant or ranked)[:n]
+        lines = "\n".join(
+            f"[{m['category']}·{m['tag']}·{'⭐' * m.get('importance', 3)}] {m['content']}"
+            for m in selected
+        )
         return f"\n\n【Lin对Anna的记忆】\n{lines}"
 
     # ---------- 对话历史 ----------
@@ -634,11 +759,102 @@ class AppState:
             self.proactive["max_minutes"] = max_minutes
         db.save_state_value("proactive_settings", self.proactive)
 
+    # ---------- Body State (Phase 1) ----------
+    def _load_body_state_snapshot(self):
+        snapshot = db.load_state_value("body_state")
+        if not isinstance(snapshot, dict):
+            return
+
+        def parse_dt(value):
+            if not value:
+                return None
+            try:
+                parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+                # Existing tick/chat code uses naive datetimes.
+                return parsed.replace(tzinfo=None)
+            except (TypeError, ValueError):
+                return None
+
+        values = snapshot.get("body_values")
+        if isinstance(values, dict):
+            for key in ("tension", "heat", "sensitivity", "control"):
+                try:
+                    self.body_values[key] = max(0.0, min(100.0, float(values.get(key, self.body_values[key]))))
+                except (TypeError, ValueError):
+                    pass
+
+        self.cycle_key = snapshot.get("cycle_key") or self.cycle_key
+        self.cycle_started_at = parse_dt(snapshot.get("cycle_started_at"))
+        self.cycle_expires_at = parse_dt(snapshot.get("cycle_expires_at"))
+        self.last_tick_at = parse_dt(snapshot.get("last_tick_at"))
+        self.active_event_key = snapshot.get("active_event_key")
+        self.active_event_started_at = parse_dt(snapshot.get("active_event_started_at"))
+        self.active_event_expires_at = parse_dt(snapshot.get("active_event_expires_at"))
+        self.last_user_message_at = parse_dt(snapshot.get("last_user_message_at"))
+        try:
+            self.continuous_turns = int(snapshot.get("continuous_turns", 0))
+        except (TypeError, ValueError):
+            self.continuous_turns = 0
+
+        restored_effects = []
+        for raw in snapshot.get("active_after_effects", []):
+            if not isinstance(raw, dict):
+                continue
+            try:
+                from app.intimacy.after_effect import AfterEffect
+
+                started = parse_dt(raw.get("started_at"))
+                expires = parse_dt(raw.get("expires_at"))
+                if not started or not expires:
+                    continue
+                restored_effects.append(AfterEffect(
+                    source_event=str(raw.get("source_event", "")),
+                    duration_minutes=int(raw.get("duration_minutes", 0)),
+                    deltas_per_hour=dict(raw.get("deltas_per_hour") or {}),
+                    description=str(raw.get("description", "")),
+                    started_at=started,
+                    expires_at=expires,
+                ))
+            except (TypeError, ValueError):
+                continue
+        self.active_after_effects = restored_effects
+
+    def save_body_state(self):
+        def iso(value):
+            return value.isoformat() if value else None
+
+        effects = []
+        for effect in getattr(self, "active_after_effects", []) or []:
+            effects.append({
+                "source_event": effect.source_event,
+                "duration_minutes": effect.duration_minutes,
+                "deltas_per_hour": dict(effect.deltas_per_hour),
+                "description": effect.description,
+                "started_at": iso(effect.started_at),
+                "expires_at": iso(effect.expires_at),
+            })
+
+        db.save_state_value("body_state", {
+            "version": 1,
+            "body_values": dict(self.body_values),
+            "cycle_key": self.cycle_key,
+            "cycle_started_at": iso(self.cycle_started_at),
+            "cycle_expires_at": iso(self.cycle_expires_at),
+            "last_tick_at": iso(self.last_tick_at),
+            "active_event_key": self.active_event_key,
+            "active_event_started_at": iso(self.active_event_started_at),
+            "active_event_expires_at": iso(self.active_event_expires_at),
+            "active_after_effects": effects,
+            "last_user_message_at": iso(self.last_user_message_at),
+            "continuous_turns": self.continuous_turns,
+        })
+
     # ---------- 状态自评 ----------
     def update_mood(self, mood_dict):
         if not mood_dict:
             return
         self.mood = mood_dict
+        print(f"[mood] 准备保存 mood_state: {self.mood!r}")
         db.save_state_value("mood_state", self.mood)
 
     # ---------- 头像 ----------

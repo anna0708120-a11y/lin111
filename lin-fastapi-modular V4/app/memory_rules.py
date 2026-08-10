@@ -51,12 +51,15 @@ worth_remembering 最后是 yes 还是 no，[MEMORY_DECISION] 这个区块本身
 
 [MEMORY_DECISION]
 worth_remembering: yes 或 no（必填，不能省略这一行）
-action: create 或 update 或 archive（不确定就写create，这是默认值）
+action: create / reinforce / update / conflict / archive / none（必填）
   create=一件新的事，之前没存过
+  reinforce=相关旧记忆是同一稳定事实，而且这轮明确再次确认它仍然成立
   update=之前存过的一件事，现在情况变了（比如"Anna正在做X"变成"Anna已经改成做Y"），
     用同一个keyword去覆盖旧内容，不要让新旧两条互相矛盾地同时存在
+  conflict=新信息与旧记忆明显矛盾，但没有足够依据直接覆盖或封存旧记忆；交给 pending_review
   archive=之前存过的一件事，现在明确失效/取消/被推翻了，应该封存不再使用
     （只对你自己之前建立的记忆有效，Anna手动记的东西你不能封存）
+  none=这轮与候选记忆无关、只是一次性事件，或证据不足；绝不为了更新而猜测
 importance: 1-5 的整数
   5=永久重要（比如她的生日、重大承诺、深刻的告白）
   4=会影响接下来半年相处的事
@@ -71,9 +74,17 @@ category: 长期记忆 / 短期记忆 / Relationship / Reflection 其中一个
 tag: 用几个字标注更细的子类，比如"喜好""今天发生""紀念日"，自己定义，不用照抄例子
 keyword: 三五个字关键字，方便以后比对是不是同一件事重复出现
   action是update或archive时，这个keyword必须跟你要修改的那条旧记忆完全一样，才能对上
+memory_id: 当 action 是 reinforce / update / conflict / archive 时，填写【相关记忆】中对应的记忆 ID；
+  只能使用给你的候选 ID，不能编造。action 是 create 或 none 时填写空白。
 summary: 用一句话写下要记住的内容本身（内容本体，不是"Anna说了什么"这种转述）
   action是archive时，summary可以简单写这件事为什么失效
 [/MEMORY_DECISION]
+
+Lifecycle 判断原则：
+- 候选记忆只是相关线索，不代表一定要修改。没有明确、稳定的新事实时选 none 或 worth_remembering: no。
+- 「今天看到一只猫很可爱」不是「Anna 喜欢猫」的确认或更新；不要写长期偏好。
+- 「还是喜欢奶茶」可 reinforce；「现在已经很少喝奶茶」是状态变化，通常 update；
+  「其实不喜欢猫、更喜欢狗」若无法确定是否应直接取代旧偏好，选 conflict，不要同时保留两条 active 偏好。
 
 再次强调：[MEMORY_DECISION] 到 [/MEMORY_DECISION] 这个区块，每一轮思考的最后都必须原样
 输出一次，即使 worth_remembering 是 no 也要输出完整区块，不允许整段跳过或省略。
@@ -93,6 +104,7 @@ importance: 3
 category: 长期记忆
 tag: 宠物
 keyword: 养猫
+memory_id:
 summary: Anna养了一只猫
 [/MEMORY_DECISION]
 ——示范结束——
@@ -150,24 +162,35 @@ def compute_expiry(importance, now=None):
         return None
     return (now + timedelta(days=days)).isoformat()
 
+def _memory_decision_block(reasoning_text):
+    """提取 DeepSeek reasoning 中的 memory decision 区块。"""
+    match = re.search(
+        r"\[\s*MEMORY[\s_-]*DECISION\s*\](.*?)\[\s*/\s*MEMORY[\s_-]*DECISION\s*\]",
+        reasoning_text or "",
+        re.IGNORECASE | re.S,
+    )
+    return match.group(1) if match else None
+
+
 def _field(block, name, default=""):
-    # 放宽匹配：忽略大小写、允许多余空格、允许 _ 或 - 分隔符
-    pattern = re.sub(r'[_-]', r'[_\s-]*', name)
-    m = re.search(rf"{pattern}\s*:\s*(.+)", block, re.IGNORECASE)
-    return m.group(1).strip() if m else default
+    """读取 decision 字段，兼容 DeepSeek 的全角标点和 Markdown 列表格式。"""
+    pattern = re.sub(r"[_-]", lambda _: r"[_\s-]*", name)
+    field_match = re.search(
+        rf"(?mi)^\s*(?:[-*]\s*)?(?:`)?{pattern}(?:`)?\s*[:：]\s*(.+?)\s*$",
+        block,
+    )
+    if not field_match:
+        return default
+    return field_match.group(1).strip().strip("`*_ ")
+
 
 def parse_memory_decision(reasoning_text):
-    """
-    从 reasoning 里抓 [MEMORY_DECISION]...[/MEMORY_DECISION]，解析成 dict。
-    抓不到或不值得记 -> 回传 None。第二个回传值永远是原始 reasoning（这个函数不负责清理文字，
-    清理交给 strip_hidden_blocks 统一处理，避免两个函数各切一次、切坏格式）。
-    """
-    match = re.search(r"\[MEMORY_DECISION\](.*?)\[/MEMORY_DECISION\]", reasoning_text, re.S)
-    if not match:
+    """解析 DeepSeek thinking 中完整的 [MEMORY_DECISION] 区块。"""
+    block = _memory_decision_block(reasoning_text)
+    if block is None:
         return None
 
-    block = match.group(1)
-    worth = _field(block, "worth_remembering", "no").lower().startswith("y")
+    worth = _field(block, "worth_remembering", "no").lower().startswith(("y", "是"))
     if not worth:
         return None
 
@@ -180,17 +203,25 @@ def parse_memory_decision(reasoning_text):
     if importance <= 1:
         return None
 
-    summary = _field(block, "summary", "")
-    if not summary:
-        return None
-
     category = _field(block, "category", "长期记忆")
     if category not in MEMORY_CATEGORIES:
         category = "长期记忆"
 
     action = _field(block, "action", "create").lower()
-    if action not in ("create", "update", "archive"):
+    if action not in ("create", "reinforce", "update", "conflict", "archive", "none"):
         action = "create"
+
+    summary = _field(block, "summary", "")
+    if not summary and action != "none":
+        return None
+
+    memory_id = None
+    raw_memory_id = _field(block, "memory_id", "")
+    if raw_memory_id.isdigit() and int(raw_memory_id) > 0:
+        memory_id = int(raw_memory_id)
+
+    if action in ("reinforce", "update", "conflict", "archive") and memory_id is None:
+        return None
 
     return {
         "action": action,
@@ -199,46 +230,30 @@ def parse_memory_decision(reasoning_text):
         "tag": _field(block, "tag", category)[:30],
         "keyword": _field(block, "keyword", "")[:50],
         "summary": summary,
+        "memory_id": memory_id,
     }
 
+
 def parse_memory_decision_traced(reasoning_text):
-    """
-    parse_memory_decision 的诊断包装版，专供 Developer Panel 的 Trace Collector 使用。
-    不改动 parse_memory_decision 本身的行为或既有呼叫端（brain.py 主流程仍用原函数），
-    这个函数只是在外面多做一层"为什么失败"的判断，回传结构固定为：
-
-        {"decision": dict 或 None, "status": "passed"/"failed", "reason": 字符串}
-
-    reason 只在 status 是 failed 时有意义，用来在 Developer Panel 的 Parser Section 里
-    显示具体卡在哪一步（找不到标签 / 缺少收尾标签 / worth_remembering 是 no / 字段缺失等）。
-    """
+    """诊断包装：返回固定的解析状态与失败原因。"""
     if not reasoning_text:
         return {"decision": None, "status": "failed", "reason": "reasoning 为空"}
 
-    has_open = "[MEMORY_DECISION]" in reasoning_text
-    has_close = "[/MEMORY_DECISION]" in reasoning_text
+    block = _memory_decision_block(reasoning_text)
+    if block is None:
+        return {"decision": None, "status": "failed", "reason": "未找到完整 [MEMORY_DECISION] 区块"}
 
-    if not has_open:
-        return {"decision": None, "status": "failed", "reason": "未找到 [MEMORY_DECISION] 開頭標籤"}
-    if not has_close:
-        return {"decision": None, "status": "failed", "reason": "缺少 [/MEMORY_DECISION] 結尾標籤，區塊未閉合"}
-
-    match = re.search(r"\[MEMORY_DECISION\](.*?)\[/MEMORY_DECISION\]", reasoning_text, re.S)
-    if not match:
-        return {"decision": None, "status": "failed", "reason": "標籤存在但區塊格式無法解析"}
-
-    block = match.group(1)
-    worth = _field(block, "worth_remembering", "no").lower().startswith("y")
+    worth = _field(block, "worth_remembering", "no").lower().startswith(("y", "是"))
     if not worth:
-        return {"decision": None, "status": "passed", "reason": "worth_remembering: no（本輪判定不值得記）"}
+        return {"decision": None, "status": "passed", "reason": "worth_remembering: no（本轮判定不值得记）"}
 
     summary = _field(block, "summary", "")
     if not summary:
-        return {"decision": None, "status": "failed", "reason": "worth_remembering 是 yes，但缺少 summary 欄位"}
+        return {"decision": None, "status": "failed", "reason": "worth_remembering 是 yes，但缺少 summary 字段"}
 
     decision = parse_memory_decision(reasoning_text)
     if not decision:
-        return {"decision": None, "status": "failed", "reason": "欄位存在但未通過 parse_memory_decision 的驗證（可能 importance<=1）"}
+        return {"decision": None, "status": "failed", "reason": "字段未通过 memory decision 验证"}
 
     return {"decision": decision, "status": "passed", "reason": None}
 

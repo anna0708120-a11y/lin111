@@ -13,23 +13,51 @@ except ImportError:
     # 本地没装 python-dotenv 也没关系，Railway 上环境变量是平台直接注入的
     pass
 
-# ---- DeepSeek ----
-# .env 或 Railway 的环境变量里填 DEEPSEEK_API_KEY，这里留空
+# ---- 主聊天模型 Provider Routing ----
+# DeepSeek 主聊天默认走官方 API；GPT / Claude 可选模型继续走 A6API。
+# Groq Memory Detector 使用独立配置，不经过这个 routing。
+MAIN_LLM_API_KEY = os.getenv("A6API_API_KEY", "")
+MAIN_LLM_BASE_URL = os.getenv("A6API_BASE_URL", "https://api.a6api.com/v1")
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
-# deepseek-chat / deepseek-reasoner 这两个旧名字会在 2026/07/24 下线，
-# 新名字是 deepseek-v4-flash（快、便宜）和 deepseek-v4-pro（更强的推理/agent能力）
-DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-v4-flash")
 DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
-# thinking mode：开了之后回应会带独立的 reasoning_content（真思考），不用再靠prompt装格式
-DEEPSEEK_REASONING_EFFORT = os.getenv("DEEPSEEK_REASONING_EFFORT", "high")
-# thinking mode 的思考内容也算在这个token数里，调太小思考会被截断
-DEEPSEEK_MAX_TOKENS = int(os.getenv("DEEPSEEK_MAX_TOKENS", 1200))
-# 真的 thinking mode（不是靠prompt装格式），"high"比较平衡，"max"更慢更贵
-DEEPSEEK_REASONING_EFFORT = os.getenv("DEEPSEEK_REASONING_EFFORT", "high")
-# thinking mode 的输出包含推理+正文一起算token，180太容易被截断，调高一点
-DEEPSEEK_MAX_TOKENS = int(os.getenv("DEEPSEEK_MAX_TOKENS", 1200))
+DEFAULT_PROVIDER = os.getenv("DEFAULT_PROVIDER", "deepseek").lower()
+DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "deepseek-v4-flash")
+MAIN_LLM_REASONING_EFFORT = os.getenv("MAIN_LLM_REASONING_EFFORT", "high")
+MAIN_LLM_TIMEOUT = int(os.getenv("MAIN_LLM_TIMEOUT", "45"))
+MAIN_LLM_MAX_TOKENS = int(os.getenv("MAIN_LLM_MAX_TOKENS", "1200"))
 
-# ---- Bark 推送 ----
+# Provider alias 是后续 UI 的稳定接口；实际 model ID 只在配置层维护。
+PROVIDER_MODELS = {
+    "gpt": os.getenv("GPT_MODEL", "gpt-5.6-terra"),
+    "claude": os.getenv("CLAUDE_MODEL", "claude-sonnet-5"),
+    "deepseek": os.getenv("DEEPSEEK_MODEL", "deepseek-v4-flash"),
+}
+
+# 支持的模型目录，不被 brain.py 直接引用。
+MODEL_CATALOG = {
+    "gpt-5.6-terra": "gpt",
+    "gpt-5.6-luna": "gpt",
+    "gpt-5.4-mini": "gpt",
+    "claude-sonnet-5": "claude",
+    "claude-haiku-4-5": "claude",
+    "deepseek-v4-flash": "deepseek",
+}
+
+MAIN_PROVIDERS = {
+    "gpt": {"capabilities": {"chat": True, "streaming": True, "reasoning": True, "structured_output": True, "tool_calling": False}},
+    "claude": {"capabilities": {"chat": True, "streaming": True, "reasoning": True, "structured_output": True, "tool_calling": False}},
+    "deepseek": {"capabilities": {"chat": True, "streaming": True, "reasoning": True, "structured_output": True, "tool_calling": False}},
+}
+
+# 旧 DeepSeek client 的兼容配置；主聊天已由 main_router 负责。
+DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-v4-flash")
+DEEPSEEK_REASONING_EFFORT = MAIN_LLM_REASONING_EFFORT
+DEEPSEEK_MAX_TOKENS = MAIN_LLM_MAX_TOKENS
+
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+GROQ_BASE_URL = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
+GROQ_MEMORY_MODEL = os.getenv("GROQ_MEMORY_MODEL", "openai/gpt-oss-20b")
+
 # 想同时推给手机+电脑，就在 Render 环境变量填 BARK_KEYS，两个key用逗号隔开，
 # 例如：BARK_KEYS=手机的key,电脑的key
 # 只填一个也没关系，旧的 BARK_KEY 变量还继续有效。
@@ -101,16 +129,12 @@ CALENDAR_CACHE_MINUTES = int(os.getenv("CALENDAR_CACHE_MINUTES", 15))
 # ---- Supabase Storage 图片桶名字 ----
 PHOTO_BUCKET = os.getenv("PHOTO_BUCKET", "photos")
 
-
-
-
-
-# ---- ElevenLabs 语⾳（免费额度，非商⽤，⽤现成⾳⾊不是克隆）----
+# ---- ElevenLabs 语音（免费额度，非商用，用现成音色不是克隆）----
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "")
-# 去 ElevenLabs ⽹站的 Voice Library 挑⼀个⾳⾊，⽹址或后台能看到 voice_id，填这⾥
+# 去 ElevenLabs 网站的 Voice Library 挑一个音色，网址或后台能看到 voice_id，填这里
 ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "")
 ELEVENLABS_MODEL = os.getenv("ELEVENLABS_MODEL", "eleven_multilingual_v2")
-# 免费额度只有10,000字/⽉，单条message别送太⻓，超过这个⻓度直接拒绝，避免⼀条訊息就把额度花光
+# 免费额度只有10,000字/月，单条message别送太长，超过这个长度直接拒绝，避免一条訊息就把额度花光
 TTS_MAX_CHARS = int(os.getenv("TTS_MAX_CHARS", 200))
-# Supabase Storage 放语⾳档的桶名字
+# Supabase Storage 放语音档的桶名字
 VOICE_BUCKET = os.getenv("VOICE_BUCKET", "voices")

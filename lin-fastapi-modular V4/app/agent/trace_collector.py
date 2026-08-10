@@ -102,7 +102,6 @@ class TraceCollector:
         norm = self._norm(status)
         summary = "Reasoning received" if norm == "success" else "Reasoning unavailable"
         event = self.timeline.emit("reasoning", _MEMORY_TYPE, norm, summary=summary, payload={
-            "reasoning_text": reasoning_text,
             "length": len(reasoning_text) if reasoning_text else 0,
         })
         return self.timeline.to_sse(event)

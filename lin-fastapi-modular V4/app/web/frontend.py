@@ -16,6 +16,7 @@ HTML_CONTENT = """<!DOCTYPE html>
 <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
 <title>Lin</title>
 <script>
+window.LinChatPolicy = window.LinChatPolicy || { showThinking: false };
 (function(){
   try{
     var t=localStorage.getItem('lin_theme');
@@ -26,6 +27,31 @@ HTML_CONTENT = """<!DOCTYPE html>
     if(m) m.setAttribute('content', mode==='dark' ? '#000000' : '#C9897A');
   }catch(e){}
 })();
+
+let voiceLoadingIdx=null;
+const CK='lin_audio_urls';
+async function playVoice(idx){
+  console.log('[TTS] playVoice clicked, idx:', idx);
+  const m=chatMemoryCache[idx];
+  if(!m||m.r!=='lin')return;
+  if(m.audioUrl){
+    new Audio(m.audioUrl).play().catch(()=>{});
+    return;
+  }
+  voiceLoadingIdx=idx;
+  try{
+    const r=await fetch(AU+'/tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:m.t})});
+    const d=await r.json();
+    if(d.url){
+      m.audioUrl=d.url;
+      try{const c=JSON.parse(localStorage.getItem(CK)||'{}');c[m.message_id||m.t]=d.url;localStorage.setItem(CK,JSON.stringify(c));}catch(e){}
+      new Audio(d.url).play().catch(()=>{});
+    }
+  }catch(e){}
+  voiceLoadingIdx=null;
+}
+
+window.playVoice = playVoice;
 
 // 页面加载完成后,如果当前在Mine tab,立即加载经期数据
 document.addEventListener('DOMContentLoaded', () => {
@@ -389,7 +415,7 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 .maw{display:flex;flex-direction:column;gap:8px;margin-top:12px;}
 .msel,.minp{border:1.5px solid var(--border);border-radius:10px;padding:8px 12px;font-size:13px;font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);outline:none;}
 .minp{resize:none;min-height:72px;}
-.msel:focus,.minp:focus{border-color:var(--rose);}
+.model-selector-current{font-size:14px;color:var(--dark);margin:8px 0 10px}.model-selector-current span{color:var(--rose-deep);font-weight:600}.model-selector-status{font-size:11px;color:var(--muted);min-height:16px;margin-top:6px}
 .msave{background:var(--rose);color:white;border:none;border-radius:10px;padding:10px;font-size:13px;font-weight:600;cursor:pointer;}
 .cms{flex:1;overflow-y:auto;padding:16px 16px 8px;-webkit-overflow-scrolling:touch;position:relative;transition:opacity .15s ease;}
 .cms.fading{opacity:0;}
@@ -556,37 +582,15 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
   .ci { font-size: 13px !important; }
 }
 
-/* Agent Activity Timeline —— 吸附在每則 Lin 回覆下方，展示「AI 現在正在做什麼」，不是浮動 widget。 */
-.dt-slot:empty{display:none;}
-.at-root{margin:6px 0 4px 44px;max-width:calc(100% - 60px);font-family:'DM Sans',sans-serif;font-size:12px;border:1px solid var(--border);border-radius:10px;background:var(--white);overflow:hidden;}
-.at-header{display:flex;align-items:center;gap:6px;padding:6px 10px;cursor:pointer;user-select:none;min-height:20px;}
-.at-header-icon{display:flex;color:var(--muted);flex-shrink:0;}
-.at-header-text{flex:1;color:var(--muted);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color .2s ease;}
-.at-header-chevron{display:flex;color:var(--muted);flex-shrink:0;transition:transform .25s cubic-bezier(.4,0,.2,1);}
-.at-expanded .at-header-chevron{transform:rotate(90deg);}
-.at-body-wrap{max-height:0;overflow:hidden;opacity:0;transform:translateY(-4px);transition:max-height .24s cubic-bezier(.4,0,.2,1),opacity .22s ease,transform .22s cubic-bezier(.4,0,.2,1);}
-.at-expanded .at-body-wrap{opacity:1;transform:translateY(0);}
-.at-body{padding:6px 10px 8px;border-top:1px solid var(--border);max-height:360px;overflow-y:auto;}
-.at-status-success{color:#2E9E5B;}
-.at-status-failed{color:#D64545;}
-.at-status-running{color:#3B7DD8;}
-.at-status-skipped,.at-status-not_executed,.at-status-unknown{color:var(--muted);}
-.at-spin{animation:atSpin 0.9s linear infinite;}
-@keyframes atSpin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
-
-/* Timeline：左側時間軸 rail + 右側 icon + 一句話 summary，不展開細節、不顯示 JSON */
-.at-timeline{display:flex;flex-direction:column;}
-.at-node{display:flex;gap:8px;}
-.at-node-rail{display:flex;flex-direction:column;align-items:center;width:14px;flex-shrink:0;}
-.at-node-dot{display:flex;align-items:center;justify-content:center;width:14px;height:14px;flex-shrink:0;}
-.at-node-line{width:1px;flex:1;background:var(--border);margin:2px 0;min-height:10px;}
-.at-node-main{flex:1;min-width:0;display:flex;align-items:center;gap:6px;padding-bottom:8px;overflow:hidden;}
-.at-node-type-icon{display:flex;color:var(--muted);flex-shrink:0;}
-.at-node-summary-wrap{flex:1;min-width:0;overflow:hidden;transition:opacity .16s ease,transform .16s ease;}
-.at-node-summary-wrap.at-rotate-out{opacity:0;transform:translateX(-6px);}
-.at-node-summary-wrap.at-rotate-in{opacity:0;transform:translateX(6px);animation:atFadeIn .22s ease forwards;}
-@keyframes atFadeIn{to{opacity:1;transform:translateX(0);}}
-.at-node-summary{color:var(--dark);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;}
+/* Agent panel: the only Agent lifecycle surface, rendered before the assistant reply. */
+.agent-panel-slot:empty{display:none;}
+.agent-panel{margin:0 0 6px 32px;max-width:calc(100% - 44px);border:1px solid var(--border);border-radius:8px;background:var(--white);overflow:hidden;box-shadow:0 1px 5px var(--shadow);}
+.agent-panel-header{width:100%;min-height:30px;padding:6px 9px;border:0;background:transparent;color:var(--dark);display:flex;align-items:center;gap:7px;text-align:left;cursor:pointer;font:11px 'DM Sans',sans-serif;}
+.agent-status,.agent-step-dot{width:7px;height:7px;border-radius:50%;flex:0 0 auto;background:var(--muted);}.agent-status.agent-running,.agent-step.agent-running .agent-step-dot{background:#b47b27;animation:agentPulse 1s ease-in-out infinite;}.agent-status.agent-success,.agent-step.agent-success .agent-step-dot{background:#4f9662;}.agent-status.agent-failed,.agent-step.agent-failed .agent-step-dot{background:#bd5b59;}.agent-status.agent-skipped,.agent-step.agent-skipped .agent-step-dot,.agent-status.agent-not_executed,.agent-step.agent-not_executed .agent-step-dot{background:var(--muted);}
+.agent-panel-title{font-weight:600;color:var(--rose-deep);}.agent-panel-summary{flex:1;min-width:0;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.agent-panel-count{font:10px ui-monospace,monospace;color:var(--muted);}.agent-panel-chevron{font-size:16px;line-height:1;color:var(--muted);transition:transform .2s ease;}.agent-panel-expanded .agent-panel-chevron{transform:rotate(180deg);}
+.agent-panel-body{display:none;border-top:1px solid var(--border);padding:4px 8px 7px;}.agent-panel-expanded .agent-panel-body{display:block;}.agent-step{border-radius:5px;}.agent-step-header{width:100%;border:0;background:transparent;display:flex;align-items:center;gap:7px;padding:6px 2px;color:var(--dark);cursor:pointer;text-align:left;font:11px 'DM Sans',sans-serif;}.agent-step-label{font-weight:500;}.agent-step-state{margin-left:auto;font-size:10px;color:var(--muted);text-transform:capitalize;}.agent-step-chevron{font-size:13px;color:var(--muted);transition:transform .2s ease;}.agent-step-detail{display:none;margin:0 0 5px 16px;padding:7px;background:var(--blush);border-radius:5px;color:var(--muted);font:10px/1.5 ui-monospace,monospace;white-space:pre-wrap;overflow-wrap:anywhere;}.agent-step-expanded .agent-step-detail{display:block;}.agent-step-expanded .agent-step-chevron{transform:rotate(180deg);}@keyframes agentPulse{0%,100%{opacity:.45;}50%{opacity:1;}}
+.voice-btn{cursor:pointer;margin-right:6px;opacity:.8;}
+.voice-btn:active{opacity:1;}
 </style>
 </head>
 <body>
@@ -680,16 +684,16 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
             <div class="intimacy-hero-bg" id="intimacyCycleBg"></div>
             <div style="position:relative;">
               <div class="intimacy-status-label">周期</div>
-              <div class="intimacy-status-value" id="cycleStage">平穩期</div>
-              <div class="intimacy-status-time" id="cycleDuration">68h 11m</div>
+              <div class="intimacy-status-value" id="cycleStage">載入中...</div>
+              <div class="intimacy-status-time" id="cycleDuration">—</div>
             </div>
           </div>
           <div class="intimacy-status-card" style="flex:0 0 calc(40% - 5px);cursor:pointer;position:relative;overflow:hidden;" onclick="document.getElementById('intimacyEventBgUpload').click()">
             <div class="intimacy-hero-bg" id="intimacyEventBg"></div>
             <div style="position:relative;">
               <div class="intimacy-status-label">事件</div>
-              <div class="intimacy-status-value" id="eventName">等待焦躁</div>
-              <div class="intimacy-status-time" id="eventDuration">2h 32m</div>
+              <div class="intimacy-status-value" id="eventName">載入中...</div>
+              <div class="intimacy-status-time" id="eventDuration">—</div>
             </div>
           </div>
         </div>
@@ -697,7 +701,7 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
         <!-- 自動變化 -->
         <div class="intimacy-auto-change">
           <div class="intimacy-auto-change-title">自動變化</div>
-          <div class="intimacy-auto-change-text" id="autoChangeDesc">平穩期基線：熱度 30 -1.4/h，壓抑 25 -1.7/h，控制 75 +1/h，敏感 35 -1.7/h，蓄積 +0.4/h，占有 42 -3.7/h，疲惫 16 -1.2/h</div>
+          <div class="intimacy-auto-change-text" id="autoChangeDesc">載入中...</div>
         </div>
 
         <!-- 數值區塊 -->
@@ -710,14 +714,14 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
               </div>
               <div class="intimacy-bar-label">蓄積感</div>
               <div class="intimacy-bar-value">
-                <span id="tensionVal">85</span>
-                <span class="intimacy-bar-level" id="tensionLevel">高</span>
+                <span id="tensionVal">—</span>
+                <span class="intimacy-bar-level" id="tensionLevel">載入中</span>
               </div>
             </div>
             <div class="intimacy-bar-track">
-              <div class="intimacy-bar-fill" id="tensionBar" style="width:85%"></div>
+              <div class="intimacy-bar-fill" id="tensionBar" style="width:0%"></div>
             </div>
-            <div class="intimacy-bar-desc" id="tensionDesc">累積到頂，普通克制已經很難壓住</div>
+            <div class="intimacy-bar-desc" id="tensionDesc">載入中...</div>
           </div>
           
           <!-- 熱度 -->
@@ -728,14 +732,14 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
               </div>
               <div class="intimacy-bar-label">熱度</div>
               <div class="intimacy-bar-value">
-                <span id="heatVal">38</span>
-                <span class="intimacy-bar-level" id="heatLevel">中低</span>
+                <span id="heatVal">—</span>
+                <span class="intimacy-bar-level" id="heatLevel">載入中</span>
               </div>
             </div>
             <div class="intimacy-bar-track">
-              <div class="intimacy-bar-fill" id="heatBar" style="width:38%"></div>
+              <div class="intimacy-bar-fill" id="heatBar" style="width:0%"></div>
             </div>
-            <div class="intimacy-bar-desc" id="heatDesc">身體有一點熱意，但還能很快冷住</div>
+            <div class="intimacy-bar-desc" id="heatDesc">載入中...</div>
           </div>
           
           <!-- 敏感度 -->
@@ -746,14 +750,14 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
               </div>
               <div class="intimacy-bar-label">敏感度</div>
               <div class="intimacy-bar-value">
-                <span id="sensitivityVal">37</span>
-                <span class="intimacy-bar-level" id="sensitivityLevel">中低</span>
+                <span id="sensitivityVal">—</span>
+                <span class="intimacy-bar-level" id="sensitivityLevel">載入中</span>
               </div>
             </div>
             <div class="intimacy-bar-track">
-              <div class="intimacy-bar-fill" id="sensitivityBar" style="width:37%"></div>
+              <div class="intimacy-bar-fill" id="sensitivityBar" style="width:0%"></div>
             </div>
-            <div class="intimacy-bar-desc" id="sensitivityDesc">有一點沒說出口的念，但還不重</div>
+            <div class="intimacy-bar-desc" id="sensitivityDesc">載入中...</div>
           </div>
           
           <!-- 控制力 -->
@@ -764,14 +768,14 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
               </div>
               <div class="intimacy-bar-label">控制力</div>
               <div class="intimacy-bar-value">
-                <span id="controlVal">69</span>
-                <span class="intimacy-bar-level" id="controlLevel">中高</span>
+                <span id="controlVal">—</span>
+                <span class="intimacy-bar-level" id="controlLevel">載入中</span>
               </div>
             </div>
             <div class="intimacy-bar-track">
-              <div class="intimacy-bar-fill" id="controlBar" style="width:69%"></div>
+              <div class="intimacy-bar-fill" id="controlBar" style="width:0%"></div>
             </div>
-            <div class="intimacy-bar-desc" id="controlDesc">還能維持表面正常，但需要刻意壓直接的衝動</div>
+            <div class="intimacy-bar-desc" id="controlDesc">載入中...</div>
           </div>
         </div>
       </div>
@@ -914,10 +918,17 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
       </button>
     </div>
   </div>
+
+  <!-- 模型设置 -->
+  <div class="card model-selector-card" style="max-width: 60%; margin-left: auto; margin-right: auto;">
+    <div class="cl">模型切换</div>
+    <div class="model-selector-current">当前模型：<span id="current-model-label">DeepSeek V4 Flash</span></div>
+    <select id="main-model-select" class="msel" onchange="updateMainModel()" aria-label="选择聊天模型"></select>
+    <div id="main-model-status" class="model-selector-status" aria-live="polite"></div>
+  </div>
 </div>
 
-<div class="tab-bar">
-  <button class="tb active" id="tb-monitor" onclick="stab('monitor')"><span class="ti">🏠</span>Home</button>
+<div class="tab-bar">  <button class="tb active" id="tb-monitor" onclick="stab('monitor')"><span class="ti">🏠</span>Home</button>
   <button class="tb" id="tb-chat" onclick="stab('chat')"><span class="ti">💬</span>Chat</button>
   <button class="tb" id="tb-memory" onclick="stab('memory')"><span class="ti">🧠</span>Memory</button>
   <button class="tb" id="tb-mine" onclick="stab('mine')"><span class="ti">🌙</span>Mine</button>
@@ -1078,42 +1089,38 @@ function switchIntimacyTab(tab){
   if(tab==='events' && !eventsLoaded){ loadEventTimeline(); eventsLoaded=true; }
 }
 
-/* ===== 事件日誌（V3 架構預留，假資料） ===== */
+/* ===== 事件日誌（後端真實資料） ===== */
 let eventsLoaded=false;
 let eventsFilter='all';
-const MOCK_EVENTS=[
-  {type:'cycle', title:'進入平穩期', desc:'熱度與敏感度逐漸回落，控制力緩慢回升。', time:'今天 08:12'},
-  {type:'event', title:'等待焦躁', desc:'持續 2 小時未收到訊息，占有欲小幅上升。', time:'今天 10:44'},
-  {type:'dream', title:'夢境片段', desc:'夢到與妳在雨中散步，醒來後蓄積感 +5。', time:'今天 06:30'},
-  {type:'settlement', title:'每日結算', desc:'昨日互動次數 12 次，親密度 +3。', time:'昨天 23:59'},
-  {type:'cycle', title:'結束高峰期', desc:'熱度從 78 回落至 52，進入緩和階段。', time:'昨天 20:15'},
-  {type:'event', title:'突然的想念', desc:'蓄積感短時間內 +8，敏感度同步上升。', time:'昨天 15:02'}
-];
+let loadedEvents=[];
 
 function filterEvents(type){
   eventsFilter=type;
   document.querySelectorAll('.event-filter-chip').forEach(c=>{
     c.classList.toggle('active', c.getAttribute('data-filter')===type);
   });
-  renderEventTimeline();
+  renderEventTimeline(loadedEvents);
 }
 
 async function loadEventTimeline(){
   const wrap=document.getElementById('eventTimeline');
   try{
     const r=await fetch(AU+'/intimacy/events');
+    if(!r.ok) throw new Error('event timeline request failed');
     const d=await r.json();
-    renderEventTimeline(Array.isArray(d)?d:d.events);
+    loadedEvents = Array.isArray(d) ? d : (d.events || []);
+    renderEventTimeline(loadedEvents);
   }catch(e){
-    // API 尚未提供事件日誌時，先用假資料呈現版面
-    renderEventTimeline(MOCK_EVENTS);
+    console.error('[loadEventTimeline]', e);
+    loadedEvents=[];
+    if(wrap) wrap.innerHTML='<div class="es">事件資料暫時無法載入</div>';
   }
 }
 
 function renderEventTimeline(list){
   const wrap=document.getElementById('eventTimeline');
   if(!wrap) return;
-  const data = list || MOCK_EVENTS;
+  const data = Array.isArray(list) ? list : [];
   const filtered = eventsFilter==='all' ? data : data.filter(e=>e.type===eventsFilter);
   if(!filtered.length){
     wrap.innerHTML='<div class="es">目前沒有符合的事件</div>';
@@ -1124,9 +1131,8 @@ function renderEventTimeline(list){
       '<div class="event-item-dot"></div>'+
       '<div class="event-item-body">'+
         '<div class="event-item-title">'+e.title+'</div>'+
-        '<div class="event-item-desc">'+e.desc+'</div>'+
-        '<div class="event-item-time">'+e.time+'</div>'+
-        (e.type==='settlement' ? '<div class="event-item-action" onclick="showSettlementDetail(this)">查看結算詳情</div>' : '')+
+        '<div class="event-item-desc">'+(e.detail_text || e.desc || '')+'</div>'+
+        '<div class="event-item-time">'+(e.timestamp || e.time || '')+'</div>'+
       '</div>'+
     '</div>'
   ).join('');
@@ -1193,19 +1199,34 @@ function renderIntimacy(d){
     if(descEl) descEl.textContent = desc;
   });
   
-  // 周期資訊 - 時間格式改為 68h 11m
+  // 周期資訊：完全使用後端狀態，不在前端推導時間。
   if(d.cycle){
     const cycleEl = document.getElementById('cycleStage');
     const durationEl = document.getElementById('cycleDuration');
-    if(cycleEl) cycleEl.textContent = d.cycle.label || '平穩期';
-    if(durationEl){
-      const hours = d.cycle.hours_elapsed || 0;
-      const h = Math.floor(hours);
-      const m = Math.floor((hours % 1) * 60);
-      durationEl.textContent = h + 'h ' + m + 'm';
-    }
+    if(cycleEl) cycleEl.textContent = d.cycle.label || '未初始化';
+    if(durationEl) durationEl.textContent = d.cycle.remaining_text || '—';
   }
-  
+
+  // 當前事件與餘波都由後端提供；沒有 active event 時才展示最接近到期的餘波。
+  const eventEl = document.getElementById('eventName');
+  const eventDurationEl = document.getElementById('eventDuration');
+  const activeEvent = d.active_event;
+  const afterEffects = Array.isArray(d.after_effects) ? d.after_effects : [];
+  const visibleEffect = afterEffects[0];
+  if(activeEvent){
+    if(eventEl) eventEl.textContent = activeEvent.label;
+    if(eventDurationEl) eventDurationEl.textContent = activeEvent.remaining_text || '—';
+    if(eventEl) eventEl.title = activeEvent.description || '';
+  }else if(visibleEffect){
+    if(eventEl) eventEl.textContent = '餘波';
+    if(eventDurationEl) eventDurationEl.textContent = visibleEffect.remaining_text || '—';
+    if(eventEl) eventEl.title = visibleEffect.description || '';
+  }else{
+    if(eventEl) eventEl.textContent = '無';
+    if(eventDurationEl) eventDurationEl.textContent = '目前沒有短期事件';
+    if(eventEl) eventEl.title = '';
+  }
+
   // 自動變化描述
   if(d.auto_change_desc){
     const autoEl = document.getElementById('autoChangeDesc');
@@ -1312,10 +1333,10 @@ function stab(tab){
     setTimeout(()=>{const c=document.getElementById('cm');c.scrollTop=c.scrollHeight;},50);
     if(!sessionManager.currentSessionId && sessionManager.sessions.length === 0){sidebar.handleNewChat();}
   }
-  else{pg.style.display='block';pg.classList.add('active');if(tab==='memory')rmem();if(tab==='monitor')loadMood();if(tab==='mine'){loadPeriod();loadChatConfig();loadTogetherDays();}}
+  else{pg.style.display='block';pg.classList.add('active');if(tab==='memory')rmem();if(tab==='monitor')loadMood();if(tab==='mine'){loadPeriod();loadChatConfig();loadMainModelConfig();loadTogetherDays();}}
 }
 // 页面加载时如果是Mine tab,立即展开
-if(document.getElementById('pg-mine')?.classList.contains('active')){loadPeriod();loadChatConfig();}
+if(document.getElementById('pg-mine')?.classList.contains('active')){loadPeriod();loadChatConfig();loadMainModelConfig();}
 loadTogetherDays(); // 页面加载时初始化在一起日子
 
 function toggleThink(el){
@@ -1362,14 +1383,17 @@ function addVoiceButtons(){
   document.querySelectorAll('#cm .msg.lin').forEach(el=>{
     const meta=el.querySelector('.mtime2');
     if(!meta||meta.querySelector('.voice-btn'))return;
-    const slot=el.querySelector('.dt-slot');
-    const mid=slot?slot.dataset.messageId:null;
-    const idx=chatMemoryCache.findIndex(m=>m.r==='lin'&&(!mid||m.message_id==mid));
+    const idx=chatMemoryCache.findIndex(m=>m.r==='lin'&&m.t===el.querySelector('.bub')?.textContent);
     if(idx<0)return;
     const btn=document.createElement('button');
     btn.className='voice-btn';
     btn.textContent='🔊';
-    btn.onclick=e=>{e.stopPropagation();playVoice(idx);};
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('[TTS] voice button clicked, idx:', idx);
+      window.playVoice(idx);
+    });
     meta.prepend(btn);
   });
 }
@@ -1395,8 +1419,9 @@ function renderOnly(history){
       iso: iso,
       time: display,
       think: m.thinking || m.think,
+      trace: m.trace,
       message_id: m.message_id,
-      trace: m.trace
+      model: m.trace && m.trace.model ? modelDisplayName(m.trace.model.model) : undefined
     };
   });
   chatMemoryCache = serverMessages;
@@ -1555,28 +1580,64 @@ async function confirmImageSend() {
     let reasoningBuffer = '';
     let contentBuffer = '';
     let currentMsgDiv = null;
-    let thinkDiv = null;
-    let currentDevTrace = null;
+    let liveAssistantEntry = null;
+    let activeModelLabel = '';
+    const currentDeveloper = window.AgentPanel ? window.AgentPanel.create(document.getElementById('cm')) : null;
+    if (currentDeveloper) currentDeveloper.ingest(window.AgentPanel.fromSse('api_start', {model: 'watch', input: 'image'}));
     let currentEvent = null;
     let sseBuffer = '';
     
     typing(false);
+
+    function ensureLiveAssistantMessage() {
+      if (currentMsgDiv) return currentMsgDiv.closest('.msg.lin');
+
+      const msgDiv = document.createElement('div');
+      msgDiv.className = 'msg lin';
+      const rowDiv = document.createElement('div');
+      rowDiv.className = 'msg-row';
+      rowDiv.innerHTML = avatarHtml('lin');
+      const bubDiv = document.createElement('div');
+      bubDiv.className = 'bub';
+      rowDiv.appendChild(bubDiv);
+      msgDiv.appendChild(rowDiv);
+      document.getElementById('cm').appendChild(msgDiv);
+
+      currentMsgDiv = bubDiv;
+      liveAssistantEntry = {
+        r: 'lin',
+        t: '',
+        time: ts(),
+        iso: new Date().toISOString(),
+        message_id: 'live-' + Date.now(),
+        model: activeModelLabel || undefined
+      };
+      chatMemoryCache.push(liveAssistantEntry);
+      return msgDiv;
+    }
     
     function processChunk({done, value}) {
       if (done) {
-        if(contentBuffer){
-          const entry = {
+        if (currentDeveloper) currentDeveloper.complete();
+        if (liveAssistantEntry) {
+          liveAssistantEntry.t = contentBuffer;
+          if (reasoningBuffer) liveAssistantEntry.think = reasoningBuffer;
+          if (currentDeveloper) liveAssistantEntry.trace = currentDeveloper.snapshot();
+        } else if (contentBuffer) {
+          chatMemoryCache.push({
             r: 'lin',
             t: contentBuffer,
             time: ts(),
-            iso: new Date().toISOString()
-          };
-          if(reasoningBuffer) entry.think = reasoningBuffer;
-          if(currentDevTrace && currentDevTrace.lastPayload) entry.trace = currentDevTrace.lastPayload;
-          chatMemoryCache.push(entry);
-          if(chatMemoryCache.length > 200) chatMemoryCache = chatMemoryCache.slice(-200);
+            iso: new Date().toISOString(),
+            message_id: 'live-' + Date.now(),
+            think: reasoningBuffer || undefined,
+            trace: currentDeveloper ? currentDeveloper.snapshot() : undefined
+          });
+        }
+        if (contentBuffer || liveAssistantEntry) {
           syncChat().catch(e => console.error('[DEBUG] Failed to sync image chat:', e));
         }
+        if(document.getElementById('tb-memory')?.classList.contains('active')) rmem();
         scrollDown();
         pendingImageDataUrl = null;
         return;
@@ -1600,56 +1661,20 @@ async function confirmImageSend() {
             const data = JSON.parse(line.slice(6));
             
             if (currentEvent === 'reasoning' && data.content !== undefined) {
+              if (currentDeveloper) currentDeveloper.ingest(window.AgentPanel.fromSse('reasoning', data));
               reasoningBuffer += data.content;
-              
-              if (!thinkDiv) {
-                const msgDiv = document.createElement('div');
-                msgDiv.className = 'msg lin';
-                
-                thinkDiv = document.createElement('div');
-                thinkDiv.className = 'think-box';
-                thinkDiv.textContent = reasoningBuffer;
-                
-                const toggle = document.createElement('div');
-                toggle.className = 'think-toggle';
-                toggle.innerHTML = '💭 思考過程';
-                toggle.onclick = () => {
-                  thinkDiv.style.display = thinkDiv.style.display==='none'?'block':'none';
-                };
-                
-                msgDiv.appendChild(toggle);
-                msgDiv.appendChild(thinkDiv);
-                document.getElementById('cm').appendChild(msgDiv);
-              } else {
-                thinkDiv.textContent = reasoningBuffer;
-              }
               scrollDown();
             }
             
             else if (currentEvent === 'content' && data.delta !== undefined) {
+              if (currentDeveloper) currentDeveloper.ingest(window.AgentPanel.fromSse('content', data));
               contentBuffer += data.delta;
               
               if (!currentMsgDiv) {
-                const msgDiv = document.createElement('div');
-                msgDiv.className = 'msg lin';
-                
-                const rowDiv = document.createElement('div');
-                rowDiv.className = 'msg-row';
-                rowDiv.innerHTML = avatarHtml('lin');
-                
-                const bubDiv = document.createElement('div');
-                bubDiv.className = 'bub';
-                bubDiv.textContent = contentBuffer;
-                
-                rowDiv.appendChild(bubDiv);
-                msgDiv.appendChild(rowDiv);
-                document.getElementById('cm').appendChild(msgDiv);
-                console.log('[DEBUG] Content msgDiv appended to #cm');
-                
-                currentMsgDiv = bubDiv;
-              } else {
-                currentMsgDiv.textContent = contentBuffer;
+                ensureLiveAssistantMessage();
               }
+              currentMsgDiv.textContent = contentBuffer;
+              if (liveAssistantEntry) liveAssistantEntry.t = contentBuffer;
               scrollDown();
             }
             
@@ -1660,12 +1685,24 @@ async function confirmImageSend() {
               }
             }
 
+            else if (currentEvent === 'model') {
+              const modelLabel = modelDisplayName(data.model || '');
+              activeModelLabel = modelLabel;
+              if (currentDeveloper) currentDeveloper.ingest(window.AgentPanel.fromSse('model', data));
+              if (liveAssistantEntry) liveAssistantEntry.model = modelLabel;
+            }
+
             else if (currentEvent === 'agent_event') {
-              const msgLinEl = currentMsgDiv ? currentMsgDiv.closest('.msg.lin') : null;
-              if (msgLinEl) {
-                if (!currentDevTrace) currentDevTrace = window.ActivityTimeline.createForContainer(msgLinEl);
-                currentDevTrace.ingest(data);
+              if (currentDeveloper) currentDeveloper.ingest(window.AgentPanel.fromSse('agent_event', data));
+              const messageEl = ensureLiveAssistantMessage();
+              if (messageEl && currentDeveloper) {
+                liveAssistantEntry.trace = currentDeveloper.snapshot();
               }
+            }
+
+            else if (currentEvent === 'body_state') {
+              if (currentDeveloper) currentDeveloper.ingest(window.AgentPanel.fromSse('body_state', data));
+              renderIntimacy(data);
             }
             
           } catch(e) {
@@ -1714,30 +1751,64 @@ async function send(){
     let reasoningBuffer = '';
     let contentBuffer = '';
     let currentMsgDiv = null;
-    let thinkDiv = null;
-    let currentDevTrace = null;
+    let liveAssistantEntry = null;
+    let activeModelLabel = '';
+    const currentDeveloper = window.AgentPanel ? window.AgentPanel.create(document.getElementById('cm')) : null;
+    if (currentDeveloper) currentDeveloper.ingest(window.AgentPanel.fromSse('api_start', {model: 'watch'}));
     let currentEvent = null;
     let sseBuffer = '';
     
     typing(false);
+
+    function ensureLiveAssistantMessage() {
+      if (currentMsgDiv) return currentMsgDiv.closest('.msg.lin');
+
+      const msgDiv = document.createElement('div');
+      msgDiv.className = 'msg lin';
+      const rowDiv = document.createElement('div');
+      rowDiv.className = 'msg-row';
+      rowDiv.innerHTML = avatarHtml('lin');
+      const bubDiv = document.createElement('div');
+      bubDiv.className = 'bub';
+      rowDiv.appendChild(bubDiv);
+      msgDiv.appendChild(rowDiv);
+      document.getElementById('cm').appendChild(msgDiv);
+
+      currentMsgDiv = bubDiv;
+      liveAssistantEntry = {
+        r: 'lin',
+        t: '',
+        time: ts(),
+        iso: new Date().toISOString(),
+        message_id: 'live-' + Date.now(),
+        model: activeModelLabel || undefined
+      };
+      chatMemoryCache.push(liveAssistantEntry);
+      return msgDiv;
+    }
     
     function processChunk({done, value}){
-      console.log('[DEBUG] processChunk called, done:', done);
       if(done){
-        console.log('[DEBUG] Stream done. contentBuffer:', contentBuffer, 'reasoningBuffer:', reasoningBuffer);
-        if(contentBuffer){
-          const entry = {
+        if (currentDeveloper) currentDeveloper.complete();
+        if (liveAssistantEntry) {
+          liveAssistantEntry.t = contentBuffer;
+          if (reasoningBuffer) liveAssistantEntry.think = reasoningBuffer;
+          if (currentDeveloper) liveAssistantEntry.trace = currentDeveloper.snapshot();
+        } else if (contentBuffer) {
+          chatMemoryCache.push({
             r: 'lin',
             t: contentBuffer,
             time: ts(),
-            iso: new Date().toISOString()
-          };
-          if(reasoningBuffer) entry.think = reasoningBuffer;
-          if(currentDevTrace && currentDevTrace.lastPayload) entry.trace = currentDevTrace.lastPayload;
-          chatMemoryCache.push(entry);
-          if(chatMemoryCache.length > 200) chatMemoryCache = chatMemoryCache.slice(-200);
+            iso: new Date().toISOString(),
+            message_id: 'live-' + Date.now(),
+            think: reasoningBuffer || undefined,
+            trace: currentDeveloper ? currentDeveloper.snapshot() : undefined
+          });
+        }
+        if (contentBuffer || liveAssistantEntry) {
           syncChat().catch(e => console.error('[DEBUG] Failed to sync chat:', e));
         }
+        if(document.getElementById('tb-memory')?.classList.contains('active')) rmem();
         scrollDown();
         return;
       }
@@ -1760,59 +1831,20 @@ async function send(){
             const data = JSON.parse(line.slice(6));
             
             if(currentEvent === 'reasoning' && data.content !== undefined){
-              console.log('[DEBUG] ✅ REASONING event received, data.content:', data.content);
+              if (currentDeveloper) currentDeveloper.ingest(window.AgentPanel.fromSse('reasoning', data));
               reasoningBuffer += data.content;
-              
-              if(!thinkDiv){
-                console.log('[DEBUG] Creating thinking msgDiv');
-                const msgDiv = document.createElement('div');
-                msgDiv.className = 'msg lin';
-                
-                thinkDiv = document.createElement('div');
-                thinkDiv.className = 'think-box';
-                thinkDiv.textContent = reasoningBuffer;
-                
-                const toggle = document.createElement('div');
-                toggle.className = 'think-toggle';
-                toggle.innerHTML = '💭 思考過程';
-                toggle.onclick = () => {
-                  thinkDiv.style.display = thinkDiv.style.display==='none'?'block':'none';
-                };
-                
-                msgDiv.appendChild(toggle);
-                msgDiv.appendChild(thinkDiv);
-                document.getElementById('cm').appendChild(msgDiv);
-              } else {
-                thinkDiv.textContent = reasoningBuffer;
-              }
               scrollDown();
             }
             
             else if(currentEvent === 'content' && data.delta !== undefined){
-              console.log('[DEBUG] ✅ CONTENT event received, data.delta:', data.delta);
+              if (currentDeveloper) currentDeveloper.ingest(window.AgentPanel.fromSse('content', data));
               contentBuffer += data.delta;
               
               if(!currentMsgDiv){
-                console.log('[DEBUG] Creating content msgDiv');
-                const msgDiv = document.createElement('div');
-                msgDiv.className = 'msg lin';
-                
-                const rowDiv = document.createElement('div');
-                rowDiv.className = 'msg-row';
-                rowDiv.innerHTML = avatarHtml('lin');
-                
-                const bubDiv = document.createElement('div');
-                bubDiv.className = 'bub';
-                bubDiv.textContent = contentBuffer;
-                
-                rowDiv.appendChild(bubDiv);
-                msgDiv.appendChild(rowDiv);
-                document.getElementById('cm').appendChild(msgDiv);
-                
-                currentMsgDiv = bubDiv;
-              } else {
-                currentMsgDiv.textContent = contentBuffer;
+                ensureLiveAssistantMessage();
               }
+              currentMsgDiv.textContent = contentBuffer;
+              if (liveAssistantEntry) liveAssistantEntry.t = contentBuffer;
               scrollDown();
             }
             
@@ -1823,12 +1855,24 @@ async function send(){
               }
             }
 
+            else if(currentEvent === 'model') {
+              const modelLabel = modelDisplayName(data.model || '');
+              activeModelLabel = modelLabel;
+              if (currentDeveloper) currentDeveloper.ingest(window.AgentPanel.fromSse('model', data));
+              if (liveAssistantEntry) liveAssistantEntry.model = modelLabel;
+            }
+
             else if(currentEvent === 'agent_event'){
-              const msgLinEl = currentMsgDiv ? currentMsgDiv.closest('.msg.lin') : null;
-              if (msgLinEl) {
-                if (!currentDevTrace) currentDevTrace = window.ActivityTimeline.createForContainer(msgLinEl);
-                currentDevTrace.ingest(data);
+              if (currentDeveloper) currentDeveloper.ingest(window.AgentPanel.fromSse('agent_event', data));
+              const messageEl = ensureLiveAssistantMessage();
+              if (messageEl && currentDeveloper) {
+                liveAssistantEntry.trace = currentDeveloper.snapshot();
               }
+            }
+
+            else if(currentEvent === 'body_state'){
+              if (currentDeveloper) currentDeveloper.ingest(window.AgentPanel.fromSse('body_state', data));
+              renderIntimacy(data);
             }
             
           }catch(e){
@@ -2188,6 +2232,59 @@ async function updateChatLimit() {
 }
 
 
+
+async function loadMainModelConfig() {
+  try {
+    const response = await fetch(AU + '/model-config');
+    const data = await response.json();
+    const select = document.getElementById('main-model-select');
+    const label = document.getElementById('current-model-label');
+    if (!select || !label || !data.current) return;
+    select.innerHTML = (data.models || []).map(item =>
+      '<option value="' + item.model + '">' + modelDisplayName(item.model) + '</option>'
+    ).join('');
+    select.value = data.current.model;
+    label.textContent = modelDisplayName(data.current.model);
+  } catch (err) {
+    console.error('Failed to load main model config:', err);
+  }
+}
+
+function modelDisplayName(model) {
+  const labels = {
+    'gpt-5.6-terra': 'GPT-5.6 Terra',
+    'gpt-5.6-luna': 'GPT-5.6 Luna',
+    'gpt-5.4-mini': 'GPT-5.4 Mini',
+    'claude-sonnet-5': 'Claude Sonnet 5',
+    'claude-haiku-4-5': 'Claude Haiku 4.5',
+    'deepseek-v4-flash': 'DeepSeek V4 Flash'
+  };
+  return labels[model] || model;
+}
+
+async function updateMainModel() {
+  const select = document.getElementById('main-model-select');
+  const label = document.getElementById('current-model-label');
+  const status = document.getElementById('main-model-status');
+  const item = select && select.options[select.selectedIndex];
+  if (!select || !item) return;
+  try {
+    const response = await fetch(AU + '/model-config', {
+      method: 'PATCH',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({model: select.value})
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || '模型设置失败');
+    label.textContent = modelDisplayName(data.current.model);
+    status.textContent = '已保存：' + modelDisplayName(data.current.model);
+    setTimeout(() => { status.textContent = ''; }, 1800);
+  } catch (err) {
+    status.textContent = '保存失败';
+    console.error('Failed to update main model:', err);
+    loadMainModelConfig();
+  }
+}
 
 // ========== 在一起日子 ==========
 async function loadTogetherDays() {

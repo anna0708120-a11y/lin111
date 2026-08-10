@@ -380,13 +380,15 @@ def apply_event(event, level="MEDIUM", line=None):
             
             # 動態調整
             
+            # 取得當前數值（供收益遞減與動態調整使用）
+            # 規則：越接近極端（0.0 或 1.0），變化幅度越小
+            current_value = current_mood[key]
+            
             # V3: 收益遞減（Diminishing Returns）
             if key in DIMINISHING_RETURNS:
                 for rule in DIMINISHING_RETURNS[key]:
                     if current_value > rule["threshold"]:
                         adjusted_delta *= rule["multiplier"]
-            # 規則：越接近極端（0.0 或 1.0），變化幅度越小
-            current_value = current_mood[key]
             
             # 針對特定事件和 mood 組合進行動態調整
             dynamic_multiplier = 1.0

@@ -29,9 +29,12 @@ def calculate_body_state(mood: dict, cycle, body_values: dict, elapsed_hours: fl
     Returns:
         更新後的身體數值
     """
-    # 從 Mood 讀取基線影響
+    # Mood 只提供温和的目标偏移；周期仍是长期变化的主来源。
     libido_base = mood.get("libido", 0.5) * 100
     stress_penalty = mood.get("stress", 0.3) * 20
+    attachment_base = mood.get("attachment", 0.5) * 100
+    possessiveness_base = mood.get("possessiveness", 0.4) * 100
+    fatigue_penalty = mood.get("fatigue", 0.2) * 100
     
     # 從 Cycle 讀取目標與增長速率
     targets = cycle.targets
@@ -43,7 +46,7 @@ def calculate_body_state(mood: dict, cycle, body_values: dict, elapsed_hours: fl
     # tension（蓄積感）= 周期目標 + libido 加成
     new_values["tension"] = approach(
         current=body_values.get("tension", 20),
-        target=targets["tension"] + libido_base * 0.3,
+        target=targets["tension"] + libido_base * 0.3 + possessiveness_base * 0.08,
         rate=growth_rates["tension"],
         elapsed_hours=elapsed_hours
     )
@@ -51,7 +54,7 @@ def calculate_body_state(mood: dict, cycle, body_values: dict, elapsed_hours: fl
     # heat（熱度）= 周期目標 + libido 加成
     new_values["heat"] = approach(
         current=body_values.get("heat", 30),
-        target=targets["heat"] + libido_base * 0.4,
+        target=targets["heat"] + libido_base * 0.4 + attachment_base * 0.06 - fatigue_penalty * 0.08,
         rate=growth_rates["heat"],
         elapsed_hours=elapsed_hours
     )
@@ -59,7 +62,7 @@ def calculate_body_state(mood: dict, cycle, body_values: dict, elapsed_hours: fl
     # sensitivity（敏感度）= 周期目標 + libido 加成
     new_values["sensitivity"] = approach(
         current=body_values.get("sensitivity", 25),
-        target=targets["sensitivity"] + libido_base * 0.2,
+        target=targets["sensitivity"] + libido_base * 0.2 + attachment_base * 0.08,
         rate=growth_rates["sensitivity"],
         elapsed_hours=elapsed_hours
     )
@@ -67,7 +70,7 @@ def calculate_body_state(mood: dict, cycle, body_values: dict, elapsed_hours: fl
     # control（控制力）= 周期目標 - stress 懲罰
     new_values["control"] = approach(
         current=body_values.get("control", 80),
-        target=targets["control"] - stress_penalty,
+        target=targets["control"] - stress_penalty - fatigue_penalty * 0.08,
         rate=growth_rates["control"],
         elapsed_hours=elapsed_hours
     )

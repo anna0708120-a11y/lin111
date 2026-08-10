@@ -31,6 +31,7 @@ def tick_and_update(state, now: datetime):
     from app.intimacy.event_log import log_event
     from app.intimacy.after_effect import apply_after_effects, cleanup_expired_effects
     from app.intimacy.silence import detect_silence, calculate_silence_pressure
+    from app.intimacy.history import build_body_state_snapshot
     from app.intimacy.influence import apply_influence
     from app.mood.decay import apply_mood_decay
     
@@ -46,6 +47,18 @@ def tick_and_update(state, now: datetime):
             state.active_event_started_at = None
             state.active_event_expires_at = None
             state.active_after_effects = []
+        log_event(
+            event_type="cycle",
+            title=f"進入{get_current_cycle(state).label}",
+            timestamp=now,
+            metadata={
+                "cycle_key": state.cycle_key,
+                "phase": "started",
+                "body_state": build_body_state_snapshot(state),
+            },
+        )
+        if hasattr(state, 'save_body_state'):
+            state.save_body_state()
         return
     
     # 計算時間差
@@ -59,6 +72,7 @@ def tick_and_update(state, now: datetime):
     
     cursor = last_tick
     segments = 0
+    mood_changed = False
     
     while cursor < now and segments < MAX_SEGMENTS:
         # V2: 檢查事件是否過期
@@ -126,6 +140,7 @@ def tick_and_update(state, now: datetime):
             # V4.3: 傳入當前周期，使用動態 target
             cycle = get_current_cycle(state)
             state.mood = apply_mood_decay(state.mood, elapsed_hours, enabled=True, cycle_key=cycle.key)
+            mood_changed = True
             
             # clamp 到 0-100
             for key in state.body_values:
@@ -138,9 +153,14 @@ def tick_and_update(state, now: datetime):
     # V2: 清理過期餘波
     if hasattr(state, 'active_after_effects'):
         state.active_after_effects = cleanup_expired_effects(state.active_after_effects, now)
-    
+
+    if mood_changed:
+        state.update_mood(state.mood)
+
     # 更新最後 tick 時間
     state.last_tick_at = now
+    if hasattr(state, 'save_body_state'):
+        state.save_body_state()
 
 
 def start_event(state, event_key: str, now: datetime) -> bool:
@@ -151,6 +171,8 @@ def start_event(state, event_key: str, now: datetime) -> bool:
         是否成功啟動（如果已有未過期事件則失敗）
     """
     from app.intimacy.event import get_event
+    from app.intimacy.event_log import log_event
+    from app.intimacy.history import build_body_state_snapshot
     
     # 如果已有未過期事件，不覆蓋
     if state.active_event_key and state.active_event_expires_at:
@@ -168,6 +190,8 @@ def start_event(state, event_key: str, now: datetime) -> bool:
     state.active_event_key = event.key
     state.active_event_started_at = now
     state.active_event_expires_at = now + timedelta(minutes=duration_minutes)
+    if hasattr(state, 'save_body_state'):
+        state.save_body_state()
     
     # V4: 寫入事件日誌
     log_event(
@@ -175,7 +199,11 @@ def start_event(state, event_key: str, now: datetime) -> bool:
         title=event.label,
         timestamp=now,
         duration_minutes=duration_minutes,
-        metadata={"event_key": event.key}
+        metadata={
+            "event_key": event.key,
+            "phase": "started",
+            "body_state": build_body_state_snapshot(state),
+        }
     )
     
     return True
@@ -186,7 +214,9 @@ def _finish_event(state, now: datetime):
     結束事件並施加 end_deltas
     """
     from app.intimacy.event import get_event
+    from app.intimacy.event_log import log_event
     from app.intimacy.after_effect import create_after_effect
+    from app.intimacy.history import build_body_state_snapshot
     
     if not state.active_event_key:
         return
@@ -197,15 +227,31 @@ def _finish_event(state, now: datetime):
         for field, delta in event.end_deltas.items():
             state.body_values[field] = state.body_values.get(field, 0) + delta
         
-        # V2: 創建餘波（如果有對應模板）
-        after_effect = create_after_effect(event.key, now)
-        if after_effect:
-            if not hasattr(state, 'active_after_effects'):
-                state.active_after_effects = []
-            state.active_after_effects.append(after_effect)
+        # Event keys and after-effect template keys are intentionally separate.
+        after_effect_key = {
+            "waiting_restless": "post_waiting",
+        }.get(event.key)
+        if after_effect_key:
+            after_effect = create_after_effect(after_effect_key, now)
+            if after_effect:
+                if not hasattr(state, 'active_after_effects'):
+                    state.active_after_effects = []
+                state.active_after_effects.append(after_effect)
     
     # 清空事件
+    finished_event_key = state.active_event_key
     state.active_event_key = None
     state.active_event_started_at = None
     state.active_event_expires_at = None
+    log_event(
+        event_type="event",
+        title=f"事件結束：{event.label if event else finished_event_key}",
+        timestamp=now,
+        detail_text="短期事件自然結束，後續餘波已套用。" if event else "短期事件自然結束。",
+        metadata={
+            "event_key": finished_event_key,
+            "phase": "ended",
+            "body_state": build_body_state_snapshot(state),
+        },
+    )
 

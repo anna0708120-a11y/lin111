@@ -6,6 +6,8 @@ state.py 透过这个模块存取数据，不直接碰 Supabase。
 返回空结果，整个 app 会自动退回纯内存模式，不会因为没接 Supabase 就跑不起来
 ——这也是为什么可以先部署、之后才补 Supabase，中间不会中断。
 """
+from datetime import datetime, timezone
+
 from app import config
 
 _client = None
@@ -39,11 +41,29 @@ def load_state_value(key, default=None):
 
 def save_state_value(key, value):
     if not _client:
+        print(f"[db][state] 保存跳过：Supabase 未连接，key={key!r}, value={value!r}")
         return
     try:
-        _client.table("app_state").upsert({"key": key, "value": value}).execute()
+        updated_at = datetime.now(timezone.utc).isoformat()
+        print(f"[db][state] 准备保存：key={key!r}, value={value!r}, updated_at={updated_at}")
+        res = (
+            _client.table("app_state")
+            .upsert({"key": key, "value": value, "updated_at": updated_at})
+            .execute()
+        )
+        saved = res.data[0] if res.data else None
+        if not saved:
+            print(f"[db][state] 保存未返回记录：key={key!r}, execute_result={res!r}")
+        elif (
+            saved.get("key") != key
+            or saved.get("value") != value
+            or not saved.get("updated_at")
+        ):
+            print(f"[db][state] 保存返回记录不完整：key={key!r}, record={saved!r}")
+        else:
+            print(f"[db][state] 保存成功：key={key!r}, record={saved!r}")
     except Exception as e:
-        print(f"[db] 写入 {key} 失败: {e}")
+        print(f"[db][state] 保存异常：key={key!r}, value={value!r}, error={e!r}")
 
 
 def delete_state_value(key):
@@ -76,9 +96,9 @@ def load_memories(limit=200):
 
 def insert_memory(tag, content, category="长期记忆", importance=3, keyword="", expires_at=None,
                    created_by="user", raw_keyword="", pending_review=False, conflict_with=None):
-    """插入一条记忆，成功的话回传 Supabase 分配的 id（前端删除要用），失败回传 None。"""
+    """插入记忆，明确返回 success、memory_id、error_reason。"""
     if not _client:
-        return None
+        return {"success": False, "memory_id": None, "error_reason": "Supabase client missing"}
     try:
         res = (
             _client.table("memory_bank")
@@ -96,11 +116,15 @@ def insert_memory(tag, content, category="长期记忆", importance=3, keyword="
             })
             .execute()
         )
-        if res.data:
-            return res.data[0].get("id")
+        if not res.data:
+            return {"success": False, "memory_id": None, "error_reason": "insert returned no data"}
+        memory_id = res.data[0].get("id")
+        if memory_id is None:
+            return {"success": False, "memory_id": None, "error_reason": "missing id"}
+        return {"success": True, "memory_id": memory_id, "error_reason": None}
     except Exception as e:
         print(f"[db] 写入记忆失败: {e}")
-    return None
+        return {"success": False, "memory_id": None, "error_reason": f"insert failed: {e}"}
 
 
 def find_memory_by_keyword(keyword, created_by=None):
@@ -129,6 +153,26 @@ def find_memory_by_keyword(keyword, created_by=None):
         return None
 
 
+def find_memory_by_id(memory_id, created_by=None):
+    """取得一條仍有效的記憶，供 Lifecycle 驗證模型選出的候選記憶。"""
+    if not _client or not memory_id:
+        return None
+    try:
+        query = (
+            _client.table("memory_bank")
+            .select("id, importance, content, created_by, keyword, raw_keyword, category, tag")
+            .eq("id", memory_id)
+            .eq("archived", False)
+        )
+        if created_by is not None:
+            query = query.eq("created_by", created_by)
+        res = query.limit(1).execute()
+        return res.data[0] if res.data else None
+    except Exception as e:
+        print(f"[db] 讀取指定記憶失敗: {e}")
+        return None
+
+
 def update_memory(memory_id, content=None, importance=None, expires_at=None):
     """更新一条已存在的记忆（修正用），只更新有给值的字段。"""
     if not _client or not memory_id:
@@ -143,8 +187,8 @@ def update_memory(memory_id, content=None, importance=None, expires_at=None):
     if not patch:
         return False
     try:
-        _client.table("memory_bank").update(patch).eq("id", memory_id).execute()
-        return True
+        res = _client.table("memory_bank").update(patch).eq("id", memory_id).select("id").execute()
+        return bool(res.data and res.data[0].get("id") == memory_id)
     except Exception as e:
         print(f"[db] 更新记忆失败: {e}")
         return False
@@ -155,8 +199,8 @@ def archive_memory(memory_id):
     if not _client or not memory_id:
         return False
     try:
-        _client.table("memory_bank").update({"archived": True}).eq("id", memory_id).execute()
-        return True
+        res = _client.table("memory_bank").update({"archived": True}).eq("id", memory_id).select("id").execute()
+        return bool(res.data and res.data[0].get("id") == memory_id)
     except Exception as e:
         print(f"[db] 归档记忆失败: {e}")
         return False
@@ -167,12 +211,14 @@ def reinforce_memory(memory_id, importance, expires_at):
     if not _client:
         return
     try:
-        _client.table("memory_bank").update({
+        res = _client.table("memory_bank").update({
             "importance": importance,
             "expires_at": expires_at,
-        }).eq("id", memory_id).execute()
+        }).eq("id", memory_id).select("id").execute()
+        return bool(res.data and res.data[0].get("id") == memory_id)
     except Exception as e:
         print(f"[db] 更新记忆失败: {e}")
+        return False
 
 
 def delete_memory(memory_id):
@@ -450,8 +496,8 @@ def insert_memory_trace(trace):
             "session_id": trace.session_id,
             "message_id": trace.message_id,
             "created_at": trace.created_at.isoformat() if trace.created_at else datetime.now().isoformat(),
-            "reasoning_text": trace.reasoning_text,
-            "raw_decision_block": trace.raw_decision_block,
+            "reasoning_text": None,
+            "raw_decision_block": None,
             "parse_success": trace.parse_success,
             "parsed_decision": json.dumps(trace.parsed_decision) if trace.parsed_decision else None,
             "parse_error": trace.parse_error,
@@ -558,3 +604,18 @@ def get_memory_trace_stats(days=7):
     except Exception as e:
         print(f"[db] 取得 memory trace 統計失敗: {e}")
         return {}
+
+
+# ---------- 语音（Supabase Storage） ----------
+def upload_voice(filename, audio_bytes):
+    """把 mp3 bytes 上传到 Storage，回传公开访问网址。"""
+    if not _client or not audio_bytes:
+        return None
+    try:
+        _client.storage.from_(config.VOICE_BUCKET).upload(
+            filename, audio_bytes, {"content-type": "audio/mpeg"}
+        )
+        return _client.storage.from_(config.VOICE_BUCKET).get_public_url(filename)
+    except Exception as e:
+        print(f"[db] 上传语音失败: {e}")
+        return None

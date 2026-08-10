@@ -5,6 +5,7 @@
 以后 Flutter app 要接进来，看这个文件就知道有哪些接口能打。
 """
 from typing import Optional
+import uuid
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import Response, StreamingResponse
@@ -15,12 +16,15 @@ from app.agent.brain import generate_reply, generate_reply_stream
 from app.context.auth import verify_context_token
 from app.context import mac as mac_context
 from app.event_bus import event_bus
-from app.notify.bark import send_to_bark
+from app.llm.main_router import get_main_model_config, list_main_models
 from app.state import state
 from app.web.pwa import MANIFEST_JSON, SERVICE_WORKER_JS
 from app.web.diagnose import DIAGNOSE_HTML
 
 router = APIRouter()
+
+class TTSPayload(BaseModel):
+    text: str
 
 class Activity(BaseModel):
     activity: str
@@ -177,54 +181,14 @@ def get_intimacy():
 
 @router.get("/intimacy/status")
 def get_intimacy_status():
-    """
-    V1：周期 + 身體數值當前狀態（給身體狀態卡片「當前狀態」區塊用）
-    回傳真實計算的數值
-    """
+    """Return the backend-owned current Body State, cycle, event, and after effects."""
     from datetime import datetime
-    from app.intimacy.cycle import get_current_cycle, get_cycle_progress
+    from app.intimacy.status import build_intimacy_status_payload
     from app.intimacy.tick import tick_and_update
-    from app.intimacy.body_state import get_body_level, get_body_description
-    
-    # 先 tick 確保數值最新
-    tick_and_update(state, datetime.now())
-    
-    cycle = get_current_cycle(state)
-    progress = get_cycle_progress(state, datetime.now())
-    body_values = getattr(state, 'body_values', {})
-    
-    # 為每個身體數值添加 level 和 desc
-    body_values_with_meta = {}
-    for key in ["tension", "heat", "sensitivity", "control"]:
-        value = body_values.get(key, 0)
-        body_values_with_meta[key] = {
-            "value": round(value, 1),
-            "level": get_body_level(value),
-            "desc": get_body_description(key, value)
-        }
-    
-    # 計算周期經過時間
-    hours_elapsed = 0
-    if hasattr(state, 'cycle_started_at') and state.cycle_started_at:
-        hours_elapsed = (datetime.now() - state.cycle_started_at).total_seconds() / 3600.0
-    
-    return {
-        "cycle": {
-            "key": cycle.key,
-            "label": cycle.label,
-            "description": cycle.description,
-            "progress": f"{progress * 100:.1f}%",
-            "hours_elapsed": int(hours_elapsed)
-        },
-        "body_values": body_values_with_meta,
-        "auto_change_desc": (
-            f"{cycle.label}基線：\n"
-            f"tension(蓄積感) → {cycle.targets['tension']:.0f} ({cycle.growth_rates['tension']:+.1f}/h)\n"
-            f"heat(熱度) → {cycle.targets['heat']:.0f} ({cycle.growth_rates['heat']:+.1f}/h)\n"
-            f"sensitivity(敏感度) → {cycle.targets['sensitivity']:.0f} ({cycle.growth_rates['sensitivity']:+.1f}/h)\n"
-            f"control(控制力) → {cycle.targets['control']:.0f} ({cycle.growth_rates['control']:+.1f}/h)"
-        )
-    }
+
+    now = datetime.now()
+    tick_and_update(state, now)
+    return build_intimacy_status_payload(state, now)
 
 @router.get("/intimacy/consent")
 def get_consent_dynamics():
@@ -349,6 +313,36 @@ def remove_memory(memory_id: int):
 def add_note(content: dict):
     state.add_note(content.get("text", ""))
     return {"status": "Success"}
+
+@router.get("/model-config")
+def get_model_config():
+    """Return the persisted main-chat model and selectable catalog."""
+    return {
+        "current": state.get_main_model(),
+        "models": list_main_models(),
+    }
+
+
+class MainModelPayload(BaseModel):
+    provider: Optional[str] = None
+    model: str
+
+
+@router.patch("/model-config")
+def update_model_config(payload: MainModelPayload):
+    """Persist the main-chat provider/model selection."""
+    try:
+        resolved = get_main_model_config(provider=payload.provider, model=payload.model)
+    except ValueError as exc:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    if payload.provider and resolved["provider"] != payload.provider.lower():
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="provider/model mismatch")
+
+    return {"current": state.update_main_model(resolved["provider"], resolved["model"])}
+
 
 @router.get("/settings")
 def get_settings():
@@ -857,3 +851,18 @@ def star_chat_session(session_id: str):
 
     new_state = session_module.toggle_star_session(session_id)
     return {"status": "Success", "starred": new_state}
+
+
+@router.post("/tts")
+def text_to_speech(payload: TTSPayload):
+    """按需生成语音并回传公开音档 URL。"""
+    from app.llm.tts_client import synth_speech
+
+    audio_bytes = synth_speech(payload.text)
+    if not audio_bytes:
+        return {"status": "Failed", "url": None}
+    filename = f"{uuid.uuid4().hex}.mp3"
+    url = db.upload_voice(filename, audio_bytes)
+    if not url:
+        return {"status": "Failed", "url": None}
+    return {"status": "Success", "url": url}

@@ -80,4 +80,19 @@ scheduler.add_job(
     minutes=10,
 )
 
+def life_runtime_tick_job():
+    """Phase 7 autonomous reconciliation; it never enables send_message."""
+    if not config.LIFE_RUNTIME_ENABLED:
+        return
+    from app.life.phase7 import drain_outbox, run_life_runtime_tick
+    run_life_runtime_tick()
+    drain_outbox()
+
+
+scheduler.add_job(
+    life_runtime_tick_job,
+    "interval",
+    minutes=config.LIFE_RUNTIME_TICK_MINUTES,
+)
+
 scheduler.start()

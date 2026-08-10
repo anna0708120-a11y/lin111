@@ -47,6 +47,19 @@ PROACTIVE_MIN_MINUTES = int(os.getenv("PROACTIVE_MIN_MINUTES", 90))   # 至少�
 PROACTIVE_MAX_MINUTES = int(os.getenv("PROACTIVE_MAX_MINUTES", 240))  # 静默超过这个数字，不管时段一定触发一次
 PROACTIVE_CHECK_EVERY_MINUTES = int(os.getenv("PROACTIVE_CHECK_EVERY_MINUTES", 5))  # 后台巡检频率
 
+# ---- Phase 7 Life Runtime ----
+LIFE_RUNTIME_ENABLED = os.getenv("LIFE_RUNTIME_ENABLED", "true").lower() == "true"
+LIFE_RUNTIME_TICK_MINUTES = int(os.getenv("LIFE_RUNTIME_TICK_MINUTES", 5))
+
+# ---- Phase 9 Tool Brain ----
+TOOL_BRAIN_ENABLED = os.getenv("TOOL_BRAIN_ENABLED", "false").lower() == "true"
+TOOL_BRAIN_TIMEOUT_SECONDS = int(os.getenv("TOOL_BRAIN_TIMEOUT_SECONDS", 30))
+GROQ_TOOL_BRAIN_API_KEY = os.getenv("GROQ_TOOL_BRAIN_API_KEY", "")
+GROQ_TOOL_BRAIN_BASE_URL = os.getenv("GROQ_TOOL_BRAIN_BASE_URL", "https://api.groq.com/openai/v1")
+GROQ_TOOL_BRAIN_MODEL = os.getenv("GROQ_TOOL_BRAIN_MODEL", "openai/gpt-oss-120b")
+TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", "")
+TAVILY_BASE_URL = os.getenv("TAVILY_BASE_URL", "https://api.tavily.com/search")
+
 # ---- 速率限制 / 冷却 ----
 DAILY_QUOTA = int(os.getenv("DAILY_QUOTA", 180))
 RPM_LIMIT = int(os.getenv("RPM_LIMIT", 8))

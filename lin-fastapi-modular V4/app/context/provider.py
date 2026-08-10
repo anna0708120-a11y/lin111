@@ -38,8 +38,20 @@ def get_context(need=None):
             value = fn()
             if value:
                 result[key] = value
+                if key in {"location", "mac", "screentime", "calendar"}:
+                    try:
+                        from app.life.runtime import ingest_context
+                        ingest_context(key, value)
+                    except Exception as life_error:
+                        print(f"[context.provider] life ingest {key} 失败: {life_error}")
         except Exception as e:
             print(f"[context.provider] 读取 {key} 失败: {e}")
+    try:
+        life = get_life_context()
+        if life:
+            result["life"] = life
+    except Exception as e:
+        print(f"[context.provider] 读取 life 失败: {e}")
     return result
 
 def format_context_for_prompt(context_dict):
@@ -88,11 +100,24 @@ def format_context_for_prompt(context_dict):
         lines.append(line)
     if "location" in context_dict:
         loc = context_dict["location"]
-        # 优先使用 label,如果没有就用 latitude/longitude
+        # 優先使用 label,如果没有就用 latitude/longitude
         if loc.get("label"):
             lines.append(f"Anna目前位置：{loc.get('label')}")
         elif loc.get("latitude") is not None and loc.get("longitude") is not None:
             lat = loc.get("latitude")
             lng = loc.get("longitude")
             lines.append(f"Anna目前位置：{lat:.4f}, {lng:.4f}")
+    life_context = context_dict.get("life")
+    if isinstance(life_context, str) and life_context.strip():
+        lines.append(life_context.strip())
     return "\n".join(lines)
+
+
+def get_life_context():
+    """Return the normalized Phase 6 life summary without exposing raw sources."""
+    try:
+        from app.life.runtime import get_life_context_text
+        return get_life_context_text()
+    except Exception as e:
+        print(f"[context.provider] 读取 life context 失败: {e}")
+        return ""

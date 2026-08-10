@@ -16,6 +16,9 @@ from app.agent.brain import generate_reply, generate_reply_stream
 from app.context.auth import verify_context_token
 from app.context import mac as mac_context
 from app.event_bus import event_bus
+from app.life import get_life_context, get_life_state, get_timeline
+from app.life.phase7 import get_audit, get_candidate, run_life_runtime_tick
+from app.life.mcp_registry import registry as life_capability_registry
 from app.llm.main_router import get_main_model_config, list_main_models
 from app.state import state
 from app.web.pwa import MANIFEST_JSON, SERVICE_WORKER_JS
@@ -161,6 +164,53 @@ def observe_anna(activity: Activity):
 def get_events():
     """System Monitor Event Bus 快照，給 Home UI 使用。"""
     return event_bus.get_snapshot()
+
+
+@router.get("/life/state")
+def life_state_endpoint():
+    return {"state": get_life_state()}
+
+
+@router.get("/life/timeline")
+def life_timeline_endpoint(date: str):
+    return {"date": date, "events": get_timeline(date)}
+
+
+@router.get("/life/context")
+def life_context_endpoint():
+    return get_life_context()
+
+
+@router.get("/life/events")
+def life_events_endpoint(start: Optional[str] = None, end: Optional[str] = None, limit: int = 500):
+    from datetime import datetime
+    from app.life.runtime import list_events
+
+    parse = lambda value: datetime.fromisoformat(value.replace("Z", "+00:00")) if value else None
+    return {"events": list_events(start=parse(start), end=parse(end), limit=limit)}
+
+
+@router.get("/life/audit")
+def life_audit_endpoint(candidate_id: Optional[str] = None):
+    return {"audit": get_audit(candidate_id)}
+
+
+@router.get("/life/candidates/{candidate_id}")
+def life_candidate_endpoint(candidate_id: str):
+    candidate = get_candidate(candidate_id)
+    return {"candidate": candidate} if candidate else {"candidate": None}
+
+
+@router.post("/life/tick")
+def life_tick_endpoint():
+    """Manual diagnostic tick. It never enables message sending."""
+    return run_life_runtime_tick()
+
+
+@router.get("/life/capabilities")
+def life_capabilities_endpoint():
+    return {"capabilities": life_capability_registry.list()}
+
 
 @router.get("/logs")
 def get_logs():

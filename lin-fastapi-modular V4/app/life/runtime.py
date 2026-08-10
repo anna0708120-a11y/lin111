@@ -9,8 +9,8 @@ from app import db
 from app.event_bus import event_bus
 
 from .contracts import LifeEvent, LifeState, aware_utc, iso_utc
-from .event_normalizer import normalize_calendar, normalize_conversation, normalize_location, normalize_mac, normalize_screentime
-from .read_model import format_life_context
+from .event_normalizer import normalize_calendar, normalize_conversation, normalize_location, normalize_mac, normalize_phone_observation, normalize_screentime
+from .read_model import dynamic_life_context, format_dynamic_life_context, format_life_context, format_stable_life_context, stable_life_context
 from .state_engine import apply_event, mark_conversation_idle
 
 _MEMORY_EVENTS: list[dict[str, Any]] = []
@@ -24,7 +24,13 @@ def _save_event(event: LifeEvent) -> tuple[dict[str, Any], bool]:
             return event.as_dict(), True
         return event.as_dict(), False
     row, inserted = db.insert_life_event(event.as_dict())
-    return row or event.as_dict(), inserted
+    if inserted:
+        return row or event.as_dict(), True
+    # Keep the current process observable when persistence is unavailable or rejects a row.
+    if not any(item.get("event_id") == event.event_id for item in _MEMORY_EVENTS):
+        _MEMORY_EVENTS.append(event.as_dict())
+        return event.as_dict(), True
+    return row or event.as_dict(), False
 
 
 def _load_state(subject_id: str) -> LifeState:
@@ -98,6 +104,8 @@ def ingest_context(source: str, payload: dict[str, Any], *, previous_state: Life
         events = normalize_screentime(payload, previous_total)
     elif source == "calendar":
         events = normalize_calendar(payload if isinstance(payload, list) else [])
+    elif source == "phone":
+        events = normalize_phone_observation(payload)
     else:
         events = []
     return ingest_events(events)
@@ -108,13 +116,18 @@ def ingest_conversation(role: str, content: str, *, session_id: str | None = Non
 
 
 def list_events(start: datetime | None = None, end: datetime | None = None, limit: int = 500) -> list[dict[str, Any]]:
+    persisted = []
     if db.is_connected():
-        return db.load_life_events(start=iso_utc(start) if start else None, end=iso_utc(end) if end else None, limit=limit)
-    rows = list(_MEMORY_EVENTS)
-    if start:
-        rows = [row for row in rows if aware_utc(row.get("occurred_at")) >= aware_utc(start)]
-    if end:
-        rows = [row for row in rows if aware_utc(row.get("occurred_at")) < aware_utc(end)]
+        persisted = db.load_life_events(start=iso_utc(start) if start else None, end=iso_utc(end) if end else None, limit=limit)
+    rows_by_id = {row.get("event_id"): row for row in persisted if row.get("event_id")}
+    for row in _MEMORY_EVENTS:
+        occurred = aware_utc(row.get("occurred_at"))
+        if start and occurred < aware_utc(start):
+            continue
+        if end and occurred >= aware_utc(end):
+            continue
+        rows_by_id.setdefault(row.get("event_id"), row)
+    rows = list(rows_by_id.values())
     rows.sort(key=lambda row: aware_utc(row.get("occurred_at")))
     return rows[-limit:]
 
@@ -134,15 +147,30 @@ def get_timeline(date_text: str, *, timezone_name: str = "Asia/Hong_Kong") -> li
     return [{"event_id": row.get("event_id"), "event_type": row.get("event_type"), "time": aware_utc(row.get("occurred_at")).astimezone(tz).strftime("%H:%M"), "label": labels.get(row.get("event_type"), row.get("event_type")), "payload": row.get("payload") or {}, "confidence": row.get("confidence")} for row in rows]
 
 
-def get_life_context(*, timezone_name: str = "Asia/Hong_Kong") -> dict[str, Any]:
-    state = get_life_state()
-    now = datetime.now(timezone.utc)
-    recent = list_events(start=now - timedelta(hours=24), end=now + timedelta(minutes=1), limit=12)
-    return {"state": state, "recent_events": [{"event_type": row.get("event_type"), "occurred_at": row.get("occurred_at"), "payload": row.get("payload") or {}} for row in recent], "timezone": timezone_name}
+def get_life_context(*, timezone_name: str = "Asia/Hong_Kong", now: datetime | None = None) -> dict[str, Any]:
+    current_time = now or datetime.now(timezone.utc)
+    recent = list_events(
+        start=aware_utc(current_time) - timedelta(hours=24),
+        end=aware_utc(current_time) + timedelta(minutes=1),
+        limit=12,
+    )
+    stable = stable_life_context()
+    dynamic = dynamic_life_context(timezone_name=timezone_name, now=current_time, events=recent)
+    return {
+        "stable": stable,
+        "dynamic": dynamic,
+        "state": get_life_state(),
+        "recent_events": dynamic["recent_events"],
+        "timezone": timezone_name,
+    }
 
 
 def get_life_context_text(*, timezone_name: str = "Asia/Hong_Kong") -> str:
-    return format_life_context(get_life_context(timezone_name=timezone_name))
+    context = get_life_context(timezone_name=timezone_name)
+    return "\n\n".join([
+        format_stable_life_context(context["stable"]),
+        format_dynamic_life_context(context["dynamic"]),
+    ])
 
 
 def replay_events(events: Iterable[LifeEvent], *, subject_id: str = "anna") -> LifeState:

@@ -195,6 +195,43 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 .qt{flex:1;height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
 .qf{height:100%;background:var(--rose);border-radius:2px;transition:width .3s;}
 
+/* Life System read-only observability view */
+.life-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;}
+.life-toolbar .cl{margin:0;}
+.life-refresh{border:1px solid var(--border);background:var(--white);color:var(--rose-deep);border-radius:8px;padding:7px 10px;font:11px 'DM Sans',sans-serif;cursor:pointer;}
+.life-refresh:hover{background:var(--blush);}
+.life-refresh-status{font-size:10px;color:var(--muted);min-height:14px;margin-top:-4px;margin-bottom:10px;}
+.life-refresh-status.life-error,.life-error{color:#bd5b59;}
+.life-state-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+.life-state-item{min-width:0;padding:10px;background:var(--blush);border-radius:10px;}
+.life-state-label{font-size:10px;color:var(--muted);margin-bottom:4px;}
+.life-state-value{font-size:13px;color:var(--dark);line-height:1.45;word-break:break-word;white-space:pre-wrap;}
+.life-state-wide{grid-column:1 / -1;}
+.life-date-row{display:flex;align-items:center;gap:8px;margin-bottom:12px;}
+.life-date-row input{flex:1;min-width:0;border:1px solid var(--border);border-radius:8px;padding:8px 10px;background:var(--cream);color:var(--dark);font:12px 'DM Sans',sans-serif;}
+.life-event-list,.life-audit-list{display:flex;flex-direction:column;gap:8px;}
+.life-event-row{display:grid;grid-template-columns:42px 10px minmax(0,1fr);gap:8px;align-items:start;padding:9px 0;border-bottom:1px solid var(--border);}
+.life-event-row:last-child{border-bottom:none;}
+.life-event-time{font-size:10px;color:var(--muted);padding-top:2px;font-variant-numeric:tabular-nums;}
+.life-event-dot{width:8px;height:8px;border-radius:50%;background:var(--rose);margin-top:5px;box-shadow:0 0 0 3px var(--blush);}
+.life-event-body{min-width:0;}
+.life-event-label{font-size:13px;color:var(--dark);font-weight:500;}
+.life-event-type{font-size:10px;color:var(--rose-deep);margin-top:2px;}
+.life-event-payload{font-size:11px;color:var(--muted);line-height:1.45;margin-top:4px;white-space:pre-wrap;word-break:break-word;}
+.life-audit-row{padding:10px 0;border-bottom:1px solid var(--border);}
+.life-audit-row:last-child{border-bottom:none;}
+.life-audit-head{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;color:var(--dark);}
+.life-status{font-size:10px;color:var(--rose-deep);background:var(--blush);border-radius:8px;padding:2px 7px;white-space:nowrap;}
+.life-audit-meta,.life-audit-reason,.life-audit-candidate{font-size:10px;color:var(--muted);line-height:1.5;margin-top:4px;word-break:break-word;}
+.life-audit-candidate{color:var(--rose-deep);}
+.life-observation{padding:10px;background:var(--blush);border-radius:10px;font-size:12px;line-height:1.55;color:var(--dark);white-space:pre-wrap;word-break:break-word;}
+.life-observation-meta{font-size:10px;color:var(--muted);margin-top:6px;line-height:1.5;}
+.life-observation-stale{color:#bd5b59;}
+.life-context-block{padding:10px 0;border-bottom:1px solid var(--border);}.life-context-block:last-child{border-bottom:none;}
+.life-context-title{font-size:11px;font-weight:500;color:var(--rose-deep);margin-bottom:7px;}.life-context-json{margin:0;max-height:180px;overflow:auto;padding:9px;background:var(--blush);border-radius:8px;color:var(--dark);font:10px/1.5 ui-monospace,monospace;white-space:pre-wrap;word-break:break-word;}
+
+@media (max-width:480px){.life-state-grid{grid-template-columns:1fr;}.life-state-wide{grid-column:auto;}}
+
 /* 侧边栏 (Claude 风格) */
 .sidebar-btn{width:36px;height:36px;border:none;background:var(--white);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--dark);border-radius:6px;transition:background .2s;box-shadow:0 1px 3px var(--shadow);}
 .sidebar-btn:hover{background:var(--blush);}
@@ -883,6 +920,51 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 </div>
 
 
+<div class="pg" id="pg-life">
+  <div class="card">
+    <div class="life-toolbar">
+      <div class="cl">Life State</div>
+      <button class="life-refresh" type="button" onclick="refreshLife()">↻ 更新</button>
+    </div>
+    <div class="life-refresh-status" id="lifeRefreshStatus" aria-live="polite"></div>
+    <div class="life-state-grid">
+      <div class="life-state-item"><div class="life-state-label">Location</div><div class="life-state-value" data-life-state="location">未知</div></div>
+      <div class="life-state-item"><div class="life-state-label">Mac state</div><div class="life-state-value" data-life-state="mac">未知</div></div>
+      <div class="life-state-item"><div class="life-state-label">Charging</div><div class="life-state-value" data-life-state="charging">未知</div></div>
+      <div class="life-state-item"><div class="life-state-label">Screen activity</div><div class="life-state-value" data-life-state="screen">未知</div></div>
+      <div class="life-state-item"><div class="life-state-label">Conversation</div><div class="life-state-value" data-life-state="conversation">未知</div></div>
+      <div class="life-state-item"><div class="life-state-label">Last activity</div><div class="life-state-value" data-life-state="activity">—</div></div>
+      <div class="life-state-item life-state-wide"><div class="life-state-label">Current schedule</div><div class="life-state-value" data-life-state="current">無</div></div>
+      <div class="life-state-item life-state-wide"><div class="life-state-label">Next schedule</div><div class="life-state-value" data-life-state="next">無</div></div>
+    </div>
+    <div class="life-refresh-status" id="lifeStateUpdated"></div>
+  </div>
+
+  <div class="card">
+    <div class="cl">Dynamic Observation</div>
+    <div id="lifeDynamicObservation"><div class="es">載入中…</div></div>
+  </div>
+
+  <div class="card">
+    <div class="cl">Life Context</div>
+    <div id="lifeContext"><div class="es">載入中…</div></div>
+  </div>
+
+  <div class="card">
+    <div class="cl">Self Timeline</div>
+    <div class="life-date-row">
+      <input id="lifeTimelineDate" type="date" aria-label="選擇 Life Timeline 日期" onchange="refreshLife()">
+      <button class="life-refresh" type="button" onclick="refreshLife()">查看</button>
+    </div>
+    <div class="life-event-list" id="lifeTimeline"><div class="es">載入中…</div></div>
+  </div>
+
+  <div class="card">
+    <div class="cl">Life Activity / Audit</div>
+    <div class="life-audit-list" id="lifeAudit"><div class="es">載入中…</div></div>
+  </div>
+</div>
+
 <div class="pg" id="pg-mine">
   <div class="card period-card">
     <div class="cl">📅 经期记录</div>
@@ -931,12 +1013,14 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 <div class="tab-bar">  <button class="tb active" id="tb-monitor" onclick="stab('monitor')"><span class="ti">🏠</span>Home</button>
   <button class="tb" id="tb-chat" onclick="stab('chat')"><span class="ti">💬</span>Chat</button>
   <button class="tb" id="tb-memory" onclick="stab('memory')"><span class="ti">🧠</span>Memory</button>
+  <button class="tb" id="tb-life" onclick="stab('life')"><span class="ti">◌</span>Life</button>
   <button class="tb" id="tb-mine" onclick="stab('mine')"><span class="ti">🌙</span>Mine</button>
 </div>
 
 <script src="/static/js/session_manager.js"></script>
 <script src="/static/js/sidebar.js"></script>
 <script src="/static/js/chat_view.js"></script>
+<script src="/static/js/life_view.js"></script>
 <script src="/static/js/dev_panel.js"></script>
 <script>
 const AU = window.location.origin;
@@ -1317,6 +1401,9 @@ function updateCatExpression(mood){
 loadMood();
 loadCollapsedAtmosphere();
 
+// Life System is intentionally read-only in this first frontend phase.
+if(document.getElementById('pg-life')?.classList.contains('active')){initLifeView();}
+
 // ---------- PWA ----------
 if('serviceWorker' in navigator){
   window.addEventListener('load', ()=>{ navigator.serviceWorker.register('/sw.js').catch(()=>{}); });
@@ -1333,7 +1420,7 @@ function stab(tab){
     setTimeout(()=>{const c=document.getElementById('cm');c.scrollTop=c.scrollHeight;},50);
     if(!sessionManager.currentSessionId && sessionManager.sessions.length === 0){sidebar.handleNewChat();}
   }
-  else{pg.style.display='block';pg.classList.add('active');if(tab==='memory')rmem();if(tab==='monitor')loadMood();if(tab==='mine'){loadPeriod();loadChatConfig();loadMainModelConfig();loadTogetherDays();}}
+  else{pg.style.display='block';pg.classList.add('active');if(tab==='memory')rmem();if(tab==='monitor')loadMood();if(tab==='life')initLifeView();if(tab==='mine'){loadPeriod();loadChatConfig();loadMainModelConfig();loadTogetherDays();}}
 }
 // 页面加载时如果是Mine tab,立即展开
 if(document.getElementById('pg-mine')?.classList.contains('active')){loadPeriod();loadChatConfig();loadMainModelConfig();}

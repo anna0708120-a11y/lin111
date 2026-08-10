@@ -7,11 +7,12 @@
 from typing import Optional
 import uuid
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 
 from app import db
+from app.attachments import AttachmentValidationError, build_attachment, public_attachment, utc_now
 from app.agent.brain import generate_reply, generate_reply_stream
 from app.context.auth import verify_context_token
 from app.context import mac as mac_context
@@ -170,6 +171,60 @@ def observe_anna(activity: Activity):
             "X-Accel-Buffering": "no"
         }
     )
+
+@router.post("/attachments")
+async def upload_attachment(
+    file: UploadFile = File(...),
+    owner_type: str = "chat",
+    owner_id: Optional[str] = None,
+    _: bool = Depends(verify_context_token),
+):
+    """Store an image or supported document without invoking any vision/model API."""
+    content = await file.read()
+    try:
+        attachment = build_attachment(
+            file.filename,
+            file.content_type,
+            content,
+            owner_type=owner_type,
+        )
+    except AttachmentValidationError as exc:
+        raise HTTPException(status_code=415, detail=str(exc)) from exc
+
+    attachment["owner_id"] = owner_id
+    if not db.upload_attachment(attachment["object_key"], content, attachment["mime_type"]):
+        raise HTTPException(status_code=503, detail="attachment_storage_unavailable")
+
+    saved = db.create_attachment(attachment)
+    if not saved:
+        db.delete_attachment_object(attachment["object_key"])
+        raise HTTPException(status_code=503, detail="attachment_metadata_unavailable")
+    return {"attachment": public_attachment(saved)}
+
+
+@router.get("/attachments/{attachment_id}")
+def get_attachment(attachment_id: str, _: bool = Depends(verify_context_token)):
+    row = db.load_attachment(attachment_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="attachment_not_found")
+    url = db.create_attachment_signed_url(row["object_key"])
+    if not url:
+        raise HTTPException(status_code=503, detail="attachment_storage_unavailable")
+    return {"attachment": {**public_attachment(row), "url": url}}
+
+
+@router.delete("/attachments/{attachment_id}")
+def delete_attachment(attachment_id: str, _: bool = Depends(verify_context_token)):
+    row = db.load_attachment(attachment_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="attachment_not_found")
+    if not db.delete_attachment_object(row["object_key"]):
+        raise HTTPException(status_code=503, detail="attachment_storage_unavailable")
+    deleted = db.mark_attachment_deleted(attachment_id, utc_now())
+    if not deleted:
+        raise HTTPException(status_code=503, detail="attachment_metadata_unavailable")
+    return {"attachment": public_attachment(deleted)}
+
 
 @router.get("/events")
 def get_events():

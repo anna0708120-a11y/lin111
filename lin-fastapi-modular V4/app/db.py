@@ -26,6 +26,89 @@ def is_connected():
     return _client is not None
 
 
+# ---------- Phase 8 Attachments ----------
+def create_attachment(row):
+    """Persist attachment metadata after its object has reached Storage."""
+    if not _client:
+        return None
+    try:
+        result = _client.table("attachments").insert(row).execute()
+        return result.data[0] if result.data else None
+    except Exception as e:
+        print(f"[db] 寫入 attachment metadata 失敗: {e}")
+        return None
+
+
+def upload_attachment(object_key, content, mime_type):
+    """Upload raw bytes to the private Phase 8 attachment bucket."""
+    if not _client:
+        return False
+    try:
+        _client.storage.from_(config.ATTACHMENT_BUCKET).upload(
+            object_key,
+            content,
+            {"content-type": mime_type, "upsert": "false"},
+        )
+        return True
+    except Exception as e:
+        print(f"[db] 上傳 attachment 失敗: {e}")
+        return False
+
+
+def delete_attachment_object(object_key):
+    if not _client:
+        return False
+    try:
+        _client.storage.from_(config.ATTACHMENT_BUCKET).remove([object_key])
+        return True
+    except Exception as e:
+        print(f"[db] 刪除 attachment object 失敗: {e}")
+        return False
+
+
+def load_attachment(attachment_id, include_deleted=False):
+    if not _client:
+        return None
+    try:
+        query = _client.table("attachments").select("*").eq("attachment_id", attachment_id)
+        if not include_deleted:
+            query = query.eq("status", "uploaded")
+        result = query.limit(1).execute()
+        return result.data[0] if result.data else None
+    except Exception as e:
+        print(f"[db] 讀取 attachment metadata 失敗: {e}")
+        return None
+
+
+def mark_attachment_deleted(attachment_id, deleted_at):
+    if not _client:
+        return None
+    try:
+        result = (
+            _client.table("attachments")
+            .update({"status": "deleted", "deleted_at": deleted_at})
+            .eq("attachment_id", attachment_id)
+            .eq("status", "uploaded")
+            .select("*")
+            .execute()
+        )
+        return result.data[0] if result.data else None
+    except Exception as e:
+        print(f"[db] 更新 attachment lifecycle 失敗: {e}")
+        return None
+
+
+def create_attachment_signed_url(object_key, expires_in=3600):
+    if not _client:
+        return None
+    try:
+        result = _client.storage.from_(config.ATTACHMENT_BUCKET).create_signed_url(object_key, expires_in)
+        return result.get("signedURL") or result.get("signedUrl")
+    except Exception as e:
+        print(f"[db] 產生 attachment signed URL 失敗: {e}")
+        return None
+
+
 # ---------- 通用状态 (key -> value，比如 last_anchor_at、proactive设置) ----------
 def load_state_value(key, default=None):
     if not _client:

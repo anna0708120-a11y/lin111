@@ -126,6 +126,9 @@ WEATHER_CACHE_MINUTES = int(os.getenv("WEATHER_CACHE_MINUTES", 30))
 ICAL_URL = os.getenv("ICAL_URL", "")
 CALENDAR_CACHE_MINUTES = int(os.getenv("CALENDAR_CACHE_MINUTES", 15))
 
+# ---- Supabase Storage 附件桶（Phase 8；私人桶，URL 由后端按需签发）----
+ATTACHMENT_BUCKET = os.getenv("ATTACHMENT_BUCKET", "attachments")
+
 # ---- Supabase Storage 图片桶名字 ----
 PHOTO_BUCKET = os.getenv("PHOTO_BUCKET", "photos")
 

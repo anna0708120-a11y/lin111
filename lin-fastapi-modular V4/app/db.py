@@ -619,3 +619,181 @@ def upload_voice(filename, audio_bytes):
     except Exception as e:
         print(f"[db] 上传语音失败: {e}")
         return None
+
+
+# ---------- Phase 6 Life System ----------
+def insert_life_event(event):
+    """Insert a normalized life event idempotently by dedupe_key."""
+    if not _client:
+        return event, True
+    try:
+        existing = (
+            _client.table("life_events")
+            .select("*")
+            .eq("dedupe_key", event["dedupe_key"])
+            .limit(1)
+            .execute()
+        )
+        if existing.data:
+            return existing.data[0], False
+        result = _client.table("life_events").insert(event).execute()
+        return (result.data[0] if result.data else event), bool(result.data)
+    except Exception as e:
+        print(f"[db] 寫入 life event 失敗: {e}")
+        return event, False
+
+
+def load_life_events(start=None, end=None, limit=500):
+    if not _client:
+        return []
+    try:
+        query = _client.table("life_events").select("*")
+        if start:
+            query = query.gte("occurred_at", start)
+        if end:
+            query = query.lt("occurred_at", end)
+        result = query.order("occurred_at", desc=False).limit(max(1, min(int(limit), 5000))).execute()
+        return result.data or []
+    except Exception as e:
+        print(f"[db] 讀取 life events 失敗: {e}")
+        return []
+
+
+def load_latest_life_state(subject_id="anna"):
+    if not _client:
+        return None
+    try:
+        result = (
+            _client.table("life_state_snapshots")
+            .select("*")
+            .eq("subject_id", subject_id)
+            .order("version", desc=True)
+            .limit(1)
+            .execute()
+        )
+        return result.data[0] if result.data else None
+    except Exception as e:
+        print(f"[db] 讀取 life state 失敗: {e}")
+        return None
+
+
+def insert_life_state_snapshot(snapshot):
+    if not _client:
+        return snapshot
+    try:
+        result = _client.table("life_state_snapshots").insert(snapshot).execute()
+        return result.data[0] if result.data else snapshot
+    except Exception as e:
+        print(f"[db] 寫入 life state snapshot 失敗: {e}")
+        return None
+
+
+# ---------- Phase 7 Life Runtime ----------
+def upsert_life_candidate(candidate):
+    if not _client:
+        return candidate, True
+    try:
+        result = _client.table("life_candidates").upsert(candidate, on_conflict="candidate_id").execute()
+        return (result.data[0] if result.data else candidate), True
+    except Exception as e:
+        print(f"[db] 寫入 life candidate 失敗: {e}")
+        return candidate, False
+
+
+def load_life_candidate(candidate_id):
+    if not _client:
+        return None
+    try:
+        result = _client.table("life_candidates").select("*").eq("candidate_id", candidate_id).limit(1).execute()
+        return result.data[0] if result.data else None
+    except Exception as e:
+        print(f"[db] 讀取 life candidate 失敗: {e}")
+        return None
+
+
+def update_life_candidate(candidate_id, patch):
+    if not _client:
+        return None
+    try:
+        result = _client.table("life_candidates").update(patch).eq("candidate_id", candidate_id).select("*").execute()
+        return result.data[0] if result.data else None
+    except Exception as e:
+        print(f"[db] 更新 life candidate 失敗: {e}")
+        return None
+
+
+def list_life_candidates(status=None, limit=500):
+    if not _client:
+        return []
+    try:
+        query = _client.table("life_candidates").select("*")
+        if status:
+            query = query.eq("status", status)
+        result = query.order("created_at", desc=False).limit(max(1, min(int(limit), 5000))).execute()
+        return result.data or []
+    except Exception as e:
+        print(f"[db] 讀取 life candidates 失敗: {e}")
+        return []
+
+
+def upsert_life_outbox(item):
+    if not _client:
+        return item
+    try:
+        result = _client.table("life_action_outbox").upsert(item, on_conflict="outbox_id").execute()
+        return result.data[0] if result.data else item
+    except Exception as e:
+        print(f"[db] 寫入 life outbox 失敗: {e}")
+        return item
+
+
+def load_pending_life_outbox(now_iso, limit=20):
+    if not _client:
+        return []
+    try:
+        result = (
+            _client.table("life_action_outbox").select("*")
+            .in_("status", ["pending", "retry"])
+            .lte("next_attempt_at", now_iso)
+            .order("next_attempt_at", desc=False).limit(limit).execute()
+        )
+        return result.data or []
+    except Exception as e:
+        print(f"[db] 讀取 pending life outbox 失敗: {e}")
+        return []
+
+
+def update_life_outbox(outbox_id, patch):
+    if not _client:
+        return None
+    try:
+        result = _client.table("life_action_outbox").update(patch).eq("outbox_id", outbox_id).select("*").execute()
+        return result.data[0] if result.data else None
+    except Exception as e:
+        print(f"[db] 更新 life outbox 失敗: {e}")
+        return None
+
+
+def insert_life_audit(row):
+    if not _client:
+        return row
+    try:
+        result = _client.table("life_action_audit").insert(row).execute()
+        return result.data[0] if result.data else row
+    except Exception as e:
+        print(f"[db] 寫入 life audit 失敗: {e}")
+        return row
+
+
+def load_life_audits(candidate_id=None, limit=500):
+    if not _client:
+        return []
+    try:
+        query = _client.table("life_action_audit").select("*")
+        if candidate_id:
+            query = query.eq("candidate_id", candidate_id)
+        result = query.order("created_at", desc=False).limit(max(1, min(int(limit), 5000))).execute()
+        return result.data or []
+    except Exception as e:
+        print(f"[db] 讀取 life audit 失敗: {e}")
+        return []

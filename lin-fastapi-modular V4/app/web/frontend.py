@@ -224,6 +224,12 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 .life-status{font-size:10px;color:var(--rose-deep);background:var(--blush);border-radius:8px;padding:2px 7px;white-space:nowrap;}
 .life-audit-meta,.life-audit-reason,.life-audit-candidate{font-size:10px;color:var(--muted);line-height:1.5;margin-top:4px;word-break:break-word;}
 .life-audit-candidate{color:var(--rose-deep);}
+.life-observation{padding:10px;background:var(--blush);border-radius:10px;font-size:12px;line-height:1.55;color:var(--dark);white-space:pre-wrap;word-break:break-word;}
+.life-observation-meta{font-size:10px;color:var(--muted);margin-top:6px;line-height:1.5;}
+.life-observation-stale{color:#bd5b59;}
+.life-context-block{padding:10px 0;border-bottom:1px solid var(--border);}.life-context-block:last-child{border-bottom:none;}
+.life-context-title{font-size:11px;font-weight:500;color:var(--rose-deep);margin-bottom:7px;}.life-context-json{margin:0;max-height:180px;overflow:auto;padding:9px;background:var(--blush);border-radius:8px;color:var(--dark);font:10px/1.5 ui-monospace,monospace;white-space:pre-wrap;word-break:break-word;}
+
 @media (max-width:480px){.life-state-grid{grid-template-columns:1fr;}.life-state-wide{grid-column:auto;}}
 
 /* 侧边栏 (Claude 风格) */
@@ -932,6 +938,16 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
       <div class="life-state-item life-state-wide"><div class="life-state-label">Next schedule</div><div class="life-state-value" data-life-state="next">無</div></div>
     </div>
     <div class="life-refresh-status" id="lifeStateUpdated"></div>
+  </div>
+
+  <div class="card">
+    <div class="cl">Dynamic Observation</div>
+    <div id="lifeDynamicObservation"><div class="es">載入中…</div></div>
+  </div>
+
+  <div class="card">
+    <div class="cl">Life Context</div>
+    <div id="lifeContext"><div class="es">載入中…</div></div>
   </div>
 
   <div class="card">

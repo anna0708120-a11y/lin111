@@ -35,12 +35,118 @@ def life_context(*, subject_id: str = "anna", recent_limit: int = 12, timezone_n
     return {"state": state.as_dict(), "recent_events": [{"event_type": x.get("event_type"), "occurred_at": x.get("occurred_at"), "payload": x.get("payload") or {}} for x in recent], "timezone": timezone_name}
 
 
+def dynamic_life_context(
+    *,
+    subject_id: str = "anna",
+    now: datetime | None = None,
+    recent_limit: int = 12,
+    phone_ttl_minutes: int = 25,
+    timezone_name: str = "Asia/Hong_Kong",
+    events: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Build per-turn facts that are intentionally kept out of stable prompt context."""
+    now = aware_utc(now or datetime.now(timezone.utc))
+    recent = events if events is not None else list_events(
+        start=now - timedelta(hours=24),
+        end=now + timedelta(minutes=1),
+        limit=recent_limit,
+    )
+    phone = None
+    for row in reversed(recent):
+        if row.get("event_type") != "phone.observed":
+            continue
+        observed_at = aware_utc(row.get("occurred_at"))
+        age_minutes = max(0, int((now - observed_at).total_seconds() // 60))
+        if age_minutes > phone_ttl_minutes:
+            continue
+        payload = row.get("payload") or {}
+        source = str(payload.get("observation_source") or "unknown")
+        confidence = float(row.get("confidence") or 0)
+        phone = {
+            "app_name": payload.get("app_name"),
+            "battery_level": payload.get("battery_level"),
+            "battery_state": payload.get("battery_state"),
+            "source": source,
+            "confidence": confidence,
+            "observed_at": row.get("occurred_at"),
+            "age_minutes": age_minutes,
+            "fresh": True,
+            "current_claim_allowed": source == "shortcut" and confidence >= 0.9,
+            "usable_for_proactive_action": source == "shortcut" and confidence >= 0.9,
+        }
+        break
+    return {
+        "generated_at": now.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        "timezone": timezone_name,
+        "phone": phone,
+        "recent_events": [
+            {
+                "event_type": row.get("event_type"),
+                "occurred_at": row.get("occurred_at"),
+                "payload": row.get("payload") or {},
+                "confidence": row.get("confidence"),
+            }
+            for row in recent
+        ],
+    }
+
+
+def stable_life_context(*, subject_id: str = "anna") -> dict[str, Any]:
+    """Return only replayed LifeState facts suitable for a cacheable prompt prefix."""
+    state = load_state(subject_id).as_dict()
+    return {
+        "subject_id": subject_id,
+        "location_state": state.get("location_state", "unknown"),
+        "mac_state": state.get("mac_state", "unknown"),
+        "screen_activity": state.get("screen_activity", "unknown"),
+        "conversation_state": state.get("conversation_state", "unknown"),
+        "current_schedule": state.get("current_schedule"),
+        "next_schedule": state.get("next_schedule"),
+    }
+
+
+def format_stable_life_context(context: dict[str, Any]) -> str:
+    return "\n".join([
+        "【Lin Stable Life Context】",
+        f"location={context.get('location_state', 'unknown')}",
+        f"mac={context.get('mac_state', 'unknown')}",
+        f"screen_activity={context.get('screen_activity', 'unknown')}",
+        f"conversation={context.get('conversation_state', 'unknown')}",
+        f"current_schedule={context.get('current_schedule') or 'none'}",
+        f"next_schedule={context.get('next_schedule') or 'none'}",
+    ])
+
+
+def format_dynamic_life_context(context: dict[str, Any]) -> str:
+    lines = ["【Lin Dynamic Life Context】"]
+    phone = context.get("phone")
+    if phone:
+        parts = []
+        if phone.get("app_name"):
+            parts.append(f"recent_phone_app={phone['app_name']}")
+        if phone.get("battery_level") is not None:
+            parts.append(f"phone_battery={phone['battery_level']}%")
+        if phone.get("battery_state"):
+            parts.append(f"phone_battery_state={phone['battery_state']}")
+        parts.extend([
+            f"source={phone.get('source')}",
+            f"age_minutes={phone.get('age_minutes')}",
+            f"confidence={phone.get('confidence')}",
+        ])
+        lines.append("phone_observation=" + ", ".join(parts))
+    return "\n".join(lines)
+
+
 def format_life_context(context: dict[str, Any]) -> str:
-    state = context.get("state") or {}
-    lines = ["【Lin Life Context】", f"location={state.get('location_state', 'unknown')}", f"mac={state.get('mac_state', 'unknown')}", f"screen_activity={state.get('screen_activity', 'unknown')}", f"conversation={state.get('conversation_state', 'unknown')}", f"current_schedule={state.get('current_schedule') or 'none'}", f"next_schedule={state.get('next_schedule') or 'none'}"]
-    if state.get("last_user_activity_at"): lines.append(f"last_user_activity_at={state['last_user_activity_at']}")
-    if state.get("last_conversation_at"): lines.append(f"last_conversation_at={state['last_conversation_at']}")
-    lines.append("recent_life_events:")
-    for item in context.get("recent_events", [])[:12]:
-        lines.append(f"- {item.get('occurred_at')} {item.get('event_type')} {item.get('payload') or {}}")
+    """Legacy prompt renderer; callers should migrate to explicit stable/dynamic sections."""
+    state = context.get("state") or context
+    lines = [
+        "【Lin Life Context】",
+        f"location={state.get('location_state', 'unknown')}",
+        f"mac={state.get('mac_state', 'unknown')}",
+        f"screen_activity={state.get('screen_activity', 'unknown')}",
+        f"conversation={state.get('conversation_state', 'unknown')}",
+        f"current_schedule={state.get('current_schedule') or 'none'}",
+        f"next_schedule={state.get('next_schedule') or 'none'}",
+    ]
     return "\n".join(lines)

@@ -113,17 +113,53 @@
     }).join('');
   }
 
+  function renderDynamic(context) {
+    const el = document.getElementById('lifeDynamicObservation');
+    if (!el) return;
+    const dynamic = context.dynamic || {};
+    const phone = dynamic.phone;
+    if (!phone) {
+      const phoneEvents = (dynamic.recent_events || []).filter((event) => event.event_type === 'phone.observed');
+      if (!phoneEvents.length) {
+        el.innerHTML = '<div class="life-observation">目前沒有可用的 Dynamic Observation</div>';
+        return;
+      }
+      const latest = phoneEvents[phoneEvents.length - 1];
+      el.innerHTML = `<div class="life-observation life-observation-stale">最新 phone observation 已過期，不會被 Lin 描述為目前狀態。</div><div class="life-observation-meta">source: ${escapeHtml((latest.payload || {}).observation_source || latest.source || 'unknown')} · observed: ${escapeHtml(formatTime(latest.occurred_at))} · confidence: ${escapeHtml(latest.confidence)}</div>`;
+      return;
+    }
+    const lines = [
+      `App: ${phone.app_name || '未提供'}`,
+      `Battery: ${phone.battery_level ?? '未提供'}${phone.battery_level != null ? '%' : ''}`,
+      `State: ${phone.battery_state || '未提供'}`,
+    ];
+    el.innerHTML = `<div class="life-observation">${escapeHtml(lines.join('\n'))}</div><div class="life-observation-meta">source: ${escapeHtml(phone.source)} · confidence: ${escapeHtml(phone.confidence)} · age: ${escapeHtml(phone.age_minutes)} min · fresh: ${escapeHtml(phone.fresh)} · current claim: ${escapeHtml(phone.current_claim_allowed)} · proactive use: ${escapeHtml(phone.usable_for_proactive_action)}</div>`;
+  }
+
+  function renderContext(context) {
+    const el = document.getElementById('lifeContext');
+    if (!el) return;
+    const stable = context.stable || context.state || {};
+    const dynamic = context.dynamic || {};
+    const recent = dynamic.recent_events || context.recent_events || [];
+    el.innerHTML = `<div class="life-context-block"><div class="life-context-title">Stable Life State</div><pre class="life-context-json">${escapeHtml(pretty(stable))}</pre></div><div class="life-context-block"><div class="life-context-title">Dynamic Read Model</div><pre class="life-context-json">${escapeHtml(pretty(dynamic))}</pre></div><div class="life-context-block"><div class="life-context-title">Recent Life Events (${recent.length})</div><pre class="life-context-json">${escapeHtml(pretty(recent))}</pre></div>`;
+  }
+
   async function refreshLife() {
     const dateInput = document.getElementById('lifeTimelineDate');
     const date = dateInput?.value || today();
     setStatus('更新中…');
     try {
-      const [stateData, timelineData, auditData] = await Promise.all([
+      const [stateData, contextData, eventData, timelineData, auditData] = await Promise.all([
         getJson('/life/state'),
+        getJson('/life/context'),
+        getJson('/life/events?limit=50'),
         getJson(`/life/timeline?date=${encodeURIComponent(date)}`),
         getJson('/life/audit'),
       ]);
       renderState(stateData.state || {});
+      renderDynamic(contextData);
+      renderContext({ ...contextData, dynamic: { ...(contextData.dynamic || {}), recent_events: (eventData.events || contextData.dynamic?.recent_events || []) } });
       renderTimeline(timelineData.events || []);
       await renderAudit(auditData.audit || []);
       setStatus(`最後更新 ${new Date().toLocaleTimeString('zh-TW', { hour12: false })}`);

@@ -16,7 +16,7 @@ from app.agent.brain import generate_reply, generate_reply_stream
 from app.context.auth import verify_context_token
 from app.context import mac as mac_context
 from app.event_bus import event_bus
-from app.life import get_life_context, get_life_state, get_timeline
+from app.life import get_life_context, get_life_state, get_timeline, ingest_context, ingest_conversation
 from app.life.phase7 import get_audit, get_candidate, run_life_runtime_tick
 from app.life.mcp_registry import registry as life_capability_registry
 from app.llm.main_router import get_main_model_config, list_main_models
@@ -71,6 +71,15 @@ class LocationPayload(BaseModel):
     longitude: Optional[float] = None
     label: Optional[str] = None  # 地点名称（如果有的话）
     accuracy: Optional[float] = None
+    timestamp: Optional[str] = None
+
+class PhoneObservationPayload(BaseModel):
+    """iOS Shortcut and optional passive bridge observations."""
+    app_name: Optional[str] = None
+    battery_level: Optional[int] = None
+    battery_state: Optional[str] = None
+    observation_source: str = "shortcut"  # shortcut | biome_passive
+    timestamp: Optional[str] = None
 
 class DeviceEventPayload(BaseModel):
     """iPhone 捷徑統一上報 endpoint，所有欄位皆可選"""
@@ -150,7 +159,9 @@ def observe_anna(activity: Activity):
         else:
             context = f"Anna说：{activity.activity}"
             state.add_conversation_turn("anna", activity.activity, session_id=target_session_id)
-    
+
+    ingest_conversation("anna", context, session_id=target_session_id)
+
     return StreamingResponse(
         generate_reply_stream(context, app_name=activity.app_name, use_cache=False, session_id=target_session_id),
         media_type="text/event-stream",
@@ -436,6 +447,7 @@ def update_mac_status(payload: MacStatus):
     （鉴权逻辑集中在 app/context/auth.py，见 verify_context_token）。
     """
     mac_context.save_mac_status(payload.dict(exclude_none=True))
+    ingest_context("mac", payload.dict(exclude_none=True))
     # 組合人類可讀的訊息，寫入 Event Bus（Persistent，覆蓋）
     parts = []
     if payload.asleep is True:
@@ -458,6 +470,7 @@ def update_mac_status(payload: MacStatus):
 def update_screentime(payload: ScreenTimePayload):
     from app.context import screentime as screentime_context
     screentime_context.save_screentime(payload.dict(exclude_none=True))
+    ingest_context("screentime", payload.dict(exclude_none=True))
     if payload.total_minutes is not None:
         hrs, mins = divmod(payload.total_minutes, 60)
         msg = f"今日螢幕使用 {hrs}h {mins}m" if hrs else f"今日螢幕使用 {mins}m"
@@ -477,9 +490,20 @@ def update_location(payload: LocationPayload):
     """
     from app.context import location as location_context
     location_context.save_location(payload.dict(exclude_none=True))
+    ingest_context("location", payload.dict(exclude_none=True))
     loc_label = payload.label or (f"{payload.latitude:.3f}, {payload.longitude:.3f}" if payload.latitude else "未知位置")
     event_bus.emit("location", f"目前位置：{loc_label}")
     return {"status": "Success"}
+
+@router.post("/context/phone", dependencies=[Depends(verify_context_token)])
+def update_phone_observation(payload: PhoneObservationPayload):
+    """Receive a timestamped iOS Shortcut observation or an explicitly passive bridge sample."""
+    data = payload.dict(exclude_none=True)
+    result = ingest_context("phone", data)
+    app_name = data.get("app_name") or "未知 App"
+    event_bus.emit("phone", f"iPhone 觀測：{app_name}")
+    return {"status": "Success", "events": len(result)}
+
 
 @router.post("/context/device", dependencies=[Depends(verify_context_token)])
 def device_event(payload: DeviceEventPayload):

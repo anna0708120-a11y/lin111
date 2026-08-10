@@ -114,6 +114,41 @@ def normalize_calendar(events: list[dict[str, Any]] | None, now: datetime | None
     return result
 
 
+
+def normalize_phone_observation(payload: dict[str, Any]) -> list[LifeEvent]:
+    """Normalize a phone-side observation without claiming it is a live OS fact."""
+    if not isinstance(payload, dict):
+        return []
+    app_name = str(payload.get("app_name") or payload.get("app") or "").strip()
+    battery_level = payload.get("battery_level")
+    battery_state = str(payload.get("battery_state") or "").strip().lower()
+    source_kind = str(payload.get("observation_source") or "shortcut").strip().lower()
+    if not app_name and battery_level is None and not battery_state:
+        return []
+
+    observed_at = iso_utc(_payload_time(payload))
+    confidence = 0.95 if source_kind == "shortcut" else 0.35
+    body = {
+        "app_name": app_name[:160] or None,
+        "battery_level": battery_level,
+        "battery_state": battery_state or None,
+        "observation_source": source_kind,
+        "observed_at": observed_at,
+    }
+    dedupe_body = {key: value for key, value in body.items() if key != "observed_at"}
+    dedupe_body["observed_at"] = observed_at
+    return [
+        _event(
+            "phone.observed",
+            "iphone",
+            body,
+            occurred_at=observed_at,
+            confidence=confidence,
+            dedupe_payload=dedupe_body,
+        )
+    ]
+
+
 def normalize_conversation(role: str, content: str, *, session_id: str | None = None, occurred_at: Any = None) -> list[LifeEvent]:
     role = str(role or "").lower()
     if role not in {"anna", "lin", "user", "assistant"} or not str(content or "").strip():

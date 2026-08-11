@@ -22,6 +22,7 @@ from app.life import get_life_context, get_life_state, get_timeline, ingest_cont
 from app.life.phase7 import get_audit, get_candidate, run_life_runtime_tick
 from app.life.mcp_registry import registry as life_capability_registry
 from app.integration.lin_context import build_lin_context, verify_lin_context_token
+from app.integration.phase_b import receive_hermes_event, verify_hermes_callback_token
 from app.llm.main_router import get_main_model_config, list_main_models
 from app.state import state
 from app.web.pwa import MANIFEST_JSON, SERVICE_WORKER_JS
@@ -110,6 +111,18 @@ class DeviceEventPayload(BaseModel):
     label: Optional[str] = None  # 地点名称（如果有的话）
     accuracy: Optional[float] = None
 
+
+class HermesEventPayload(BaseModel):
+    schema_version: str
+    event_id: str
+    task_id: str
+    context_id: str
+    type: str
+    source: str
+    observed_at: str
+    payload: dict
+    source_versions: dict
+
 @router.get("/health")
 def health():
     """给 Render / 之后的监控用的健康检查接口，顺便回报 Supabase 有没有连上。"""
@@ -129,6 +142,15 @@ def lin_context_endpoint(
         session_id=session_id,
         memory_query=memory_query,
     )
+
+
+@router.post("/internal/lin-events/v1")
+def lin_event_endpoint(
+    event: HermesEventPayload,
+    _: bool = Depends(verify_hermes_callback_token),
+):
+    """Receive an allowlisted Hermes result or proposal; Render owns writes."""
+    return receive_hermes_event(event.dict())
 
 @router.get("/manifest.json")
 def manifest():

@@ -2,6 +2,7 @@
 (function () {
   const modes = { dynamic: 'readable', context: 'readable', timeline: 'readable', audit: 'readable' };
   let data = { state: {}, context: {}, events: [], timeline: [], audit: [], device: {} };
+  let refreshInFlight = null;
   let refreshLastAt = 0;
   const refreshCooldownMs = 5000;
 

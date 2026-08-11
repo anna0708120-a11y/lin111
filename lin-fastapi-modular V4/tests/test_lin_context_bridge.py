@@ -28,6 +28,11 @@ class LinContextBridgeTests(unittest.TestCase):
             "stable": {"location_state": "home", "current_schedule": None},
             "dynamic": {"recent_events": [{"event_type": "conversation.user_message", "payload": {"text": "private"}}]},
             "state": {"version": 12, "ignored_streak": 99},
+            "interpretations": [{
+                "kind": "workload.focus", "observation": "multiple observations",
+                "hypothesis": "Anna may be focused.", "confidence": 0.72,
+                "expires_at": "2026-08-11T12:00:00Z",
+            }],
             "recent_events": [],
             "timezone": "Asia/Hong_Kong",
         }

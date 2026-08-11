@@ -74,6 +74,14 @@ def _life_projection(raw: dict[str, Any]) -> dict[str, Any]:
             "location_state", "location_observed_at", "mac_state", "screen_activity",
             "conversation_state", "current_schedule", "next_schedule") if key in stable},
         "state": state,
+        "interpretations": [
+            {
+                key: item.get(key)
+                for key in ("interpretation_id", "kind", "observation", "hypothesis", "confidence", "observed_at", "expires_at")
+                if key in item
+            }
+            for item in (raw.get("interpretations") or [])
+        ],
         "recent_events": recent,
     }
 

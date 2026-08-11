@@ -93,6 +93,21 @@ class LifeSystemTests(unittest.TestCase):
         self.assertGreaterEqual(len(timeline), 3)
         context = get_life_context()
         self.assertEqual(context["state"]["location_state"], "at_home")
+        self.assertEqual(context["interpretations"], [])
+
+    def test_life_context_exposes_derived_interpretation_without_state_write(self):
+        now = datetime(2026, 8, 10, 12, 0, tzinfo=timezone.utc)
+        events = [
+            LifeEvent("mac-1", "mac.active", "mac", "2026-08-10T11:35:00Z", "2026-08-10T11:35:00Z", {"to": "active"}, 0.95, "mac-1"),
+            LifeEvent("mac-2", "mac.unlocked", "mac", "2026-08-10T11:45:00Z", "2026-08-10T11:45:00Z", {"to": "active"}, 0.95, "mac-2"),
+            LifeEvent("screen-1", "screentime.summary", "screentime", "2026-08-10T11:50:00Z", "2026-08-10T11:50:00Z", {"activity": "high"}, 0.98, "screen-1"),
+        ]
+        ingest_events(events)
+        before = get_life_state()
+        context = get_life_context(now=now)
+        after = get_life_state()
+        self.assertEqual(context["interpretations"][0]["kind"], "workload.focus")
+        self.assertEqual(before, after)
 
     def test_phone_observation_has_source_confidence_and_ttl(self):
         now = datetime(2026, 8, 10, 12, 0, tzinfo=timezone.utc)

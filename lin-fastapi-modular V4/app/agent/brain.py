@@ -19,6 +19,8 @@ from app.persona import build_system_prompt
 from app.memory_rules import parse_memory_decision, parse_mood_event, strip_hidden_blocks
 from app import memory_trace  # Phase 2: 記錄 memory 決策鏈路
 from app.context.provider import get_context, format_context_for_prompt
+from app.life.runtime import get_life_context
+from app.life.interpretations import format_interpretations_for_prompt, relevant_interpretations
 from app import mood_engine
 from app.agent.thinking_decision import (
     clean_thinking_text,
@@ -421,6 +423,12 @@ def _generate_reply_stream_impl(context, app_name=None, use_cache=True, session_
     
     print("[TRACE-B] before build context")
     world_context = format_context_for_prompt(get_context())
+    life_context = get_life_context()
+    interpretation_context = format_interpretations_for_prompt(
+        relevant_interpretations(life_context.get("interpretations", []), context)
+    )
+    if interpretation_context:
+        world_context = "\n".join(part for part in (world_context, interpretation_context) if part)
     print("[TRACE-C] after build context")
     print("[TRACE-D] before build prompt")
     thinking_suggestion = should_show_thinking(context, state)

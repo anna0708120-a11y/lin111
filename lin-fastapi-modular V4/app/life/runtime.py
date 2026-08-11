@@ -11,6 +11,7 @@ from app.event_bus import event_bus
 from .contracts import LifeEvent, LifeState, aware_utc, iso_utc
 from .event_normalizer import normalize_calendar, normalize_conversation, normalize_location, normalize_mac, normalize_phone_observation, normalize_screentime
 from .read_model import dynamic_life_context, format_dynamic_life_context, format_life_context, format_stable_life_context, stable_life_context
+from .interpretations import derive_interpretations
 from .state_engine import apply_event, mark_conversation_idle
 
 _MEMORY_EVENTS: list[dict[str, Any]] = []
@@ -161,6 +162,7 @@ def get_life_context(*, timezone_name: str = "Asia/Hong_Kong", now: datetime | N
         "dynamic": dynamic,
         "state": get_life_state(),
         "recent_events": dynamic["recent_events"],
+        "interpretations": derive_interpretations(recent, now=aware_utc(current_time)),
         "timezone": timezone_name,
     }
 

@@ -21,6 +21,7 @@ from app.event_bus import event_bus
 from app.life import get_life_context, get_life_state, get_timeline, ingest_context, ingest_conversation
 from app.life.phase7 import get_audit, get_candidate, run_life_runtime_tick
 from app.life.mcp_registry import registry as life_capability_registry
+from app.integration.lin_context import build_lin_context, verify_lin_context_token
 from app.llm.main_router import get_main_model_config, list_main_models
 from app.state import state
 from app.web.pwa import MANIFEST_JSON, SERVICE_WORKER_JS
@@ -113,6 +114,21 @@ class DeviceEventPayload(BaseModel):
 def health():
     """给 Render / 之后的监控用的健康检查接口，顺便回报 Supabase 有没有连上。"""
     return {"status": "ok", "supabase_connected": db.is_connected()}
+
+
+@router.get("/internal/lin-context/v1")
+def lin_context_endpoint(
+    task_type: str = "general",
+    session_id: Optional[str] = None,
+    memory_query: str = "",
+    _: bool = Depends(verify_lin_context_token),
+):
+    """Return a bounded, read-only snapshot of Lin's current Render context."""
+    return build_lin_context(
+        task_type=task_type,
+        session_id=session_id,
+        memory_query=memory_query,
+    )
 
 @router.get("/manifest.json")
 def manifest():

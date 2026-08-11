@@ -118,6 +118,13 @@ ENABLE_PHOTO = os.getenv("ENABLE_PHOTO", "true").lower() == "true"
 # 用 Bearer Token 方式：请求header加 Authorization: Bearer 这个值
 CONTEXT_API_TOKEN = os.getenv("CONTEXT_API_TOKEN", "")
 
+# ---- Read-only Render -> Hermes Lin Context Bridge ----
+LIN_CONTEXT_API_TOKEN = os.getenv("LIN_CONTEXT_API_TOKEN", "")
+LIN_CONTEXT_TTL_SECONDS = int(os.getenv("LIN_CONTEXT_TTL_SECONDS", "900"))
+LIN_CONTEXT_CONVERSATION_LIMIT = int(os.getenv("LIN_CONTEXT_CONVERSATION_LIMIT", "12"))
+LIN_CONTEXT_MEMORY_LIMIT = int(os.getenv("LIN_CONTEXT_MEMORY_LIMIT", "8"))
+LIN_CONTEXT_LIFE_EVENT_LIMIT = int(os.getenv("LIN_CONTEXT_LIFE_EVENT_LIMIT", "8"))
+
 # ---- 天气：定位坐标（用 WEATHER_LAT / WEATHER_LON 环境变量设置） ----
 WEATHER_LAT = os.getenv("WEATHER_LAT", "25.0330")   # 默认台北
 WEATHER_LON = os.getenv("WEATHER_LON", "121.5654")

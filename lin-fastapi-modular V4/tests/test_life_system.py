@@ -23,13 +23,18 @@ class LifeSystemTests(unittest.TestCase):
         reset_memory_runtime()
 
     def test_location_transitions_and_unknown_baseline(self):
+        self.assertEqual(
+            normalize_location({"label": "office", "timestamp": "2026-08-10T08:00:00Z"}, "at_home"),
+            [],
+        )
         first = normalize_location({"label": "home", "timestamp": "2026-08-10T08:20:00+08:00"}, "unknown")
         self.assertEqual(first[0].event_type, "location.returned_home")
         state, changed = apply_event(LifeState(), first[0])
         self.assertEqual(state.location_state, "at_home")
-        self.assertEqual(changed, ["location_state"])
+        self.assertEqual(state.location_observed_at, first[0].occurred_at)
+        self.assertEqual(changed, ["location_state", "location_observed_at"])
 
-        left = normalize_location({"label": "office", "timestamp": "2026-08-10T09:10:00+08:00"}, state.location_state)
+        left = normalize_location({"location_event": "leave_home", "timestamp": "2026-08-10T09:10:00+08:00"}, state.location_state)
         state, _ = apply_event(state, left[0])
         self.assertEqual(left[0].event_type, "location.left_home")
         self.assertEqual(state.location_state, "outside")
@@ -74,7 +79,7 @@ class LifeSystemTests(unittest.TestCase):
     def test_replay_is_deterministic_and_duplicate_ingest_is_idempotent(self):
         events = []
         events += normalize_location({"label": "home", "timestamp": "2026-08-10T08:20:00+08:00"}, "unknown")
-        events += normalize_location({"label": "office", "timestamp": "2026-08-10T09:10:00+08:00"}, "at_home")
+        events += normalize_location({"location_event": "leave_home", "timestamp": "2026-08-10T09:10:00+08:00"}, "at_home")
         events += normalize_location({"label": "home", "timestamp": "2026-08-10T18:40:00+08:00"}, "outside")
         expected = replay_events(events)
         self.assertEqual(expected.location_state, "at_home")

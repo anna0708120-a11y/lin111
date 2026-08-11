@@ -17,6 +17,9 @@ def apply_event(state: LifeState, event: LifeEvent) -> tuple[LifeState, list[str
         new = p.get("to") if et != "location.observed" else p.get("state")
         if new and new != values["location_state"]:
             values["location_state"] = new; changed.append("location_state")
+        observed_at = p.get("observed_at") or event.occurred_at
+        if observed_at and observed_at != values.get("location_observed_at"):
+            values["location_observed_at"] = observed_at; changed.append("location_observed_at")
     elif et.startswith("mac.") and p.get("to"):
         if p["to"] != values["mac_state"]:
             values["mac_state"] = p["to"]; changed.append("mac_state")

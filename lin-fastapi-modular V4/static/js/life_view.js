@@ -2,6 +2,8 @@
 (function () {
   const modes = { dynamic: 'readable', context: 'readable', timeline: 'readable', audit: 'readable' };
   let data = { state: {}, context: {}, events: [], timeline: [], audit: [], device: {} };
+  let refreshLastAt = 0;
+  const refreshCooldownMs = 5000;
 
   const escapeHtml = (value) => String(value ?? '')
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -114,10 +116,20 @@
   };
 
   async function refreshLife() {
+    if (refreshInFlight) return refreshInFlight;
+    const now = Date.now();
+    if (now - refreshLastAt < refreshCooldownMs) return;
+    refreshLastAt = now;
+    refreshInFlight = (async () => {
     const input = document.getElementById('lifeTimelineDate');
     const date = input?.value || today();
     status('更新中…');
     try {
+      try {
+        await fetch(AU + '/life/context/refresh', { method: 'POST', headers: { Accept: 'application/json' } });
+      } catch (_refreshError) {
+        // Keep the last valid Life view available when providers are unavailable.
+      }
       const [state, context, events, timeline, audit, device] = await Promise.all([
         getJson('/life/state'), getJson('/life/context'), getJson('/life/events?limit=50'),
         getJson(`/life/timeline?date=${encodeURIComponent(date)}`), getJson('/life/audit'), getJson('/events'),
@@ -127,8 +139,12 @@
       status(`最后更新 ${new Date().toLocaleTimeString('zh-TW', { hour12: false })}`);
     } catch (error) {
       status('Life System 暂时无法读取', true);
-      const el = document.getElementById('lifeDeviceSummary');
-      if (el) el.innerHTML = empty(error.message);
+    }
+    })();
+    try {
+      return await refreshInFlight;
+    } finally {
+      refreshInFlight = null;
     }
   }
 

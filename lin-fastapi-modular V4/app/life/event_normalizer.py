@@ -41,7 +41,7 @@ def _event(
 
 
 def _payload_time(payload: dict[str, Any]) -> Any:
-    return payload.get("timestamp") or payload.get("updated_at") or payload.get("occurred_at") or payload.get("time")
+    return payload.get("observed_at") or payload.get("timestamp") or payload.get("updated_at") or payload.get("occurred_at") or payload.get("time")
 
 
 def normalize_location(payload: dict[str, Any], previous_state: str = "unknown") -> list[LifeEvent]:
@@ -115,6 +115,28 @@ def normalize_mac(payload: dict[str, Any], previous_state: str = "unknown", prev
     if isinstance(charging, bool) and charging != previous_charging:
         events.append(_event("mac.charging_changed", "mac", {"charging": charging}, occurred_at=_payload_time(payload), confidence=0.95, dedupe_payload={"charging": charging, "occurred_at": iso_utc(_payload_time(payload))}))
     return events
+
+
+def normalize_weather(payload: dict[str, Any]) -> list[LifeEvent]:
+    """Normalize an existing Open-Meteo observation into dedupable Life evidence."""
+    if not isinstance(payload, dict) or payload.get("temperature") is None:
+        return []
+    observed_at = payload.get("observed_at") or payload.get("timestamp") or payload.get("updated_at")
+    body = {
+        "temperature": payload.get("temperature"),
+        "feels_like": payload.get("feels_like"),
+        "humidity": payload.get("humidity"),
+        "wind_speed": payload.get("wind_speed"),
+        "weather_code": payload.get("weather_code"),
+    }
+    return [_event(
+        "weather.observed",
+        "weather",
+        body,
+        occurred_at=observed_at,
+        confidence=0.9,
+        dedupe_payload={**body, "observed_at": iso_utc(observed_at)},
+    )]
 
 
 def normalize_screentime(payload: dict[str, Any], previous_total: int | None = None) -> list[LifeEvent]:

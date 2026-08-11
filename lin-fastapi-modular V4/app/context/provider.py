@@ -38,7 +38,7 @@ def get_context(need=None):
             value = fn()
             if value:
                 result[key] = value
-                if key in {"location", "mac", "screentime", "calendar"}:
+                if key in {"location", "mac", "weather", "screentime", "calendar"}:
                     try:
                         from app.life.runtime import ingest_context
                         ingest_context(key, value)

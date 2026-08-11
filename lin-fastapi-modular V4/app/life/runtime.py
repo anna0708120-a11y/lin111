@@ -9,7 +9,7 @@ from app import db
 from app.event_bus import event_bus
 
 from .contracts import LifeEvent, LifeState, aware_utc, iso_utc
-from .event_normalizer import normalize_calendar, normalize_conversation, normalize_location, normalize_mac, normalize_phone_observation, normalize_screentime
+from .event_normalizer import normalize_calendar, normalize_conversation, normalize_location, normalize_mac, normalize_phone_observation, normalize_screentime, normalize_weather
 from .read_model import dynamic_life_context, format_dynamic_life_context, format_life_context, format_stable_life_context, stable_life_context
 from .interpretations import derive_interpretations
 from .state_engine import apply_event, mark_conversation_idle
@@ -95,6 +95,8 @@ def ingest_context(source: str, payload: dict[str, Any], *, previous_state: Life
         events = normalize_location(payload, state.location_state)
     elif source == "mac":
         events = normalize_mac(payload, state.mac_state, state.mac_charging)
+    elif source == "weather":
+        events = normalize_weather(payload)
     elif source == "screentime":
         previous_total = None
         recent = list_events(limit=20)

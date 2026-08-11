@@ -31,7 +31,9 @@ def get_weather():
             try:
                 updated_dt = datetime.fromisoformat(updated_at.replace("Z", "+00:00"))
                 if datetime.now(timezone.utc) - updated_dt < timedelta(minutes=config.WEATHER_CACHE_MINUTES):
-                    return cached["payload"]
+                    payload = dict(cached["payload"])
+                    payload.setdefault("observed_at", updated_dt.isoformat(timespec="seconds").replace("+00:00", "Z"))
+                    return payload
             except Exception:
                 pass
 
@@ -50,6 +52,7 @@ def get_weather():
             "humidity": data.get("relative_humidity_2m"),
             "wind_speed": data.get("wind_speed_10m"),
             "weather_code": data.get("weather_code"),
+            "observed_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
         }
         db.save_context("weather", payload)
 

@@ -6,11 +6,12 @@
 """
 from typing import Optional
 from datetime import datetime, timezone
+import threading
 import uuid
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import Response, StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 
 from app import db
 from app.attachments import AttachmentValidationError, build_attachment, public_attachment, utc_now
@@ -64,10 +65,31 @@ class MacStatus(BaseModel):
     asleep: Optional[bool] = None
 
 class ScreenTimePayload(BaseModel):
-    """iPhone 快捷指令定期上传屏幕使用时间。字段都设成可选。"""
-    total_minutes: Optional[int] = None
-    date: Optional[str] = None  # YYYY-MM-DD
-    apps: Optional[list] = None  # [{"name": "Instagram", "minutes": 30}, ...]
+    """Validated iPhone-provided daily Screen Time evidence."""
+    total_minutes: int = Field(ge=0, le=1440)
+    date: str
+    timestamp: Optional[str] = None
+    apps: Optional[list[dict]] = None
+
+    @field_validator("date")
+    @classmethod
+    def validate_date(cls, value):
+        try:
+            datetime.strptime(value, "%Y-%m-%d")
+        except (TypeError, ValueError) as exc:
+            raise ValueError("date must be YYYY-MM-DD") from exc
+        return value
+
+    @field_validator("timestamp")
+    @classmethod
+    def validate_timestamp(cls, value):
+        if value is None:
+            return value
+        try:
+            datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("timestamp must be ISO 8601") from exc
+        return value
 
 class LocationPayload(BaseModel):
     """iPhone 快捷指令上传定位。字段都设成可选。"""
@@ -123,10 +145,37 @@ class HermesEventPayload(BaseModel):
     payload: dict
     source_versions: dict
 
+
+_refresh_last_at = None
+_refresh_lock = threading.Lock()
+_REFRESH_COOLDOWN_SECONDS = 60
+
+
+def _refresh_context_sources():
+    global _refresh_last_at
+    now = datetime.now(timezone.utc)
+    with _refresh_lock:
+        if _refresh_last_at and (now - _refresh_last_at).total_seconds() < _REFRESH_COOLDOWN_SECONDS:
+            return {"status": "cooldown"}
+        _refresh_last_at = now
+    from app.context.provider import get_context
+    context = get_context(need=["weather", "calendar"])
+    return {"status": "refreshed", "sources": sorted(key for key in context if key in {"weather", "calendar"})}
+
 @router.get("/health")
 def health():
     """给 Render / 之后的监控用的健康检查接口，顺便回报 Supabase 有没有连上。"""
     return {"status": "ok", "supabase_connected": db.is_connected()}
+
+
+@router.post("/life/context/refresh")
+def refresh_life_context():
+    """Safely refresh only server-owned weather and calendar evidence."""
+    try:
+        return _refresh_context_sources()
+    except Exception as exc:
+        print(f"[life.refresh] context refresh failed: {exc}")
+        return {"status": "unavailable"}
 
 
 @router.get("/internal/lin-context/v1")
@@ -563,8 +612,9 @@ def update_mac_status(payload: MacStatus):
 @router.post("/context/screentime", dependencies=[Depends(verify_context_token)])
 def update_screentime(payload: ScreenTimePayload):
     from app.context import screentime as screentime_context
-    screentime_context.save_screentime(payload.dict(exclude_none=True))
-    ingest_context("screentime", payload.dict(exclude_none=True))
+    data = payload.dict(exclude_none=True)
+    screentime_context.save_screentime(data)
+    ingest_context("screentime", data)
     if payload.total_minutes is not None:
         hrs, mins = divmod(payload.total_minutes, 60)
         msg = f"今日螢幕使用 {hrs}h {mins}m" if hrs else f"今日螢幕使用 {mins}m"

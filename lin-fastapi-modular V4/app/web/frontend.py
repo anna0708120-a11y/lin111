@@ -197,6 +197,15 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 
 /* Life System read-only observability view */
 .life-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;}
+.life-section-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;}
+.life-section-heading .cl{margin:0;}
+.life-mode-toggle{display:inline-flex;align-items:center;gap:2px;padding:2px;background:var(--blush);border:1px solid var(--border);border-radius:999px;}
+.life-mode-toggle button{border:0;background:transparent;color:var(--muted);padding:3px 6px;border-radius:999px;font:10px 'DM Sans',sans-serif;cursor:pointer;}
+.life-mode-toggle button.active{background:var(--white);color:var(--rose-deep);box-shadow:0 1px 2px var(--shadow);}
+.life-device-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+.life-device-item{min-width:0;padding:10px;background:var(--blush);border-radius:10px;}
+.life-device-icon{font-size:14px;margin-bottom:5px;}.life-device-label{font-size:10px;color:var(--muted);}.life-device-message{font-size:12px;color:var(--dark);line-height:1.45;margin-top:3px;word-break:break-word;}.life-device-time{font-size:10px;color:var(--muted);margin-top:4px;}
+.life-empty{padding:12px 0;color:var(--muted);font-size:12px;text-align:center;}
 .life-toolbar .cl{margin:0;}
 .life-refresh{border:1px solid var(--border);background:var(--white);color:var(--rose-deep);border-radius:8px;padding:7px 10px;font:11px 'DM Sans',sans-serif;cursor:pointer;}
 .life-refresh:hover{background:var(--blush);}
@@ -930,31 +939,21 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
       <button class="life-refresh" type="button" onclick="refreshLife()">↻ 更新</button>
     </div>
     <div class="life-refresh-status" id="lifeRefreshStatus" aria-live="polite"></div>
-    <div class="life-state-grid">
-      <div class="life-state-item life-location-card"><div class="life-state-label">Location</div><div class="life-state-value life-location-value" data-life-state="location">未知</div><div class="life-location-meta" data-life-state="location-observed">等待快捷指令位置事件</div></div>
-      <div class="life-state-item"><div class="life-state-label">Mac state</div><div class="life-state-value" data-life-state="mac">未知</div></div>
-      <div class="life-state-item"><div class="life-state-label">Charging</div><div class="life-state-value" data-life-state="charging">未知</div></div>
-      <div class="life-state-item"><div class="life-state-label">Screen activity</div><div class="life-state-value" data-life-state="screen">未知</div></div>
-      <div class="life-state-item"><div class="life-state-label">Conversation</div><div class="life-state-value" data-life-state="conversation">未知</div></div>
-      <div class="life-state-item"><div class="life-state-label">Last activity</div><div class="life-state-value" data-life-state="activity">—</div></div>
-      <div class="life-state-item life-state-wide"><div class="life-state-label">Current schedule</div><div class="life-state-value" data-life-state="current">無</div></div>
-      <div class="life-state-item life-state-wide"><div class="life-state-label">Next schedule</div><div class="life-state-value" data-life-state="next">無</div></div>
-    </div>
-    <div class="life-refresh-status" id="lifeStateUpdated"></div>
+    <div class="life-device-summary" id="lifeDeviceSummary"><div class="life-empty">載入裝置狀態…</div></div>
   </div>
 
   <div class="card">
-    <div class="cl">Dynamic Observation</div>
+    <div class="life-section-heading"><div class="cl">Dynamic Observation</div><div class="life-mode-toggle" data-life-toggle="dynamic"><button type="button" class="active" onclick="setLifeMode('dynamic','readable')">顯示</button><button type="button" onclick="setLifeMode('dynamic','raw')">Raw</button></div></div>
     <div id="lifeDynamicObservation"><div class="es">載入中…</div></div>
   </div>
 
   <div class="card">
-    <div class="cl">Life Context</div>
+    <div class="life-section-heading"><div class="cl">Life Context</div><div class="life-mode-toggle" data-life-toggle="context"><button type="button" class="active" onclick="setLifeMode('context','readable')">顯示</button><button type="button" onclick="setLifeMode('context','raw')">Raw</button></div></div>
     <div id="lifeContext"><div class="es">載入中…</div></div>
   </div>
 
   <div class="card">
-    <div class="cl">Self Timeline</div>
+    <div class="life-section-heading"><div class="cl">Self Timeline</div><div class="life-mode-toggle" data-life-toggle="timeline"><button type="button" class="active" onclick="setLifeMode('timeline','readable')">顯示</button><button type="button" onclick="setLifeMode('timeline','raw')">Raw</button></div></div>
     <div class="life-date-row">
       <input id="lifeTimelineDate" type="date" aria-label="選擇 Life Timeline 日期" onchange="refreshLife()">
       <button class="life-refresh" type="button" onclick="refreshLife()">查看</button>
@@ -963,7 +962,7 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
   </div>
 
   <div class="card">
-    <div class="cl">Life Activity / Audit</div>
+    <div class="life-section-heading"><div class="cl">Life Activity / Audit</div><div class="life-mode-toggle" data-life-toggle="audit"><button type="button" class="active" onclick="setLifeMode('audit','readable')">顯示</button><button type="button" onclick="setLifeMode('audit','raw')">Raw</button></div></div>
     <div class="life-audit-list" id="lifeAudit"><div class="es">載入中…</div></div>
   </div>
 </div>
@@ -2000,23 +1999,15 @@ async function llogs(){
     const lc=document.getElementById('lc');
     if(ev){
       let html='';
-      // 持久狀態列（Mac / 定位 / 螢幕）
-      const PORDER=['app','mac','location','screentime','weather'];
-      const pItems=PORDER.map(k=>ev.persistent[k]).filter(Boolean);
-      if(pItems.length>0){
-        html+='<div style="display:flex;flex-wrap:wrap;gap:6px;padding:4px 0 10px">';
-        html+=pItems.map(e=>'<div style="font-size:11px;background:var(--blush);color:var(--rose-deep);border-radius:8px;padding:3px 8px;line-height:1.4"><span style="opacity:.65">'+e.time+'</span>  '+e.message+'</div>').join('');
-        html+='</div>';
-      }
-      // 活動流
+      // ── 監控日誌：Life 狀態已遷移，這裡只保留活動流 ──────
       const acts=ev.activity||[];
       const LEVEL_COLOR={info:'var(--rose-deep)',warn:'#b86e00',alert:'#c0392b'};
       if(acts.length>0){
-        html+=acts.map(e=>{
+        html=acts.map(e=>{
           const col=LEVEL_COLOR[e.level]||'var(--rose-deep)';
           return '<div class="li"><div class="lm"><span class="lt" style="color:'+col+'">'+e.type+'</span><span class="ltime">'+e.time+'</span></div><div>'+e.message+'</div></div>';
         }).join('');
-      } else if(pItems.length===0){
+      } else {
         html='<div class="es">📡 等待系統事件...</div>';
       }
       lc.innerHTML=html;

@@ -1,183 +1,134 @@
-/* Life System UI: read-only state, timeline, candidate and audit visibility. */
+/* Life System UI: readable Life Center with optional raw developer views. */
 (function () {
-  const root = () => document.getElementById('lifeUi');
-  const stateValue = (value, fallback = '未知') => {
-    if (value === null || value === undefined || value === '') return fallback;
-    return String(value);
-  };
+  const modes = { dynamic: 'readable', context: 'readable', timeline: 'readable', audit: 'readable' };
+  let data = { state: {}, context: {}, events: [], timeline: [], audit: [], device: {} };
+
   const escapeHtml = (value) => String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-  const pretty = (value) => {
-    if (value === null || value === undefined || value === '') return '—';
-    if (typeof value === 'object') return JSON.stringify(value, null, 2);
-    return String(value);
-  };
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+  const pretty = (value) => JSON.stringify(value ?? null, null, 2);
   const formatTime = (value) => {
     if (!value) return '—';
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString('zh-TW', { hour12: false });
   };
-  const locationLabel = (value) => ({
-    at_home: '在家',
-    outside: '外出',
-    unknown: '未知',
-  })[value] || stateValue(value);
-  const today = () => {
-    const now = new Date();
-    const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
-    return local.toISOString().slice(0, 10);
-  };
-
-  async function getJson(path) {
+  const today = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  const getJson = async (path) => {
     const response = await fetch(AU + path, { headers: { Accept: 'application/json' } });
     if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
     return response.json();
-  }
-
-  function setStatus(text, error = false) {
+  };
+  const label = (map, value, fallback = '暂无数据') => map[value] || fallback;
+  const locationLabel = (value) => label({ at_home: '在家', outside: '外出', unknown: '暂无数据' }, value);
+  const status = (text, error = false) => {
     const el = document.getElementById('lifeRefreshStatus');
+    if (el) { el.textContent = text; el.classList.toggle('life-error', error); }
+  };
+  const raw = (value) => `<pre class="life-context-json">${escapeHtml(pretty(value))}</pre>`;
+  const empty = (text) => `<div class="life-empty">${escapeHtml(text)}</div>`;
+
+  function renderDevice() {
+    const el = document.getElementById('lifeDeviceSummary');
     if (!el) return;
-    el.textContent = text;
-    el.classList.toggle('life-error', error);
+    const state = data.state || {};
+    const persistent = data.device.persistent || {};
+    const cards = [
+      ['location', '位置', state.location_state === 'unknown' || !state.location_state ? '暂无数据' : locationLabel(state.location_state), state.location_observed_at ? `最后位置事件：${formatTime(state.location_observed_at)}` : '尚未接入位置快捷指令'],
+      ['mac', '电脑', persistent.mac?.message || (state.mac_state === 'unknown' ? '尚未接入' : label({ active: '使用中', idle: '闲置', locked: '已锁定' }, state.mac_state)), persistent.mac?.time ? `最后更新：${persistent.mac.time}` : '最后更新：—'],
+      ['screentime', '屏幕使用', persistent.screentime?.message || (state.screen_activity === 'unknown' ? '尚未接入' : label({ low: '使用较少', moderate: '适度使用', high: '使用较多' }, state.screen_activity)), persistent.screentime?.time ? `最后更新：${persistent.screentime.time}` : '最后更新：—'],
+      ['app', '手机与网络', persistent.app?.message || '暂无数据', persistent.app?.time ? `最后更新：${persistent.app.time}` : '尚未接入 iPhone 快捷指令'],
+      ['weather', '天气', persistent.weather?.message || '暂无数据', persistent.weather?.time ? `最后更新：${persistent.weather.time}` : '最后更新：—'],
+      ['calendar', '日程', state.current_schedule?.title ? `进行中：${state.current_schedule.title}` : state.next_schedule?.title ? `下一项：${state.next_schedule.title}` : '暂无日程', state.current_schedule?.start || state.next_schedule?.start ? `时间：${formatTime(state.current_schedule?.start || state.next_schedule?.start)}` : '最后更新：—'],
+      ['conversation', '对话', label({ active: '正在交流', idle: '暂时安静', unknown: '暂无数据' }, state.conversation_state), state.last_user_activity_at ? `最后互动：${formatTime(state.last_user_activity_at)}` : '最后更新：—'],
+    ];
+    const icons = { location: '⌂', mac: '▣', screentime: '◷', app: '◌', weather: '☼', calendar: '□', conversation: '○' };
+    el.innerHTML = cards.map(([type, title, message, meta]) => `<article class="life-device-item"><div class="life-device-icon">${icons[type]}</div><div class="life-device-label">${title}</div><div class="life-device-message">${escapeHtml(message)}</div><div class="life-device-time">${escapeHtml(meta)}</div></article>`).join('');
   }
 
-  function renderState(state) {
-    const values = {
-      location: locationLabel(state.location_state),
-      mac: stateValue(state.mac_state),
-      charging: state.mac_charging === true ? '充電中' : state.mac_charging === false ? '未充電' : '未知',
-      screen: stateValue(state.screen_activity),
-      conversation: stateValue(state.conversation_state),
-      current: state.current_schedule ? pretty(state.current_schedule) : '無',
-      next: state.next_schedule ? pretty(state.next_schedule) : '無',
-      activity: formatTime(state.last_user_activity_at || state.last_conversation_at),
-    };
-    Object.entries(values).forEach(([key, value]) => {
-      const el = document.querySelector(`[data-life-state="${key}"]`);
-      if (el) el.textContent = value;
-    });
-    const observed = document.querySelector('[data-life-state="location-observed"]');
-    if (observed) {
-      observed.textContent = state.location_observed_at
-        ? `最後位置事件：${formatTime(state.location_observed_at)}`
-        : '等待快捷指令位置事件';
-    }
-    const updated = document.getElementById('lifeStateUpdated');
-    if (updated) updated.textContent = state.updated_at ? `更新於 ${formatTime(state.updated_at)}` : '尚無持久化狀態';
-  }
-
-  function payloadSummary(payload) {
-    if (!payload || typeof payload !== 'object') return '';
-    const preferred = ['label', 'app_name', 'battery', 'battery_level', 'total_minutes', 'note'];
-    const bits = preferred.filter((key) => payload[key] !== undefined && payload[key] !== null && payload[key] !== '')
-      .map((key) => `${key}: ${payload[key]}`);
-    return bits.length ? bits.join(' · ') : '';
-  }
-
-  function renderTimeline(events) {
-    const el = document.getElementById('lifeTimeline');
-    if (!el) return;
-    if (!events.length) {
-      el.innerHTML = '<div class="es">這一天還沒有 Life Event</div>';
-      return;
-    }
-    el.innerHTML = events.slice().reverse().map((event) => `
-      <article class="life-event-row">
-        <div class="life-event-time">${escapeHtml(event.time || formatTime(event.occurred_at))}</div>
-        <div class="life-event-dot"></div>
-        <div class="life-event-body">
-          <div class="life-event-label">${escapeHtml(event.label || event.event_type || 'Life Event')}</div>
-          <div class="life-event-type">${escapeHtml(event.event_type || '')}</div>
-          <div class="life-event-payload">${escapeHtml(payloadSummary(event.payload) || pretty(event.payload || ''))}</div>
-        </div>
-      </article>`).join('');
-  }
-
-  async function renderAudit(rows) {
-    const el = document.getElementById('lifeAudit');
-    if (!el) return;
-    if (!rows.length) {
-      el.innerHTML = '<div class="es">目前沒有 Candidate / Action / Audit 記錄</div>';
-      return;
-    }
-    const ids = [...new Set(rows.map((row) => row.candidate_id).filter(Boolean))];
-    const candidates = await Promise.all(ids.map(async (id) => {
-      try { return await getJson(`/life/candidates/${encodeURIComponent(id)}`); } catch (_) { return { candidate: null }; }
-    }));
-    const byId = Object.fromEntries(candidates.map((item) => [item.candidate?.candidate_id, item.candidate]));
-    el.innerHTML = rows.slice().reverse().map((row) => {
-      const candidate = byId[row.candidate_id];
-      const candidateText = candidate
-        ? `${stateValue(candidate.status)} · ${stateValue(candidate.decision, '尚未決策')}`
-        : 'Candidate 未找到';
-      return `
-        <article class="life-audit-row">
-          <div class="life-audit-head"><strong>${escapeHtml(row.stage || 'audit')}</strong><span class="life-status">${escapeHtml(row.status || 'unknown')}</span></div>
-          <div class="life-audit-meta">${escapeHtml(formatTime(row.created_at))} · ${escapeHtml(row.candidate_id || '無 candidate')}</div>
-          <div class="life-audit-reason">${escapeHtml(row.reason || '—')}</div>
-          <div class="life-audit-candidate">Candidate：${escapeHtml(candidateText)}</div>
-        </article>`;
-    }).join('');
-  }
-
-  function renderDynamic(context) {
+  function renderDynamic() {
     const el = document.getElementById('lifeDynamicObservation');
     if (!el) return;
-    const dynamic = context.dynamic || {};
+    const dynamic = data.context.dynamic || {};
+    if (modes.dynamic === 'raw') { el.innerHTML = raw(dynamic); return; }
     const phone = dynamic.phone;
-    if (!phone) {
-      const phoneEvents = (dynamic.recent_events || []).filter((event) => event.event_type === 'phone.observed');
-      if (!phoneEvents.length) {
-        el.innerHTML = '<div class="life-observation">目前沒有可用的 Dynamic Observation</div>';
-        return;
-      }
-      const latest = phoneEvents[phoneEvents.length - 1];
-      el.innerHTML = `<div class="life-observation life-observation-stale">最新 phone observation 已過期，不會被 Lin 描述為目前狀態。</div><div class="life-observation-meta">source: ${escapeHtml((latest.payload || {}).observation_source || latest.source || 'unknown')} · observed: ${escapeHtml(formatTime(latest.occurred_at))} · confidence: ${escapeHtml(latest.confidence)}</div>`;
-      return;
-    }
-    const lines = [
-      `App: ${phone.app_name || '未提供'}`,
-      `Battery: ${phone.battery_level ?? '未提供'}${phone.battery_level != null ? '%' : ''}`,
-      `State: ${phone.battery_state || '未提供'}`,
+    if (!phone) { el.innerHTML = empty('暂无可用手机观察；尚未接入或最后观察已过期。'); return; }
+    const items = [
+      ['最近使用', phone.app_name || '暂无数据'],
+      ['电量', phone.battery_level == null ? '暂无数据' : `${phone.battery_level}%`],
+      ['充电状态', phone.battery_state || '暂无数据'],
+      ['观察时间', formatTime(phone.observed_at)],
     ];
-    el.innerHTML = `<div class="life-observation">${escapeHtml(lines.join('\n'))}</div><div class="life-observation-meta">source: ${escapeHtml(phone.source)} · confidence: ${escapeHtml(phone.confidence)} · age: ${escapeHtml(phone.age_minutes)} min · fresh: ${escapeHtml(phone.fresh)} · current claim: ${escapeHtml(phone.current_claim_allowed)} · proactive use: ${escapeHtml(phone.usable_for_proactive_action)}</div>`;
+    el.innerHTML = `<div class="life-device-summary">${items.map(([title, message]) => `<div class="life-device-item"><div class="life-device-label">${title}</div><div class="life-device-message">${escapeHtml(message)}</div></div>`).join('')}</div>`;
   }
 
-  function renderContext(context) {
+  function renderContext() {
     const el = document.getElementById('lifeContext');
     if (!el) return;
-    const stable = context.stable || context.state || {};
-    const dynamic = context.dynamic || {};
-    const recent = dynamic.recent_events || context.recent_events || [];
-    el.innerHTML = `<div class="life-context-block"><div class="life-context-title">Stable Life State</div><pre class="life-context-json">${escapeHtml(pretty(stable))}</pre></div><div class="life-context-block"><div class="life-context-title">Dynamic Read Model</div><pre class="life-context-json">${escapeHtml(pretty(dynamic))}</pre></div><div class="life-context-block"><div class="life-context-title">Recent Life Events (${recent.length})</div><pre class="life-context-json">${escapeHtml(pretty(recent))}</pre></div>`;
+    if (modes.context === 'raw') { el.innerHTML = raw(data.context); return; }
+    const state = data.context.stable || data.state || {};
+    const facts = [
+      ['位置', state.location_state === 'unknown' || !state.location_state ? '暂无数据' : locationLabel(state.location_state)],
+      ['电脑', state.mac_state === 'unknown' || !state.mac_state ? '尚未接入' : label({ active: '使用中', idle: '闲置', locked: '已锁定' }, state.mac_state)],
+      ['屏幕使用', state.screen_activity === 'unknown' || !state.screen_activity ? '尚未接入' : label({ low: '使用较少', moderate: '适度使用', high: '使用较多' }, state.screen_activity)],
+      ['对话', label({ active: '正在交流', idle: '暂时安静', unknown: '暂无数据' }, state.conversation_state)],
+      ['当前日程', state.current_schedule?.title || '暂无日程'],
+      ['下一项日程', state.next_schedule?.title || '暂无日程'],
+    ];
+    el.innerHTML = `<div class="life-device-summary">${facts.map(([title, message]) => `<div class="life-device-item"><div class="life-device-label">${title}</div><div class="life-device-message">${escapeHtml(message)}</div></div>`).join('')}</div>`;
   }
 
+  function eventText(event) {
+    const map = {
+      'location.returned_home': '回到家了', 'location.left_home': '离开家了',
+      'mac.active': '电脑开始使用', 'mac.idle': '电脑进入闲置', 'mac.locked': '电脑已锁定', 'mac.unlocked': '电脑已解锁',
+      'conversation.user_message': '你发来消息', 'conversation.lin_message': 'Lin 回复了消息',
+      'conversation.idle_elapsed': '对话暂时安静', 'screentime.summary': '更新屏幕使用时间',
+      'calendar.upcoming': '日程即将开始', 'phone.observed': '更新手机观察',
+    };
+    return map[event.event_type] || '记录了一项生活状态';
+  }
+
+  function renderTimeline() {
+    const el = document.getElementById('lifeTimeline');
+    if (!el) return;
+    if (modes.timeline === 'raw') { el.innerHTML = raw(data.timeline); return; }
+    if (!data.timeline.length) { el.innerHTML = empty('这一天还没有 Life 记录。'); return; }
+    el.innerHTML = data.timeline.slice().reverse().map((event) => `<article class="life-event-row"><div class="life-event-time">${escapeHtml(event.time || formatTime(event.occurred_at))}</div><div class="life-event-dot"></div><div class="life-event-body"><div class="life-event-label">${escapeHtml(eventText(event))}</div><div class="life-event-payload">${escapeHtml(event.payload?.title || event.payload?.app_name || event.payload?.total_minutes != null ? String(event.payload.title || event.payload.app_name || `${event.payload.total_minutes} 分钟`) : '')}</div></div></article>`).join('');
+  }
+
+  async function renderAudit() {
+    const el = document.getElementById('lifeAudit');
+    if (!el) return;
+    if (modes.audit === 'raw') { el.innerHTML = raw(data.audit); return; }
+    if (!data.audit.length) { el.innerHTML = empty('目前没有 Life 自动处理记录。'); return; }
+    const text = { candidate: '发现一个可处理的生活事件', policy: '已完成安全检查', decision: '已完成行动判断', outbox: '已写入待处理项目', action: '行动处理结果', tick: '系统巡检' };
+    el.innerHTML = data.audit.slice().reverse().map((row) => `<article class="life-audit-row"><div class="life-audit-head"><strong>${escapeHtml(text[row.stage] || 'Life 记录')}</strong><span class="life-status">${escapeHtml(row.status || '完成')}</span></div><div class="life-audit-meta">${escapeHtml(formatTime(row.created_at))}</div><div class="life-audit-reason">${escapeHtml(row.reason || '—')}</div></article>`).join('');
+  }
+
+  function renderAll() { renderDevice(); renderDynamic(); renderContext(); renderTimeline(); renderAudit(); }
+
+  window.setLifeMode = function (section, mode) {
+    modes[section] = mode;
+    document.querySelectorAll(`[data-life-toggle="${section}"] button`).forEach((button) => button.classList.toggle('active', button.textContent === (mode === 'raw' ? 'Raw' : '顯示')));
+    renderAll();
+  };
+
   async function refreshLife() {
-    const dateInput = document.getElementById('lifeTimelineDate');
-    const date = dateInput?.value || today();
-    setStatus('更新中…');
+    const input = document.getElementById('lifeTimelineDate');
+    const date = input?.value || today();
+    status('更新中…');
     try {
-      const [stateData, contextData, eventData, timelineData, auditData] = await Promise.all([
-        getJson('/life/state'),
-        getJson('/life/context'),
-        getJson('/life/events?limit=50'),
-        getJson(`/life/timeline?date=${encodeURIComponent(date)}`),
-        getJson('/life/audit'),
+      const [state, context, events, timeline, audit, device] = await Promise.all([
+        getJson('/life/state'), getJson('/life/context'), getJson('/life/events?limit=50'),
+        getJson(`/life/timeline?date=${encodeURIComponent(date)}`), getJson('/life/audit'), getJson('/events'),
       ]);
-      renderState(stateData.state || {});
-      renderDynamic(contextData);
-      renderContext({ ...contextData, dynamic: { ...(contextData.dynamic || {}), recent_events: (eventData.events || contextData.dynamic?.recent_events || []) } });
-      renderTimeline(timelineData.events || []);
-      await renderAudit(auditData.audit || []);
-      setStatus(`最後更新 ${new Date().toLocaleTimeString('zh-TW', { hour12: false })}`);
+      data = { state: state.state || {}, context: context || {}, events: events.events || [], timeline: timeline.events || [], audit: audit.audit || [], device: device || {} };
+      renderAll();
+      status(`最后更新 ${new Date().toLocaleTimeString('zh-TW', { hour12: false })}`);
     } catch (error) {
-      setStatus('Life System 暫時無法讀取', true);
-      const timeline = document.getElementById('lifeTimeline');
-      if (timeline) timeline.innerHTML = `<div class="es life-error">${escapeHtml(error.message)}</div>`;
+      status('Life System 暂时无法读取', true);
+      const el = document.getElementById('lifeDeviceSummary');
+      if (el) el.innerHTML = empty(error.message);
     }
   }
 

@@ -5,6 +5,7 @@
 以后 Flutter app 要接进来，看这个文件就知道有哪些接口能打。
 """
 from typing import Optional
+from datetime import datetime, timezone
 import uuid
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
@@ -589,6 +590,12 @@ def device_event(payload: DeviceEventPayload):
         event_bus.emit("system", f"🔔 提醒：{title}{due}")
 
     elif t in ("arrive_home", "leave_home"):
+        location_event = "arrive_home" if t == "arrive_home" else "leave_home"
+        ingest_context("location", {
+            "location_event": location_event,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "confidence": 0.95,
+        })
         emoji = "🏠" if t == "arrive_home" else "🚶"
         msg = "Anna 到家了" if t == "arrive_home" else "Anna 離家了"
         event_bus.emit("system", f"{emoji} {msg}")

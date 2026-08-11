@@ -45,22 +45,48 @@ def _payload_time(payload: dict[str, Any]) -> Any:
 
 
 def normalize_location(payload: dict[str, Any], previous_state: str = "unknown") -> list[LifeEvent]:
+    """Only classify an explicit Home automation event or label as location state.
+
+    Coordinates and arbitrary place labels do not establish whether Anna is at home;
+    upstream must provide an explicit home/away semantic signal.
+    """
     if not isinstance(payload, dict):
         return []
-    state = str(payload.get("state") or payload.get("location_state") or "").strip().lower()
-    if state not in {"unknown", "at_home", "outside"}:
-        label = str(payload.get("label") or "").lower()
+    raw_state = str(
+        payload.get("state")
+        or payload.get("location_state")
+        or payload.get("location_event")
+        or ""
+    ).strip().lower()
+    state_map = {
+        "arrive_home": "at_home",
+        "returned_home": "at_home",
+        "home": "at_home",
+        "at_home": "at_home",
+        "leave_home": "outside",
+        "left_home": "outside",
+        "outside": "outside",
+    }
+    state = state_map.get(raw_state)
+    if state is None:
+        label = str(payload.get("label") or "").strip().lower()
         if label in {"home", "at_home", "家", "家中", "家裡"}:
             state = "at_home"
-        elif label:
-            state = "outside"
-        else:
-            state = "unknown"
-    if state == "unknown" or state == previous_state:
+        # A generic label such as an office, coordinate, or place name is not
+        # reliable enough to infer that Anna has left home.
+    if state is None or state == previous_state:
         return []
-    transition = {"from": previous_state, "to": state}
+    observed_at = iso_utc(_payload_time(payload))
+    transition = {"from": previous_state, "to": state, "observed_at": observed_at}
     kind = "location.returned_home" if state == "at_home" else "location.left_home"
-    return [_event(kind, "location", transition, occurred_at=_payload_time(payload), confidence=float(payload.get("confidence", 0.8)), dedupe_payload={"from": previous_state, "to": state, "occurred_at": iso_utc(_payload_time(payload))})]
+    return [_event(
+        kind,
+        "location",
+        transition,
+        occurred_at=observed_at,
+        confidence=float(payload.get("confidence", 0.8)),
+        dedupe_payload={"from": previous_state, "to": state, "occurred_at": observed_at},
+    )]
 
 
 def normalize_mac(payload: dict[str, Any], previous_state: str = "unknown", previous_charging: bool | None = None) -> list[LifeEvent]:

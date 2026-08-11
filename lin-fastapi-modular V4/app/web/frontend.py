@@ -203,6 +203,9 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 .life-refresh-status{font-size:10px;color:var(--muted);min-height:14px;margin-top:-4px;margin-bottom:10px;}
 .life-refresh-status.life-error,.life-error{color:#bd5b59;}
 .life-state-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+.life-location-card{border-left:3px solid var(--rose);}
+.life-location-value{font-size:16px;font-weight:500;}
+.life-location-meta{font-size:10px;color:var(--muted);margin-top:4px;word-break:break-word;}
 .life-state-item{min-width:0;padding:10px;background:var(--blush);border-radius:10px;}
 .life-state-label{font-size:10px;color:var(--muted);margin-bottom:4px;}
 .life-state-value{font-size:13px;color:var(--dark);line-height:1.45;word-break:break-word;white-space:pre-wrap;}
@@ -928,7 +931,7 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
     </div>
     <div class="life-refresh-status" id="lifeRefreshStatus" aria-live="polite"></div>
     <div class="life-state-grid">
-      <div class="life-state-item"><div class="life-state-label">Location</div><div class="life-state-value" data-life-state="location">未知</div></div>
+      <div class="life-state-item life-location-card"><div class="life-state-label">Location</div><div class="life-state-value life-location-value" data-life-state="location">未知</div><div class="life-location-meta" data-life-state="location-observed">等待快捷指令位置事件</div></div>
       <div class="life-state-item"><div class="life-state-label">Mac state</div><div class="life-state-value" data-life-state="mac">未知</div></div>
       <div class="life-state-item"><div class="life-state-label">Charging</div><div class="life-state-value" data-life-state="charging">未知</div></div>
       <div class="life-state-item"><div class="life-state-label">Screen activity</div><div class="life-state-value" data-life-state="screen">未知</div></div>

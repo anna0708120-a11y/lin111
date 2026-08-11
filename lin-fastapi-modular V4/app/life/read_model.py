@@ -97,6 +97,7 @@ def stable_life_context(*, subject_id: str = "anna") -> dict[str, Any]:
     return {
         "subject_id": subject_id,
         "location_state": state.get("location_state", "unknown"),
+        "location_observed_at": state.get("location_observed_at"),
         "mac_state": state.get("mac_state", "unknown"),
         "screen_activity": state.get("screen_activity", "unknown"),
         "conversation_state": state.get("conversation_state", "unknown"),
@@ -109,6 +110,7 @@ def format_stable_life_context(context: dict[str, Any]) -> str:
     return "\n".join([
         "【Lin Stable Life Context】",
         f"location={context.get('location_state', 'unknown')}",
+        f"location_observed_at={context.get('location_observed_at') or 'unknown'}",
         f"mac={context.get('mac_state', 'unknown')}",
         f"screen_activity={context.get('screen_activity', 'unknown')}",
         f"conversation={context.get('conversation_state', 'unknown')}",

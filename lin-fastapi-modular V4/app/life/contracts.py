@@ -62,6 +62,7 @@ class LifeEvent:
 @dataclass(frozen=True)
 class LifeState:
     location_state: str = "unknown"
+    location_observed_at: str | None = None
     mac_state: str = "unknown"
     mac_charging: bool | None = None
     screen_activity: str = "unknown"
@@ -80,6 +81,7 @@ class LifeState:
     def as_dict(self) -> dict[str, Any]:
         return {
             "location_state": self.location_state,
+            "location_observed_at": self.location_observed_at,
             "mac_state": self.mac_state,
             "mac_charging": self.mac_charging,
             "screen_activity": self.screen_activity,
@@ -101,6 +103,7 @@ class LifeState:
         value = value if isinstance(value, dict) else {}
         return cls(
             location_state=str(value.get("location_state") or "unknown"),
+            location_observed_at=value.get("location_observed_at"),
             mac_state=str(value.get("mac_state") or "unknown"),
             mac_charging=value.get("mac_charging") if isinstance(value.get("mac_charging"), bool) else None,
             screen_activity=str(value.get("screen_activity") or "unknown"),

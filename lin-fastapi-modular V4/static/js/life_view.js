@@ -21,6 +21,11 @@
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString('zh-TW', { hour12: false });
   };
+  const locationLabel = (value) => ({
+    at_home: '在家',
+    outside: '外出',
+    unknown: '未知',
+  })[value] || stateValue(value);
   const today = () => {
     const now = new Date();
     const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
@@ -42,7 +47,7 @@
 
   function renderState(state) {
     const values = {
-      location: stateValue(state.location_state),
+      location: locationLabel(state.location_state),
       mac: stateValue(state.mac_state),
       charging: state.mac_charging === true ? '充電中' : state.mac_charging === false ? '未充電' : '未知',
       screen: stateValue(state.screen_activity),
@@ -55,6 +60,12 @@
       const el = document.querySelector(`[data-life-state="${key}"]`);
       if (el) el.textContent = value;
     });
+    const observed = document.querySelector('[data-life-state="location-observed"]');
+    if (observed) {
+      observed.textContent = state.location_observed_at
+        ? `最後位置事件：${formatTime(state.location_observed_at)}`
+        : '等待快捷指令位置事件';
+    }
     const updated = document.getElementById('lifeStateUpdated');
     if (updated) updated.textContent = state.updated_at ? `更新於 ${formatTime(state.updated_at)}` : '尚無持久化狀態';
   }

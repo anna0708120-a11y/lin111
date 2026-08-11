@@ -1534,6 +1534,8 @@ async function syncChat(){
   }
 }
 
+  setInterval(syncChat, 5000);
+
 function smsg(role,text,think,trace){
   // Wrapper: 委托给 ChatView.appendLiveMessage()，保持旧代码调用兼容性
   if (typeof chatView !== 'undefined' && chatView.appendLiveMessage) {

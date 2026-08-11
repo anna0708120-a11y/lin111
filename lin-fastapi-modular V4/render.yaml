@@ -30,3 +30,5 @@ services:
         value: "240"
       - key: PROACTIVE_CHECK_EVERY_MINUTES
         value: "5"
+      - key: LIFE_SEND_ENABLED
+        value: "false"

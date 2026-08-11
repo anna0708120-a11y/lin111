@@ -4,22 +4,27 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Callable
 
+from app import config
+
 from .candidates import DECISIONS, normalize_decision
 
-SEND_ENABLED = False
+
+def send_enabled() -> bool:
+    return bool(config.LIFE_SEND_ENABLED)
 
 
-def validate_decision(decision: str | None, *, send_enabled: bool = SEND_ENABLED) -> tuple[str, str]:
+def validate_decision(decision: str | None, *, allow_send: bool | None = None) -> tuple[str, str]:
     normalized = normalize_decision(decision)
-    if normalized == "send_message" and not send_enabled:
+    enabled = send_enabled() if allow_send is None else allow_send
+    if normalized == "send_message" and not enabled:
         return "prepare_message", "send_message_feature_flag_disabled"
     if normalized not in DECISIONS:
         return "no_action", "unknown_decision"
     return normalized, "decision_accepted"
 
 
-def execute(action: str, candidate: dict[str, Any], *, send_enabled: bool = SEND_ENABLED, sender: Callable[[dict[str, Any]], Any] | None = None) -> dict[str, Any]:
-    action, validation_reason = validate_decision(action, send_enabled=send_enabled)
+def execute(action: str, candidate: dict[str, Any], *, allow_send: bool | None = None, sender: Callable[[dict[str, Any]], Any] | None = None) -> dict[str, Any]:
+    action, validation_reason = validate_decision(action, allow_send=allow_send)
     now = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
     if action == "send_message" and sender is not None:
         result = sender(candidate)

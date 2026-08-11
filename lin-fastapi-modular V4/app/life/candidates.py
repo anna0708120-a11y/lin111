@@ -66,6 +66,6 @@ def decide(candidate: dict[str, Any], *, policy_action: str, policy_reason: str,
         return "no_action", "candidate_expired"
     if policy_action in {"defer", "drop"}:
         return policy_action, policy_reason
-    proposed = decision_fn(candidate) if decision_fn else ("prepare_message" if candidate.get("route") == "welcome_home" else "defer")
+    proposed = decision_fn(candidate) if decision_fn else ("send_message" if candidate.get("route") == "conversation_followup" else "prepare_message")
     decision = normalize_decision(proposed)
     return decision, "ai_decision_or_local_fallback"

@@ -78,6 +78,7 @@ PROACTIVE_CHECK_EVERY_MINUTES = int(os.getenv("PROACTIVE_CHECK_EVERY_MINUTES", 5
 # ---- Phase 7 Life Runtime ----
 LIFE_RUNTIME_ENABLED = os.getenv("LIFE_RUNTIME_ENABLED", "true").lower() == "true"
 LIFE_RUNTIME_TICK_MINUTES = int(os.getenv("LIFE_RUNTIME_TICK_MINUTES", 5))
+LIFE_SEND_ENABLED = os.getenv("LIFE_SEND_ENABLED", "false").lower() == "true"
 
 # ---- Phase 9 Tool Brain ----
 TOOL_BRAIN_ENABLED = os.getenv("TOOL_BRAIN_ENABLED", "false").lower() == "true"

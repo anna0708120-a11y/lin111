@@ -134,14 +134,14 @@ def evaluate_candidate(candidate_id: str, *, decision_fn: Callable[[dict[str, An
     status = "prepared" if action == "prepare_message" else "deferred" if action == "defer" else "dropped" if action in {"drop", "no_action"} else "pending"
     updated = _update_candidate(candidate_id, {"status": status, "decision": action, "decision_reason": f"{reason}; {action_reason}"})
     _audit(candidate_id, "decision", action, f"{reason}; {action_reason}", {"decision": action})
-    if action == "prepare_message":
+    if action in {"prepare_message", "send_message"}:
         queued = outbox.enqueue(updated, action)
-        _audit(candidate_id, "outbox", "queued", "prepare_message_queued", queued)
+        _audit(candidate_id, "outbox", "queued", f"{action}_queued", queued)
         updated = _update_candidate(candidate_id, {"action_reference": queued.get("outbox_id")})
     return updated
 
 
-def execute_candidate(candidate_id: str, *, sender: Callable[[dict[str, Any]], Any] | None = None, send_enabled: bool = False) -> dict[str, Any]:
+def execute_candidate(candidate_id: str, *, sender: Callable[[dict[str, Any]], Any] | None = None, allow_send: bool | None = None) -> dict[str, Any]:
     candidate = _MEMORY_CANDIDATES.get(candidate_id) if not db.is_connected() else db.load_life_candidate(candidate_id)
     if not candidate:
         raise KeyError(candidate_id)
@@ -152,7 +152,7 @@ def execute_candidate(candidate_id: str, *, sender: Callable[[dict[str, Any]], A
         _audit(candidate_id, "action", "expired", "candidate_expired")
         return {"ok": False, "status": "expired", "reason": "candidate_expired", "candidate": updated}
     action = candidate.get("decision") or "no_action"
-    result = execute(action, candidate, sender=sender, send_enabled=send_enabled)
+    result = execute(action, candidate, sender=sender, allow_send=allow_send)
     status = "sent" if result.get("ok") and result.get("action") == "send_message" else "completed" if result.get("ok") else "failed"
     updated = _update_candidate(candidate_id, {"status": status})
     _audit(candidate_id, "action", status, result.get("validation_reason") or result.get("error", ""), result)
@@ -196,16 +196,27 @@ def run_life_runtime_tick(*, now: datetime | None = None, policy_config: PolicyC
 
 
 def drain_outbox(*, now: datetime | None = None) -> list[dict[str, Any]]:
-    """Execute only previously approved non-send actions from the persistent outbox."""
+    """Drain approved actions through the Life delivery boundary."""
     now = now or _now()
 
     def execute_item(item: dict[str, Any]) -> dict[str, Any]:
         candidate = _MEMORY_CANDIDATES.get(item["candidate_id"]) if not db.is_connected() else db.load_life_candidate(item["candidate_id"])
         if not candidate:
             raise RuntimeError("candidate_missing")
-        result = execute(item.get("action"), candidate, send_enabled=False)
-        if not result.get("ok"):
-            raise RuntimeError(str(result.get("error") or "action_failed"))
+        sender = None
+        try:
+            if item.get("action") == "send_message":
+                from .actions import send_enabled
+                if not send_enabled():
+                    raise RuntimeError("send_message_feature_flag_disabled")
+                from .delivery import deliver_message
+                sender = deliver_message
+            result = execute(item.get("action"), candidate, sender=sender)
+            if not result.get("ok"):
+                raise RuntimeError(str(result.get("error") or "action_failed"))
+        except Exception as exc:
+            _audit(candidate["candidate_id"], "action", "failed", str(exc)[:300], {"action": item.get("action"), "outbox_id": item.get("outbox_id")})
+            raise
         _update_candidate(candidate["candidate_id"], {"status": "completed"})
         _audit(candidate["candidate_id"], "outbox", "completed", result.get("validation_reason", ""), result)
         return result

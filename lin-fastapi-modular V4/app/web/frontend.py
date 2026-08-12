@@ -640,6 +640,12 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 .agent-panel-body{display:none;border-top:1px solid var(--border);padding:4px 8px 7px;}.agent-panel-expanded .agent-panel-body{display:block;}.agent-step{border-radius:5px;}.agent-step-header{width:100%;border:0;background:transparent;display:flex;align-items:center;gap:7px;padding:6px 2px;color:var(--dark);cursor:pointer;text-align:left;font:11px 'DM Sans',sans-serif;}.agent-step-label{font-weight:500;}.agent-step-state{margin-left:auto;font-size:10px;color:var(--muted);text-transform:capitalize;}.agent-step-chevron{font-size:13px;color:var(--muted);transition:transform .2s ease;}.agent-step-detail{display:none;margin:0 0 5px 16px;padding:7px;background:var(--blush);border-radius:5px;color:var(--muted);font:10px/1.5 ui-monospace,monospace;white-space:pre-wrap;overflow-wrap:anywhere;}.agent-step-expanded .agent-step-detail{display:block;}.agent-step-expanded .agent-step-chevron{transform:rotate(180deg);}@keyframes agentPulse{0%,100%{opacity:.45;}50%{opacity:1;}}
 .voice-btn{cursor:pointer;margin-right:6px;opacity:.8;}
 .voice-btn:active{opacity:1;}
+.workgroup-shell{height:100%;display:flex;flex-direction:column;background:var(--cream);}
+.workgroup-head{padding:16px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:var(--white);}
+.workgroup-head strong{display:block;font-size:17px;}.workgroup-head small{display:block;color:var(--muted);font-size:11px;margin-top:3px;}.workgroup-local{font-size:10px;color:var(--muted);border:1px solid var(--border);padding:4px 7px;border-radius:5px;}
+.workgroup-members{display:flex;gap:12px;padding:10px 18px;border-bottom:1px solid var(--border);background:var(--white);font-size:12px;color:var(--muted);}
+.workgroup-member{display:flex;align-items:center;gap:5px;}.workgroup-avatar{width:25px;height:25px;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:11px;font-weight:700;}.workgroup-avatar.anna{background:#4b94c6;}.workgroup-avatar.gemma{background:#8361bc;}.workgroup-avatar.lin{background:#449669;}
+.workgroup-messages{flex:1;overflow:auto;padding:16px;display:flex;flex-direction:column;gap:12px;}.workgroup-message{display:flex;gap:7px;max-width:86%;}.workgroup-message.anna{align-self:flex-end;flex-direction:row-reverse;}.workgroup-message.gemma,.workgroup-message.lin{align-self:flex-start;}.workgroup-bubble{padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:var(--white);line-height:1.45;white-space:pre-wrap;}.workgroup-message.anna .workgroup-bubble{background:#e7f3ff;}.workgroup-message.gemma .workgroup-bubble{background:#f1ebff;}.workgroup-message.lin .workgroup-bubble{background:#e9f8ef;}.workgroup-meta{font-size:10px;color:var(--muted);margin-bottom:3px;}.workgroup-process{font-size:10px;color:#8361bc;margin-top:5px;}.workgroup-composer{display:flex;gap:8px;padding:10px;border-top:1px solid var(--border);background:var(--white);}.workgroup-composer input{flex:1;min-width:0;padding:10px;border:1px solid var(--border);border-radius:6px;background:var(--cream);color:var(--dark);}.workgroup-composer button{border:0;border-radius:6px;background:var(--rose-deep);color:#fff;padding:0 15px;}
 </style>
 </head>
 <body>
@@ -904,6 +910,15 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
   </div>
 </div>
 
+<div class="pg" id="pg-workgroup">
+  <div class="workgroup-shell">
+    <div class="workgroup-head"><div><strong>Internal Workgroup</strong><small>Anna · Gemma · Lin</small></div><span class="workgroup-local">本机私有</span></div>
+    <div id="workgroupMembers" class="workgroup-members"></div>
+    <div id="workgroupMessages" class="workgroup-messages"><div class="es">连接工作群中...</div></div>
+    <form id="workgroupComposer" class="workgroup-composer"><input id="workgroupInput" placeholder="在内部工作群发消息..." autocomplete="off"><button type="submit">发送</button></form>
+  </div>
+</div>
+
 <div class="pg" id="pg-memory">
   <div class="mtabs">
     <div class="mtab active" onclick="smtab(event,'lt')">長期記憶</div>
@@ -1016,6 +1031,7 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
   <button class="tb" id="tb-chat" onclick="stab('chat')"><span class="ti">💬</span>Chat</button>
   <button class="tb" id="tb-memory" onclick="stab('memory')"><span class="ti">🧠</span>Memory</button>
   <button class="tb" id="tb-life" onclick="stab('life')"><span class="ti">◌</span>Life</button>
+  <button class="tb" id="tb-workgroup" onclick="stab('workgroup')"><span class="ti">👥</span>Workgroup</button>
   <button class="tb" id="tb-mine" onclick="stab('mine')"><span class="ti">🌙</span>Mine</button>
 </div>
 
@@ -1412,9 +1428,26 @@ if('serviceWorker' in navigator){
 }
 
 
+async function loadWorkgroup(){
+  const base='http://127.0.0.1:8787';
+  const membersEl=document.getElementById('workgroupMembers');
+  const messagesEl=document.getElementById('workgroupMessages');
+  if(!membersEl||!messagesEl)return;
+  try{
+    const r=await fetch(base+'/api/messages');
+    const d=await r.json();
+    membersEl.innerHTML=Object.entries(d.members||{}).map(([id,m])=>'<div class="workgroup-member"><span class="workgroup-avatar '+id+'">'+({anna:'A',gemma:'G',lin:'L'}[id]||'?')+'</span>'+m.name+'</div>').join('');
+    messagesEl.innerHTML=(d.messages||[]).map(m=>'<article class="workgroup-message '+m.member+'"><span class="workgroup-avatar '+m.member+'">'+({anna:'A',gemma:'G',lin:'L'}[m.member]||'?')+'</span><div><div class="workgroup-meta">'+m.member_profile.name+'</div><div class="workgroup-bubble"></div>'+(m.member==='gemma'?'<div class="workgroup-process">Gemma preprocessing · '+(m.metadata?.model||'gemma4:31b')+'</div>':'')+'</div></article>').join('')||'<div class="es">还没有工作群消息</div>';
+    (d.messages||[]).forEach((m,i)=>{const el=messagesEl.querySelectorAll('.workgroup-bubble')[i];if(el)el.textContent=m.text;});
+    messagesEl.scrollTop=messagesEl.scrollHeight;
+  }catch(e){messagesEl.innerHTML='<div class="es">工作群服务未启动：请运行 serve_workgroup.py</div>';}
+}
+function initWorkgroup(){
+  loadWorkgroup();
+  const form=document.getElementById('workgroupComposer');
+  if(form&&!form.dataset.bound){form.dataset.bound='1';form.addEventListener('submit',async e=>{e.preventDefault();const input=document.getElementById('workgroupInput');const text=input.value.trim();if(!text)return;input.value='';input.disabled=true;try{const r=await fetch('http://127.0.0.1:8787/api/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});if(r.ok){const d=await r.json();const m=document.getElementById('workgroupMessages');m.innerHTML='';(d.messages||[]).forEach(x=>{const article=document.createElement('article');article.className='workgroup-message '+x.member;article.innerHTML='<span class="workgroup-avatar '+x.member+'">'+({anna:'A',gemma:'G',lin:'L'}[x.member]||'?')+'</span><div><div class="workgroup-meta">'+x.member_profile.name+'</div><div class="workgroup-bubble"></div></div>';article.querySelector('.workgroup-bubble').textContent=x.text;m.appendChild(article);});m.scrollTop=m.scrollHeight;}}finally{input.disabled=false;input.focus();}});}
 function stab(tab){
   document.querySelectorAll('.tb').forEach(e=>e.classList.remove('active'));
-  document.getElementById('tb-'+tab).classList.add('active');
   document.querySelectorAll('.pg').forEach(e=>{e.style.display='none';e.classList.remove('active');});
   const pg=document.getElementById('pg-'+tab);
   if(tab==='chat'){
@@ -1422,7 +1455,7 @@ function stab(tab){
     setTimeout(()=>{const c=document.getElementById('cm');c.scrollTop=c.scrollHeight;},50);
     if(!sessionManager.currentSessionId && sessionManager.sessions.length === 0){sidebar.handleNewChat();}
   }
-  else{pg.style.display='block';pg.classList.add('active');if(tab==='memory')rmem();if(tab==='monitor')loadMood();if(tab==='life')initLifeView();if(tab==='mine'){loadPeriod();loadChatConfig();loadMainModelConfig();loadTogetherDays();}}
+  else{pg.style.display='block';pg.classList.add('active');if(tab==='memory')rmem();if(tab==='monitor')loadMood();if(tab==='life')initLifeView();if(tab==='workgroup')initWorkgroup();if(tab==='mine'){loadPeriod();loadChatConfig();loadMainModelConfig();loadTogetherDays();}}
 }
 // 页面加载时如果是Mine tab,立即展开
 if(document.getElementById('pg-mine')?.classList.contains('active')){loadPeriod();loadChatConfig();loadMainModelConfig();}

@@ -65,12 +65,12 @@ def detect_memory_candidate(user_text, candidates=None):
     if not coarse_memory_candidate(text):
         return {"action": "none", "decision": "no", "memory_id": None, "tag": "", "keyword": "", "summary": "", "reason": "coarse_gate"}
 
-    if not config.GROQ_API_KEY:
+    if not config.GEMMA_API_KEY or not config.GEMMA_MODEL:
         intent = detect_memory_intent(text)
         if intent["explicit"]:
             fact = intent["fact"]
             return {"action": "create", "decision": "remember", "memory_id": None, "tag": "用户明确要求", "keyword": fact[:50], "summary": fact, "reason": "explicit_intent"}
-        return {"action": "none", "decision": "uncertain", "memory_id": None, "tag": "", "keyword": "", "summary": "", "reason": "groq_not_configured"}
+        return {"action": "none", "decision": "uncertain", "memory_id": None, "tag": "", "keyword": "", "summary": "", "reason": "gemma_not_configured"}
 
     candidate_text = "\n".join(
         "ID:{id} | source:{created_by} | keyword:{keyword} | {content}".format(
@@ -82,30 +82,28 @@ def detect_memory_candidate(user_text, candidates=None):
         for memory in (candidates or [])
     ) or "（没有相关记忆）"
     payload = {
-        "model": config.GROQ_MEMORY_MODEL,
+        "model": config.GEMMA_MODEL,
         "messages": [
             {"role": "system", "content": GROQ_MEMORY_DETECTOR_SYSTEM},
             {"role": "user", "content": f"用户新消息：{text}\n\n【相关记忆】\n{candidate_text}"},
         ],
-        "temperature": 0.1,
-        "max_tokens": 180,
-        "reasoning_effort": "low",
-        "include_reasoning": False,
-        "response_format": {"type": "json_object"},
+        "stream": False,
+        "format": "json",
+        "options": {"temperature": 0.1, "num_predict": 180},
     }
     try:
         response = requests.post(
-            f"{config.GROQ_BASE_URL}/chat/completions",
+            f"{config.GEMMA_BASE_URL}/chat",
             headers={
-                "Authorization": f"Bearer {config.GROQ_API_KEY}",
+                "Authorization": f"Bearer {config.GEMMA_API_KEY}",
                 "Content-Type": "application/json",
             },
             json=payload,
-            timeout=12,
+            timeout=config.GEMMA_TIMEOUT_SECONDS,
         )
         response.raise_for_status()
         body = response.json()
-        result = _parse_json(body.get("choices", [{}])[0].get("message", {}).get("content")) or {}
+        result = _parse_json(body.get("message", {}).get("content")) or {}
         model_decision = str(result.get("decision", "")).lower()
         action = str(result.get("action") or {"remember": "create", "no": "none", "uncertain": "none"}.get(model_decision, "none")).lower()
         if action not in {"create", "reinforce", "update", "conflict", "archive", "none"}:

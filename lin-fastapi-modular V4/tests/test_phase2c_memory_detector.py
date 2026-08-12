@@ -34,13 +34,14 @@ class Phase2CMemoryDetectorTests(unittest.TestCase):
         self.assertEqual(decision["summary"], "我以后不喝咖啡")
         post.assert_not_called()
 
-    @patch.object(detector.config, "GROQ_API_KEY", "test-key")
+    @patch.object(detector.config, "GEMMA_API_KEY", "test-key")
+    @patch.object(detector.config, "GEMMA_MODEL", "gemma4:31b")
     @patch.object(detector.requests, "post")
-    def test_groq_request_uses_structured_short_output(self, post):
+    def test_gemma_request_uses_structured_short_output(self, post):
         response = Mock()
         response.raise_for_status.return_value = None
         response.json.return_value = {
-            "choices": [{"message": {"content": '{"decision":"remember","tag":"喜好","keyword":"喜欢猫","summary":"Anna喜欢猫，尤其喜欢橘猫","reason":"明确偏好"}'}}]
+            "message": {"content": '{"decision":"remember","tag":"喜好","keyword":"喜欢猫","summary":"Anna喜欢猫，尤其喜欢橘猫","reason":"明确偏好"}'}
         }
         post.return_value = response
 
@@ -48,10 +49,10 @@ class Phase2CMemoryDetectorTests(unittest.TestCase):
         payload = post.call_args.kwargs["json"]
 
         self.assertEqual(result["decision"], "remember")
-        self.assertEqual(payload["model"], "openai/gpt-oss-20b")
-        self.assertEqual(payload["temperature"], 0.1)
-        self.assertEqual(payload["response_format"], {"type": "json_object"})
-        self.assertNotIn("stream", payload)
+        self.assertEqual(payload["model"], "gemma4:31b")
+        self.assertEqual(payload["options"]["temperature"], 0.1)
+        self.assertEqual(payload["format"], "json")
+        self.assertFalse(payload["stream"])
         self.assertNotIn("reasoning", result)
 
     def test_mocked_detector_cases_have_no_false_positives(self):
@@ -66,20 +67,21 @@ class Phase2CMemoryDetectorTests(unittest.TestCase):
             "weak_hint": {"decision": "uncertain", "reason": "近期感受不足以证明长期偏好"},
             "contradiction": {"decision": "uncertain", "reason": "过去与现在矛盾"},
         }
-        with patch.object(detector.config, "GROQ_API_KEY", "test-key"), patch.object(detector.requests, "post") as post:
+        with patch.object(detector.config, "GEMMA_API_KEY", "test-key"), patch.object(detector.config, "GEMMA_MODEL", "gemma4:31b"), patch.object(detector.requests, "post") as post:
             for case_id, text, expected in CASES:
                 if case_id == "explicit_request":
                     continue
                 response = Mock()
                 response.raise_for_status.return_value = None
-                response.json.return_value = {"choices": [{"message": {"content": __import__("json").dumps(responses[case_id], ensure_ascii=False)}}]}
+                response.json.return_value = {"message": {"content": __import__("json").dumps(responses[case_id], ensure_ascii=False)}}
                 post.return_value = response
                 result = detector.detect_memory_candidate(text)
                 self.assertEqual(result["decision"], expected, case_id)
                 if expected != "remember":
                     self.assertEqual(result["summary"], "", case_id)
 
-    @patch.object(detector.config, "GROQ_API_KEY", "test-key")
+    @patch.object(detector.config, "GEMMA_API_KEY", "test-key")
+    @patch.object(detector.config, "GEMMA_MODEL", "gemma4:31b")
     @patch.object(detector.requests, "post")
     def test_detector_error_is_uncertain_and_non_writing(self, post):
         post.side_effect = detector.requests.RequestException("timeout")

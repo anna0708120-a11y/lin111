@@ -58,6 +58,12 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GROQ_BASE_URL = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
 GROQ_MEMORY_MODEL = os.getenv("GROQ_MEMORY_MODEL", "openai/gpt-oss-20b")
 
+# ---- Gemma auxiliary inference (Ollama Cloud-compatible) ----
+GEMMA_BASE_URL = os.getenv("GEMMA_BASE_URL", "https://ollama.com/api").rstrip("/")
+GEMMA_API_KEY = os.getenv("GEMMA_API_KEY", "")
+GEMMA_MODEL = os.getenv("GEMMA_MODEL", "")
+GEMMA_TIMEOUT_SECONDS = int(os.getenv("GEMMA_TIMEOUT_SECONDS", "20"))
+
 # 想同时推给手机+电脑，就在 Render 环境变量填 BARK_KEYS，两个key用逗号隔开，
 # 例如：BARK_KEYS=手机的key,电脑的key
 # 只填一个也没关系，旧的 BARK_KEY 变量还继续有效。

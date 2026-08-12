@@ -1441,8 +1441,10 @@ async function loadWorkgroup(){
     messagesEl.scrollTop=messagesEl.scrollHeight;
   }catch(e){messagesEl.innerHTML='<div class="es">工作群暂时无法载入</div>';}
 }
+let workgroupPollTimer=null;
 function initWorkgroup(){
   loadWorkgroup();
+  if(!workgroupPollTimer){workgroupPollTimer=setInterval(()=>{if(document.getElementById('pg-workgroup')?.classList.contains('active'))loadWorkgroup();},3000);}
   const form=document.getElementById('workgroupComposer');
   if(form&&!form.dataset.bound){form.dataset.bound='1';form.addEventListener('submit',async e=>{e.preventDefault();const input=document.getElementById('workgroupInput');const text=input.value.trim();if(!text)return;input.value='';input.disabled=true;try{const r=await fetch(AU+'/workgroup/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});if(r.ok){await loadWorkgroup();}}finally{input.disabled=false;input.focus();}});}
 }

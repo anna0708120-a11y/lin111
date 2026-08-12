@@ -400,6 +400,41 @@ def insert_conversation_turn(role, content, thinking=None, image_data=None, sess
     except Exception as e:
         print(f"[db] 写入对话历史失败: {e}")
 
+
+# ---------- 独立 Workgroup 消息 ----------
+def load_workgroup_messages(limit=100):
+    if not _client:
+        return []
+    try:
+        result = (
+            _client.table("workgroup_messages")
+            .select("id, message_id, member, role, content, metadata, created_at")
+            .order("created_at", desc=False)
+            .limit(limit)
+            .execute()
+        )
+        return result.data or []
+    except Exception as e:
+        print(f"[db] 读取 Workgroup 消息失败: {e}")
+        return []
+
+
+def insert_workgroup_message(message_id, member, role, content, metadata=None):
+    if not _client:
+        return None
+    try:
+        result = _client.table("workgroup_messages").insert({
+            "message_id": message_id,
+            "member": member,
+            "role": role,
+            "content": content,
+            "metadata": metadata or {},
+        }).execute()
+        return result.data[0] if result.data else None
+    except Exception as e:
+        print(f"[db] 写入 Workgroup 消息失败: {e}")
+        return None
+
 # ---------- Lin 的碎碎念 ----------
 def load_notes(limit=50):
     if not _client:

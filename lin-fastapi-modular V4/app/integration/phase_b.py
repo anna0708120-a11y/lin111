@@ -82,8 +82,9 @@ def receive_hermes_event(event: dict[str, Any]) -> dict[str, Any]:
         metadata = payload.get("metadata") or {}
         if member not in {"anna", "lin", "gemma"} or not text or not isinstance(metadata, dict):
             raise HTTPException(status_code=422, detail="invalid_workgroup_message")
-        record = {"member": member, "text": text[:4000], "metadata": metadata}
-        state.add_log(f"workgroup.{member}", __import__("json").dumps(record, ensure_ascii=False))
+        stored = db.insert_workgroup_message(str(event["event_id"]), member, "assistant", text[:4000], metadata)
+        if not stored:
+            raise HTTPException(status_code=503, detail="workgroup_storage_unavailable")
         _seen_event_ids.add(event_id)
         return {"status": "accepted", "event_id": event_id, "type": event_type, "member": member}
 

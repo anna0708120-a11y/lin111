@@ -8,6 +8,7 @@ from typing import Optional
 from datetime import datetime, timezone
 import threading
 import uuid
+import json
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import Response, StreamingResponse
@@ -330,9 +331,11 @@ def post_workgroup_message(payload: WorkgroupInput):
     text = payload.text.strip()
     if not text:
         raise HTTPException(status_code=422, detail="empty_workgroup_message")
-    record = {"member": "anna", "text": text, "metadata": {}}
-    state.add_log("workgroup.anna", __import__("json").dumps(record, ensure_ascii=False))
-    return {"status": "accepted", "delivery": "hermes_poll_required"}
+    message_id = str(uuid.uuid4())
+    stored = db.insert_workgroup_message(message_id, "anna", "user", text, {})
+    if not stored:
+        raise HTTPException(status_code=503, detail="workgroup_storage_unavailable")
+    return {"status": "accepted", "message_id": message_id, "delivery": "hermes_poll_required"}
 
 
 @router.get("/workgroup/messages")
@@ -344,17 +347,10 @@ def workgroup_messages_endpoint():
         "gemma": {"name": "Gemma", "kind": "sub-agent", "model": "gemma4:31b"},
     }
     rows = []
-    for entry in state.activity_log:
-        kind = str(entry.get("type") or "")
-        if not kind.startswith("workgroup."):
-            continue
-        try:
-            record = __import__("json").loads(entry.get("content") or "{}")
-        except (TypeError, ValueError):
-            continue
-        member = record.get("member")
-        if member in members and record.get("text"):
-            rows.append({"member": member, "member_profile": members[member], "text": record["text"], "metadata": record.get("metadata") or {}, "created_at": entry.get("time")})
+    for entry in db.load_workgroup_messages(limit=100):
+        member = entry.get("member")
+        if member in members and entry.get("content"):
+            rows.append({"message_id": entry.get("message_id"), "member": member, "member_profile": members[member], "text": entry["content"], "metadata": entry.get("metadata") or {}, "created_at": entry.get("created_at")})
     return {"members": members, "messages": rows[-100:]}
 
 

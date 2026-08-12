@@ -131,4 +131,4 @@ class Timeline:
             "trace_id": self.trace_id,
             "event": event,
         }
-        return f"event: tool_step_update\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n" if event.get("type") == "tool" else f"event: agent_event\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
+        return f"event: tool_step_update\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"

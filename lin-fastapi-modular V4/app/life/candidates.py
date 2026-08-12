@@ -16,7 +16,13 @@ def candidate_id(source_event_id: str, route: str) -> str:
 
 def build(event: dict[str, Any], state: dict[str, Any], *, now: datetime | None = None, ttl_minutes: int = 180, route: str | None = None) -> dict[str, Any] | None:
     event_type = str(event.get("event_type") or "")
-    if event_type == "location.returned_home":
+    if event_type == "proactive.proposed":
+        route = route or str((event.get("payload") or {}).get("route") or "proactive_followup")
+        seed = str((event.get("payload") or {}).get("message") or "").strip()
+        priority = 0.5
+        if not seed:
+            return None
+    elif event_type == "location.returned_home":
         route = route or "welcome_home"
         seed = "Anna 回到家了"
         priority = 0.7
@@ -28,6 +34,12 @@ def build(event: dict[str, Any], state: dict[str, Any], *, now: datetime | None 
         return None
     created = now or datetime.now(timezone.utc)
     expires = created.timestamp() + ttl_minutes * 60
+    if event_type == "proactive.proposed":
+        source_expiry = ((event.get("payload") or {}).get("interpretation") or {}).get("expires_at")
+        try:
+            expires = min(expires, datetime.fromisoformat(str(source_expiry).replace("Z", "+00:00")).timestamp())
+        except (TypeError, ValueError):
+            return None
     candidate_key = candidate_id(str(event["event_id"]), route)
     return {
         "candidate_id": candidate_key,

@@ -12,7 +12,9 @@ class WorkgroupUiTests(unittest.TestCase):
     def test_workgroup_keeps_gemma_process_display_separate(self):
         self.assertIn('Gemma preprocessing', HTML_CONTENT)
         self.assertIn("m.member==='gemma'", HTML_CONTENT)
-        self.assertIn("article.className='workgroup-message '+x.member", HTML_CONTENT)
+        self.assertIn("fetch(AU+'/workgroup/messages')", HTML_CONTENT)
+        self.assertIn('await loadWorkgroup()', HTML_CONTENT)
+        self.assertNotIn('127.0.0.1:8787', HTML_CONTENT)
 
 
 if __name__ == "__main__":

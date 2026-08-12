@@ -51,7 +51,7 @@ class EvidenceRefreshTests(unittest.TestCase):
         result = routes._refresh_context_sources()
         self.assertEqual(result["status"], "refreshed")
         self.assertEqual(result["sources"], ["weather"])
-        get_context.assert_called_once_with(need=["weather", "calendar"])
+        get_context.assert_called_once_with(need=["mac", "weather", "calendar"])
 
     @patch("app.context.provider.get_context")
     def test_context_refresh_uses_server_side_cooldown(self, get_context):

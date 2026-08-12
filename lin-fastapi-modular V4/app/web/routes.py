@@ -134,6 +134,10 @@ class DeviceEventPayload(BaseModel):
     accuracy: Optional[float] = None
 
 
+class WorkgroupInput(BaseModel):
+    text: str = Field(min_length=1, max_length=4000)
+
+
 class HermesEventPayload(BaseModel):
     schema_version: str
     event_id: str
@@ -159,8 +163,8 @@ def _refresh_context_sources():
             return {"status": "cooldown"}
         _refresh_last_at = now
     from app.context.provider import get_context
-    context = get_context(need=["weather", "calendar"])
-    return {"status": "refreshed", "sources": sorted(key for key in context if key in {"weather", "calendar"})}
+    context = get_context(need=["mac", "weather", "calendar"])
+    return {"status": "refreshed", "sources": sorted(key for key in context if key in {"mac", "weather", "calendar"})}
 
 @router.get("/health")
 def health():
@@ -318,6 +322,40 @@ def delete_attachment(attachment_id: str, _: bool = Depends(verify_context_token
 def get_events():
     """System Monitor Event Bus 快照，給 Home UI 使用。"""
     return event_bus.get_snapshot()
+
+
+@router.post("/workgroup/messages")
+def post_workgroup_message(payload: WorkgroupInput):
+    """Anna posts to Render; Hermes polls this HTTPS feed and responds separately."""
+    text = payload.text.strip()
+    if not text:
+        raise HTTPException(status_code=422, detail="empty_workgroup_message")
+    record = {"member": "anna", "text": text, "metadata": {}}
+    state.add_log("workgroup.anna", __import__("json").dumps(record, ensure_ascii=False))
+    return {"status": "accepted", "delivery": "hermes_poll_required"}
+
+
+@router.get("/workgroup/messages")
+def workgroup_messages_endpoint():
+    """Render-hosted, HTTPS-safe read model for Hermes workgroup messages."""
+    members = {
+        "anna": {"name": "Anna", "kind": "human"},
+        "lin": {"name": "Lin", "kind": "primary", "model": "deepseek-v4-flash"},
+        "gemma": {"name": "Gemma", "kind": "sub-agent", "model": "gemma4:31b"},
+    }
+    rows = []
+    for entry in state.activity_log:
+        kind = str(entry.get("type") or "")
+        if not kind.startswith("workgroup."):
+            continue
+        try:
+            record = __import__("json").loads(entry.get("content") or "{}")
+        except (TypeError, ValueError):
+            continue
+        member = record.get("member")
+        if member in members and record.get("text"):
+            rows.append({"member": member, "member_profile": members[member], "text": record["text"], "metadata": record.get("metadata") or {}, "created_at": entry.get("time")})
+    return {"members": members, "messages": rows[-100:]}
 
 
 @router.get("/life/state")

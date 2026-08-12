@@ -51,13 +51,13 @@ class PhaseBCallbackTests(unittest.TestCase):
         self.assertEqual(result["decision"]["summary"], "Anna told me an important fact.")
         apply.assert_called_once()
 
-    @patch("app.integration.phase_b.ingest_events")
-    def test_life_proposal_is_not_written_without_render_approval(self, ingest):
+    @patch("app.integration.phase_b.create_candidates_for_events")
+    def test_life_proposal_is_not_written_without_render_approval(self, create_candidates):
         result = receive_hermes_event(self.event("life.event.proposed", {
             "event_type": "mac.active", "payload": {"to": "active"}
         }))
         self.assertEqual(result["status"], "proposal_received")
-        ingest.assert_not_called()
+        create_candidates.assert_not_called()
 
     def test_duplicate_event_is_idempotent(self):
         with patch("app.integration.phase_b.state.add_log") as log:

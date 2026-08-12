@@ -1446,6 +1446,7 @@ function initWorkgroup(){
   loadWorkgroup();
   const form=document.getElementById('workgroupComposer');
   if(form&&!form.dataset.bound){form.dataset.bound='1';form.addEventListener('submit',async e=>{e.preventDefault();const input=document.getElementById('workgroupInput');const text=input.value.trim();if(!text)return;input.value='';input.disabled=true;try{const r=await fetch('http://127.0.0.1:8787/api/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});if(r.ok){const d=await r.json();const m=document.getElementById('workgroupMessages');m.innerHTML='';(d.messages||[]).forEach(x=>{const article=document.createElement('article');article.className='workgroup-message '+x.member;article.innerHTML='<span class="workgroup-avatar '+x.member+'">'+({anna:'A',gemma:'G',lin:'L'}[x.member]||'?')+'</span><div><div class="workgroup-meta">'+x.member_profile.name+'</div><div class="workgroup-bubble"></div></div>';article.querySelector('.workgroup-bubble').textContent=x.text;m.appendChild(article);});m.scrollTop=m.scrollHeight;}}finally{input.disabled=false;input.focus();}});}
+}
 function stab(tab){
   document.querySelectorAll('.tb').forEach(e=>e.classList.remove('active'));
   document.querySelectorAll('.pg').forEach(e=>{e.style.display='none';e.classList.remove('active');});

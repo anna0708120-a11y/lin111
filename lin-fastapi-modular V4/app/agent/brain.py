@@ -355,8 +355,6 @@ def _generate_reply_stream_impl(context, app_name=None, use_cache=True, session_
         conversation_history,
         thinking_suggestion=thinking_suggestion,
     )
-    print("[TRACE-E] after build prompt")
-
     yield collector.record_prompt(
         "passed",
         prompt_version=getattr(config, "PROMPT_VERSION", None),
@@ -389,7 +387,7 @@ def _generate_reply_stream_impl(context, app_name=None, use_cache=True, session_
                 full_reasoning += data
             elif event_type == "content":
                 full_content += data
-                yield f"event: content\ndata: {json.dumps({'delta': data})}\n\n"
+                yield f"event: text_delta\ndata: {json.dumps({'delta': data}, ensure_ascii=False)}\n\n"
             elif event_type == "raw_reasoning":
                 raw_reasoning = data
             elif event_type == "error":

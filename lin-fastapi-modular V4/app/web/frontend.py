@@ -1757,7 +1757,7 @@ async function confirmImageSend() {
               scrollDown();
             }
             
-            else if (currentEvent === 'content' && data.delta !== undefined) {
+            else if ((currentEvent === 'text_delta' || currentEvent === 'content') && data.delta !== undefined) {
               if (currentDeveloper) currentDeveloper.ingest(window.AgentPanel.fromSse('content', data));
               contentBuffer += data.delta;
               
@@ -1783,7 +1783,7 @@ async function confirmImageSend() {
               if (liveAssistantEntry) liveAssistantEntry.model = modelLabel;
             }
 
-            else if (currentEvent === 'agent_event') {
+            else if ((currentEvent === 'tool_step_update' || currentEvent === 'agent_event')) {
               if (currentDeveloper) currentDeveloper.ingest(window.AgentPanel.fromSse('agent_event', data));
               const messageEl = ensureLiveAssistantMessage();
               if (messageEl && currentDeveloper) {
@@ -1927,7 +1927,7 @@ async function send(){
               scrollDown();
             }
             
-            else if(currentEvent === 'content' && data.delta !== undefined){
+            else if ((currentEvent === 'text_delta' || currentEvent === 'content') && data.delta !== undefined) {
               if (currentDeveloper) currentDeveloper.ingest(window.AgentPanel.fromSse('content', data));
               contentBuffer += data.delta;
               
@@ -1953,7 +1953,7 @@ async function send(){
               if (liveAssistantEntry) liveAssistantEntry.model = modelLabel;
             }
 
-            else if(currentEvent === 'agent_event'){
+            else if ((currentEvent === 'tool_step_update' || currentEvent === 'agent_event')) {
               if (currentDeveloper) currentDeveloper.ingest(window.AgentPanel.fromSse('agent_event', data));
               const messageEl = ensureLiveAssistantMessage();
               if (messageEl && currentDeveloper) {

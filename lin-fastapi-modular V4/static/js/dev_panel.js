@@ -42,6 +42,7 @@
   }
 
   function fromSse(type, data) {
+    if (type === 'tool_step_update') return data && data.event ? data.event : null;
     if (type === 'agent_event') return data && data.event ? data.event : null;
     if (type === 'api_start') return { id: 'api_start', status: 'running', summary: data.model || 'watch', payload: data };
     if (type === 'reasoning') return { id: 'reasoning', status: 'running', summary: data.content || '', payload: data };

@@ -8,8 +8,9 @@
 
   function normalizeStatus(status) {
     if (status === 'passed') return 'success';
-    if (['running', 'success', 'failed', 'skipped', 'not_executed'].includes(status)) return status;
-    return 'running';
+    if (status === 'failed' || status === 'error') return 'error';
+    if (['pending', 'running', 'success', 'skipped', 'not_executed'].includes(status)) return status;
+    return 'pending';
   }
 
   function labelFor(event) {
@@ -104,7 +105,7 @@
       if (isNew) this.order.push(event.id);
       this.render(event, isNew);
       if (event.status === 'running' && !this.userToggled) this.toggle(true);
-      if (event.status === 'success' || event.status === 'skipped' || event.status === 'not_executed') this.autoCollapse();
+      if (event.status === 'success' || event.status === 'error' || event.status === 'skipped' || event.status === 'not_executed') this.autoCollapse();
     }
 
     render(latest, isNew) {
@@ -123,7 +124,8 @@
       if (!row) return;
       row.className = 'agent-step agent-' + latest.status;
       row.querySelector('.agent-step-label').textContent = labelFor(latest);
-      row.querySelector('.agent-step-state').textContent = latest.status === 'running' ? 'Running' : latest.status;
+      const stateLabels = {pending: 'Pending', running: 'Running', success: 'Success', error: 'Failed', skipped: 'Skipped', not_executed: 'Not_executed'};
+      row.querySelector('.agent-step-state').textContent = stateLabels[latest.status] || latest.status;
       row.querySelector('.agent-step-detail').textContent = detailFor(latest);
     }
 

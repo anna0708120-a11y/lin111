@@ -635,7 +635,7 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 .agent-panel-slot:empty{display:none;}
 .agent-panel{margin:0 0 6px 32px;max-width:calc(100% - 44px);border:1px solid var(--border);border-radius:8px;background:var(--white);overflow:hidden;box-shadow:0 1px 5px var(--shadow);}
 .agent-panel-header{width:100%;min-height:30px;padding:6px 9px;border:0;background:transparent;color:var(--dark);display:flex;align-items:center;gap:7px;text-align:left;cursor:pointer;font:11px 'DM Sans',sans-serif;}
-.agent-status,.agent-step-dot{width:7px;height:7px;border-radius:50%;flex:0 0 auto;background:var(--muted);}.agent-status.agent-running,.agent-step.agent-running .agent-step-dot{background:#b47b27;animation:agentPulse 1s ease-in-out infinite;}.agent-status.agent-success,.agent-step.agent-success .agent-step-dot{background:#4f9662;}.agent-status.agent-failed,.agent-step.agent-failed .agent-step-dot{background:#bd5b59;}.agent-status.agent-skipped,.agent-step.agent-skipped .agent-step-dot,.agent-status.agent-not_executed,.agent-step.agent-not_executed .agent-step-dot{background:var(--muted);}
+.agent-status,.agent-step-dot{width:7px;height:7px;border-radius:50%;flex:0 0 auto;background:var(--muted);border:1px solid var(--muted);}.agent-status.agent-pending,.agent-step.agent-pending .agent-step-dot{background:transparent;}.agent-status.agent-running,.agent-step.agent-running .agent-step-dot{background:#b47b27;border-color:#b47b27;animation:agentPulse 1s ease-in-out infinite;}.agent-status.agent-success,.agent-step.agent-success .agent-step-dot{background:#4f9662;border-color:#4f9662;}.agent-status.agent-error,.agent-step.agent-error .agent-step-dot{background:#bd5b59;border-color:#bd5b59;}.agent-status.agent-skipped,.agent-step.agent-skipped .agent-step-dot,.agent-status.agent-not_executed,.agent-step.agent-not_executed .agent-step-dot{background:var(--muted);border-color:var(--muted);}
 .agent-panel-title{font-weight:600;color:var(--rose-deep);}.agent-panel-summary{flex:1;min-width:0;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.agent-panel-count{font:10px ui-monospace,monospace;color:var(--muted);}.agent-panel-chevron{font-size:16px;line-height:1;color:var(--muted);transition:transform .2s ease;}.agent-panel-expanded .agent-panel-chevron{transform:rotate(180deg);}
 .agent-panel-body{display:none;border-top:1px solid var(--border);padding:4px 8px 7px;}.agent-panel-expanded .agent-panel-body{display:block;}.agent-step{border-radius:5px;}.agent-step-header{width:100%;border:0;background:transparent;display:flex;align-items:center;gap:7px;padding:6px 2px;color:var(--dark);cursor:pointer;text-align:left;font:11px 'DM Sans',sans-serif;}.agent-step-label{font-weight:500;}.agent-step-state{margin-left:auto;font-size:10px;color:var(--muted);text-transform:capitalize;}.agent-step-chevron{font-size:13px;color:var(--muted);transition:transform .2s ease;}.agent-step-detail{display:none;margin:0 0 5px 16px;padding:7px;background:var(--blush);border-radius:5px;color:var(--muted);font:10px/1.5 ui-monospace,monospace;white-space:pre-wrap;overflow-wrap:anywhere;}.agent-step-expanded .agent-step-detail{display:block;}.agent-step-expanded .agent-step-chevron{transform:rotate(180deg);}@keyframes agentPulse{0%,100%{opacity:.45;}50%{opacity:1;}}
 .voice-btn{cursor:pointer;margin-right:6px;opacity:.8;}
@@ -1432,13 +1432,14 @@ async function loadWorkgroup(){
   const membersEl=document.getElementById('workgroupMembers');
   const messagesEl=document.getElementById('workgroupMessages');
   if(!membersEl||!messagesEl)return;
+  const followNewMessages = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight <= 48;
   try{
     const r=await fetch(AU+'/workgroup/messages');
     const d=await r.json();
     membersEl.innerHTML=Object.entries(d.members||{}).map(([id,m])=>'<div class="workgroup-member"><span class="workgroup-avatar '+id+'">'+({anna:'A',gemma:'G',lin:'L'}[id]||'?')+'</span>'+m.name+'</div>').join('');
     messagesEl.innerHTML=(d.messages||[]).map(m=>'<article class="workgroup-message '+m.member+'"><span class="workgroup-avatar '+m.member+'">'+({anna:'A',gemma:'G',lin:'L'}[m.member]||'?')+'</span><div><div class="workgroup-meta">'+m.member_profile.name+'</div><div class="workgroup-bubble"></div>'+(m.member==='gemma'?'<div class="workgroup-process">Gemma preprocessing · '+(m.metadata?.model||'gemma4:31b')+'</div>':'')+'</div></article>').join('')||'<div class="es">还没有工作群消息</div>';
     (d.messages||[]).forEach((m,i)=>{const el=messagesEl.querySelectorAll('.workgroup-bubble')[i];if(el)el.textContent=m.text;});
-    messagesEl.scrollTop=messagesEl.scrollHeight;
+    if(followNewMessages)messagesEl.scrollTop=messagesEl.scrollHeight;
   }catch(e){messagesEl.innerHTML='<div class="es">工作群暂时无法载入</div>';}
 }
 let workgroupPollTimer=null;
@@ -1708,8 +1709,8 @@ async function confirmImageSend() {
     let currentMsgDiv = null;
     let liveAssistantEntry = null;
     let activeModelLabel = '';
-    const currentDeveloper = window.AgentPanel ? window.AgentPanel.create(document.getElementById('cm')) : null;
-    if (currentDeveloper) currentDeveloper.ingest(window.AgentPanel.fromSse('api_start', {model: 'watch', input: 'image'}));
+    let currentDeveloper = null;
+    let currentAgentSlot = null;
     let currentEvent = null;
     let sseBuffer = '';
     
@@ -1720,6 +1721,9 @@ async function confirmImageSend() {
 
       const msgDiv = document.createElement('div');
       msgDiv.className = 'msg lin';
+      const agentSlot = document.createElement('div');
+      agentSlot.className = 'agent-panel-slot';
+      msgDiv.appendChild(agentSlot);
       const rowDiv = document.createElement('div');
       rowDiv.className = 'msg-row';
       rowDiv.innerHTML = avatarHtml('lin');
@@ -1730,6 +1734,7 @@ async function confirmImageSend() {
       document.getElementById('cm').appendChild(msgDiv);
 
       currentMsgDiv = bubDiv;
+      currentAgentSlot = agentSlot;
       liveAssistantEntry = {
         r: 'lin',
         t: '',
@@ -1793,7 +1798,6 @@ async function confirmImageSend() {
             }
             
             else if ((currentEvent === 'text_delta' || currentEvent === 'content') && data.delta !== undefined) {
-              if (currentDeveloper) currentDeveloper.ingest(window.AgentPanel.fromSse('content', data));
               contentBuffer += data.delta;
               
               if (!currentMsgDiv) {
@@ -1819,8 +1823,10 @@ async function confirmImageSend() {
             }
 
             else if ((currentEvent === 'tool_step_update' || currentEvent === 'agent_event')) {
-              if (currentDeveloper) currentDeveloper.ingest(window.AgentPanel.fromSse('agent_event', data));
+              const step = window.AgentPanel ? window.AgentPanel.fromSse(currentEvent, data) : null;
               const messageEl = ensureLiveAssistantMessage();
+              if (!currentDeveloper && step && currentAgentSlot) currentDeveloper = window.AgentPanel.create(currentAgentSlot);
+              if (currentDeveloper) currentDeveloper.ingest(step);
               if (messageEl && currentDeveloper) {
                 liveAssistantEntry.trace = currentDeveloper.snapshot();
               }
@@ -1879,8 +1885,8 @@ async function send(){
     let currentMsgDiv = null;
     let liveAssistantEntry = null;
     let activeModelLabel = '';
-    const currentDeveloper = window.AgentPanel ? window.AgentPanel.create(document.getElementById('cm')) : null;
-    if (currentDeveloper) currentDeveloper.ingest(window.AgentPanel.fromSse('api_start', {model: 'watch'}));
+    let currentDeveloper = null;
+    let currentAgentSlot = null;
     let currentEvent = null;
     let sseBuffer = '';
     
@@ -1891,6 +1897,9 @@ async function send(){
 
       const msgDiv = document.createElement('div');
       msgDiv.className = 'msg lin';
+      const agentSlot = document.createElement('div');
+      agentSlot.className = 'agent-panel-slot';
+      msgDiv.appendChild(agentSlot);
       const rowDiv = document.createElement('div');
       rowDiv.className = 'msg-row';
       rowDiv.innerHTML = avatarHtml('lin');
@@ -1901,6 +1910,7 @@ async function send(){
       document.getElementById('cm').appendChild(msgDiv);
 
       currentMsgDiv = bubDiv;
+      currentAgentSlot = agentSlot;
       liveAssistantEntry = {
         r: 'lin',
         t: '',
@@ -1963,7 +1973,6 @@ async function send(){
             }
             
             else if ((currentEvent === 'text_delta' || currentEvent === 'content') && data.delta !== undefined) {
-              if (currentDeveloper) currentDeveloper.ingest(window.AgentPanel.fromSse('content', data));
               contentBuffer += data.delta;
               
               if(!currentMsgDiv){
@@ -1989,8 +1998,10 @@ async function send(){
             }
 
             else if ((currentEvent === 'tool_step_update' || currentEvent === 'agent_event')) {
-              if (currentDeveloper) currentDeveloper.ingest(window.AgentPanel.fromSse('agent_event', data));
+              const step = window.AgentPanel ? window.AgentPanel.fromSse(currentEvent, data) : null;
               const messageEl = ensureLiveAssistantMessage();
+              if (!currentDeveloper && step && currentAgentSlot) currentDeveloper = window.AgentPanel.create(currentAgentSlot);
+              if (currentDeveloper) currentDeveloper.ingest(step);
               if (messageEl && currentDeveloper) {
                 liveAssistantEntry.trace = currentDeveloper.snapshot();
               }

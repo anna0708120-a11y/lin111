@@ -111,50 +111,6 @@ def generate_reply(context, app_name=None, use_cache=True):
     返回 (reply_text, thinking_text)。
     thinking_text 是清理过、可以直接显示给Anna看的思考内容；命中缓存或没配置API key时是 None。
     """
-    # V1 新增：對話前先 tick 身體狀態
-    from datetime import datetime
-    from app.intimacy.tick import tick_and_update
-    from app.intimacy.event import check_event_triggers
-    from app.intimacy.silence import detect_silence
-    
-    now = datetime.now()
-    tick_and_update(state, now)
-    
-    # V2 新增：更新用戶最後發消息時間，重置連續對話計數
-    if not hasattr(state, 'last_user_message_at'):
-        state.last_user_message_at = now
-    else:
-        # 檢查是否是連續對話（間隔少於 10 分鐘）
-        if state.last_user_message_at:
-            gap_minutes = (now - state.last_user_message_at).total_seconds() / 60.0
-            if gap_minutes < 10:
-                state.continuous_turns = getattr(state, 'continuous_turns', 0) + 1
-            else:
-                state.continuous_turns = 1
-        else:
-            state.continuous_turns = 1
-    
-    state.last_user_message_at = now
-    
-    # V2 新增：檢查是否該觸發事件
-    from app.intimacy.tick import start_event
-    
-    # 檢測等待焦躁（如果之前有等待）
-    silence_info = detect_silence(state.last_user_message_at, now) if hasattr(state, 'last_user_message_at') else {}
-    
-    # 組裝觸發情境
-    trigger_context = {
-        "silence_minutes": silence_info.get("silence_minutes", 0),
-        "continuous_turns": getattr(state, 'continuous_turns', 0)
-    }
-    
-    # 檢查所有觸發條件
-    triggered_events = check_event_triggers(state.body_values, trigger_context)
-    
-    # 如果有觸發且目前沒有事件，啟動第一個觸發的事件
-    if triggered_events and not getattr(state, 'active_event_key', None):
-        start_event(state, triggered_events[0], now)
-    
     if use_cache and state.last_context_cache == context and state.last_reply_at:
         if datetime.now() - state.last_reply_at < timedelta(minutes=2):
             return random.choice(FALLBACK_REPLIES), None
@@ -163,56 +119,10 @@ def generate_reply(context, app_name=None, use_cache=True):
         return "今天额度用完了，或者刚刚问太快了，等一下再说。", None
 
     memory_summary = state.recent_memory_text(query=context)
-    conv_list = state.get_recent_conversation(n=20)
-    if conv_list:
-        formatted = []
-        for item in conv_list:
-            if item["role"] == "user":
-                formatted.append(f"Anna: {item['content']}")
-            else:
-                formatted.append(f"Lin: {item['content']}")
-        conversation_history = "\n".join(formatted)
-    else:
-        conversation_history = "(无最近对话)"
-
-    persona = Persona.get_system_prompt()
-    final_system = f"{persona}\n\n{memory_summary}\n\n最近对话：\n{conversation_history}"
-
-    messages = [
-        {"role": "system", "content": final_system},
-        {"role": "user", "content": context}
-    ]
-
-    reply, thinking = llm.chat(messages, use_thinking=LLM_THINKING_ENABLED)
-    
-    # V3 新增：對話結束後結算關係
-    if reply and hasattr(state, 'relationship'):
-        from app.intimacy.settlement import settle_interaction
-        state.relationship = settle_interaction(
-            state.relationship,
-            context,
-            reply,
-            getattr(state, 'continuous_turns', 1)
-        )
-    
-    # V3 新增：檢測是否該觸發主事件（親密釋放）
-    from app.intimacy.ephemeral import should_trigger_intimacy_release, trigger_ephemeral_event
-    
-    if should_trigger_intimacy_release(context, reply, state.body_values):
-        trigger_ephemeral_event(state, "intimacy_release", now)
-
-    state.last_reply_at = datetime.now()
-    state.last_context_cache = context
-    return reply, thinking
-    if conv_list:
-        formatted = []
-        for turn in conv_list:
-            role_name = "Anna" if turn["role"] == "anna" else "Lin"
-            formatted.append(f"{role_name}：{turn['content']}")
-        conversation_history = "\n".join(formatted)
-    else:
-        conversation_history = ""
-    
+    conversation_history = "\n".join(
+        f"{'Anna' if turn['role'] == 'anna' else 'Lin'}：{turn['content']}"
+        for turn in state.get_recent_conversation(n=20)
+    )
     world_context = format_context_for_prompt(get_context())
     thinking_suggestion = should_show_thinking(context, state)
     system_prompt = build_system_prompt(

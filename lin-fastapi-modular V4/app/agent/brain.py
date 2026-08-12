@@ -21,6 +21,7 @@ from app import memory_trace  # Phase 2: 記錄 memory 決策鏈路
 from app.context.provider import get_context, format_context_for_prompt
 from app.life.runtime import get_life_context
 from app.life.interpretations import format_interpretations_for_prompt, relevant_interpretations
+from app.life.gemma_interpreter import format_for_prompt as format_gemma_life_for_prompt, interpret_life_evidence, relevant_life_interpretation
 from app import mood_engine
 from app.agent.thinking_decision import (
     clean_thinking_text,
@@ -124,6 +125,12 @@ def generate_reply(context, app_name=None, use_cache=True):
         for turn in state.get_recent_conversation(n=20)
     )
     world_context = format_context_for_prompt(get_context())
+    life_context = get_life_context()
+    gemma_context = format_gemma_life_for_prompt(
+        relevant_life_interpretation(interpret_life_evidence(life_context.get("recent_events", [])), context)
+    )
+    if gemma_context:
+        world_context = "\n".join(part for part in (world_context, gemma_context) if part)
     thinking_suggestion = should_show_thinking(context, state)
     system_prompt = build_system_prompt(
         context,
@@ -337,8 +344,11 @@ def _generate_reply_stream_impl(context, app_name=None, use_cache=True, session_
     interpretation_context = format_interpretations_for_prompt(
         relevant_interpretations(life_context.get("interpretations", []), context)
     )
-    if interpretation_context:
-        world_context = "\n".join(part for part in (world_context, interpretation_context) if part)
+    gemma_context = format_gemma_life_for_prompt(
+        relevant_life_interpretation(interpret_life_evidence(life_context.get("recent_events", [])), context)
+    )
+    if interpretation_context or gemma_context:
+        world_context = "\n".join(part for part in (world_context, interpretation_context, gemma_context) if part)
     print("[TRACE-C] after build context")
     print("[TRACE-D] before build prompt")
     thinking_suggestion = should_show_thinking(context, state)

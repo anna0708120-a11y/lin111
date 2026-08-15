@@ -5,6 +5,40 @@
 都只改这一个文件，不用去别的模块里翻。
 """
 import os
+import json
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
+
+
+def _load_polaris_config():
+    """Load non-secret runtime settings from Polaris before constants are built."""
+    base_url = os.getenv("POLARIS_SERVER_URL", "").rstrip("/")
+    if not base_url:
+        return {}
+    namespace = os.getenv("POLARIS_CONFIG_NAMESPACE", "lin")
+    group = os.getenv("POLARIS_CONFIG_GROUP", "LIN")
+    file_name = os.getenv("POLARIS_CONFIG_FILE", "lin-runtime.json")
+    query = urlencode({"namespace": namespace, "group": group, "fileName": file_name, "version": "0"})
+    try:
+        request = Request(f"{base_url}/config/v1/GetConfigFile?{query}", headers={"Accept": "application/json"})
+        with urlopen(request, timeout=float(os.getenv("POLARIS_CONFIG_TIMEOUT", "5"))) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        content = payload.get("configFile", {}).get("content")
+        values = json.loads(content) if content else {}
+        if not isinstance(values, dict):
+            raise ValueError("Polaris config content must be a JSON object")
+        print(f"[polaris] loaded {namespace}/{group}/{file_name} version {payload.get('configFile', {}).get('version', '?')}")
+        return values
+    except Exception as exc:
+        print(f"[polaris] config unavailable, using environment defaults: {exc}")
+        return {}
+
+
+_POLARIS_CONFIG = _load_polaris_config()
+
+
+def _setting(env_name, config_name, default):
+    return os.getenv(env_name, _POLARIS_CONFIG.get(config_name, default))
 
 try:
     from dotenv import load_dotenv
@@ -20,11 +54,11 @@ MAIN_LLM_API_KEY = os.getenv("A6API_API_KEY", "")
 MAIN_LLM_BASE_URL = os.getenv("A6API_BASE_URL", "https://api.a6api.com/v1")
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
 DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
-DEFAULT_PROVIDER = os.getenv("DEFAULT_PROVIDER", "deepseek").lower()
-DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "deepseek-v4-flash")
-MAIN_LLM_REASONING_EFFORT = os.getenv("MAIN_LLM_REASONING_EFFORT", "high")
-MAIN_LLM_TIMEOUT = int(os.getenv("MAIN_LLM_TIMEOUT", "45"))
-MAIN_LLM_MAX_TOKENS = int(os.getenv("MAIN_LLM_MAX_TOKENS", "1200"))
+DEFAULT_PROVIDER = str(_setting("DEFAULT_PROVIDER", "default_provider", "deepseek")).lower()
+DEFAULT_MODEL = _setting("DEFAULT_MODEL", "default_model", "deepseek-v4-flash")
+MAIN_LLM_REASONING_EFFORT = _setting("MAIN_LLM_REASONING_EFFORT", "main_llm_reasoning_effort", "high")
+MAIN_LLM_TIMEOUT = int(_setting("MAIN_LLM_TIMEOUT", "main_llm_timeout", 45))
+MAIN_LLM_MAX_TOKENS = int(_setting("MAIN_LLM_MAX_TOKENS", "main_llm_max_tokens", 1200))
 
 # Provider alias 是后续 UI 的稳定接口；实际 model ID 只在配置层维护。
 PROVIDER_MODELS = {
@@ -76,18 +110,18 @@ PORT = int(os.getenv("PORT", 8080))
 
 # ---- 主动消息 (proactive) 默认设置 ----
 # 之后可以透过 /settings 接口从前端改，或整个搬进 Supabase 的一张表
-PROACTIVE_ENABLED_DEFAULT = True
-PROACTIVE_MIN_MINUTES = int(os.getenv("PROACTIVE_MIN_MINUTES", 90))   # 至少静默这么久才考虑主动开口
-PROACTIVE_MAX_MINUTES = int(os.getenv("PROACTIVE_MAX_MINUTES", 240))  # 静默超过这个数字，不管时段一定触发一次
-PROACTIVE_CHECK_EVERY_MINUTES = int(os.getenv("PROACTIVE_CHECK_EVERY_MINUTES", 5))  # 后台巡检频率
+PROACTIVE_ENABLED_DEFAULT = str(_setting("PROACTIVE_ENABLED_DEFAULT", "proactive_enabled_default", True)).lower() == "true"
+PROACTIVE_MIN_MINUTES = int(_setting("PROACTIVE_MIN_MINUTES", "proactive_min_minutes", 90))
+PROACTIVE_MAX_MINUTES = int(_setting("PROACTIVE_MAX_MINUTES", "proactive_max_minutes", 240))
+PROACTIVE_CHECK_EVERY_MINUTES = int(_setting("PROACTIVE_CHECK_EVERY_MINUTES", "proactive_check_every_minutes", 5))
 
 # ---- Phase 7 Life Runtime ----
-LIFE_RUNTIME_ENABLED = os.getenv("LIFE_RUNTIME_ENABLED", "true").lower() == "true"
-LIFE_RUNTIME_TICK_MINUTES = int(os.getenv("LIFE_RUNTIME_TICK_MINUTES", 5))
-LIFE_SEND_ENABLED = os.getenv("LIFE_SEND_ENABLED", "false").lower() == "true"
+LIFE_RUNTIME_ENABLED = str(_setting("LIFE_RUNTIME_ENABLED", "life_runtime_enabled", "true")).lower() == "true"
+LIFE_RUNTIME_TICK_MINUTES = int(_setting("LIFE_RUNTIME_TICK_MINUTES", "life_runtime_tick_minutes", 5))
+LIFE_SEND_ENABLED = str(_setting("LIFE_SEND_ENABLED", "life_send_enabled", "false")).lower() == "true"
 
 # ---- Phase 9 Tool Brain ----
-TOOL_BRAIN_ENABLED = os.getenv("TOOL_BRAIN_ENABLED", "false").lower() == "true"
+TOOL_BRAIN_ENABLED = str(_setting("TOOL_BRAIN_ENABLED", "tool_brain_enabled", "false")).lower() == "true"
 TOOL_BRAIN_TIMEOUT_SECONDS = int(os.getenv("TOOL_BRAIN_TIMEOUT_SECONDS", 30))
 GROQ_TOOL_BRAIN_API_KEY = os.getenv("GROQ_TOOL_BRAIN_API_KEY", "")
 GROQ_TOOL_BRAIN_BASE_URL = os.getenv("GROQ_TOOL_BRAIN_BASE_URL", "https://api.groq.com/openai/v1")
@@ -109,15 +143,15 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
 # ---- 聊天记录持久化（跨装置同步用）----
 # 手机 dock / 电脑 dock / 网页版，三端现在都从 Supabase 读同一份聊天记录，不再各自存在浏览器 localStorage 里。
 # 保留条数做成配置项，以后觉得 500 太少，改这个数字就好，不用动数据库结构。
-CHAT_HISTORY_LIMIT = int(os.getenv("CHAT_HISTORY_LIMIT", 500))
+CHAT_HISTORY_LIMIT = int(_setting("CHAT_HISTORY_LIMIT", "chat_history_limit", 500))
 
 # ---- Context Provider 总开关（每个功能都能单独关，改.env就好，不用删代码） ----
-ENABLE_MAC = os.getenv("ENABLE_MAC", "true").lower() == "true"
-ENABLE_WEATHER = os.getenv("ENABLE_WEATHER", "true").lower() == "true"
-ENABLE_CALENDAR = os.getenv("ENABLE_CALENDAR", "true").lower() == "true"
-ENABLE_SCREENTIME = os.getenv("ENABLE_SCREENTIME", "true").lower() == "true"
-ENABLE_LOCATION = os.getenv("ENABLE_LOCATION", "true").lower() == "true"
-ENABLE_PHOTO = os.getenv("ENABLE_PHOTO", "true").lower() == "true"
+ENABLE_MAC = str(_setting("ENABLE_MAC", "enable_mac", "true")).lower() == "true"
+ENABLE_WEATHER = str(_setting("ENABLE_WEATHER", "enable_weather", "true")).lower() == "true"
+ENABLE_CALENDAR = str(_setting("ENABLE_CALENDAR", "enable_calendar", "true")).lower() == "true"
+ENABLE_SCREENTIME = str(_setting("ENABLE_SCREENTIME", "enable_screentime", "true")).lower() == "true"
+ENABLE_LOCATION = str(_setting("ENABLE_LOCATION", "enable_location", "true")).lower() == "true"
+ENABLE_PHOTO = str(_setting("ENABLE_PHOTO", "enable_photo", "true")).lower() == "true"
 
 # ---- Context API 统一鉴权 Token ----
 # Mac / iPhone快捷指令 / 以后第二台电脑，全部共用这一个token

@@ -16,6 +16,8 @@ from app import config
 from app.agent.proactive import run_proactive_check, run_memory_review
 from app.web.frontend import HTML_CONTENT
 from app.web.routes import router
+from app.integrations.hermes_routes import router as hermes_router
+from app.web.spaces_routes import router as spaces_router
 from app.state import state
 
 app = FastAPI()
@@ -28,6 +30,8 @@ app.add_middleware(
 )
 
 app.include_router(router)
+app.include_router(hermes_router)
+app.include_router(spaces_router)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 

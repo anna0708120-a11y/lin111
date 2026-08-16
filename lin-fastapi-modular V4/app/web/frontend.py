@@ -1470,7 +1470,7 @@ function openDeepLinkedView(){
   if(!view)return;
   if(view==='diary'){
     stab('memory');
-    const archiveTab=document.querySelector('.mtab[onclick*="\'ar\'"]');
+    const archiveTab=Array.from(document.querySelectorAll('.mtab')).find((tab)=>tab.getAttribute('onclick')?.includes("'ar'"));
     if(archiveTab)smtab({target:archiveTab},'ar');
     return;
   }

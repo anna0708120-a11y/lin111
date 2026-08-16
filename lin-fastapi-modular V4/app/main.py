@@ -17,6 +17,8 @@ from app.agent.proactive import run_proactive_check, run_memory_review
 from app.web.frontend import HTML_CONTENT
 from app.web.routes import router
 from app.integrations.hermes_routes import router as hermes_router
+from app.integrations.hermes_management_proxy import router as hermes_management_router
+from app.integrations.hermes_settings_routes import router as hermes_settings_router
 from app.web.spaces_routes import router as spaces_router
 from app.state import state
 
@@ -31,6 +33,8 @@ app.add_middleware(
 
 app.include_router(router)
 app.include_router(hermes_router)
+app.include_router(hermes_management_router)
+app.include_router(hermes_settings_router)
 app.include_router(spaces_router)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 

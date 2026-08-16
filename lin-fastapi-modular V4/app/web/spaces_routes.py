@@ -15,8 +15,8 @@ router = APIRouter(tags=["lin-spaces"])
 
 
 def _group_url() -> str:
-    target = os.getenv("LIN_GROUP_CHAT_URL", "/group-chat").strip()
-    return target if target.startswith(("/", "https://", "http://")) else "/group-chat"
+    target = os.getenv("LIN_GROUP_CHAT_URL", "/?view=workgroup").strip()
+    return target if target.startswith(("/", "https://", "http://")) else "/?view=workgroup"
 
 
 @router.get("/spaces")

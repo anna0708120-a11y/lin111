@@ -1,28 +1,20 @@
 import unittest
-from unittest.mock import patch
 
-from app.web.frontend import HTML_CONTENT
+from app.web.spaces_routes import SPACES_HTML, WORKGROUP_HTML, _group_url
 
 
 class WorkgroupUiTests(unittest.TestCase):
-    def test_internal_workgroup_is_a_separate_visible_page(self):
-        for marker in ('id="tb-workgroup"', 'id="pg-workgroup"', 'Anna · Gemma · Lin', 'id="workgroupMembers"', 'id="workgroupMessages"', 'id="workgroupComposer"', 'initWorkgroup()'):
-            self.assertIn(marker, HTML_CONTENT)
+    def test_dwell_group_card_enters_the_original_workgroup_page(self):
+        self.assertEqual(_group_url(), "/workgroup")
+        self.assertIn("location.assign('__GROUP_URL__')", SPACES_HTML)
 
-    def test_workgroup_keeps_gemma_process_display_separate(self):
-        self.assertIn('Gemma preprocessing', HTML_CONTENT)
-        self.assertIn("m.member==='gemma'", HTML_CONTENT)
-        self.assertIn("fetch(AU+'/workgroup/messages')", HTML_CONTENT)
-        self.assertIn('await loadWorkgroup()', HTML_CONTENT)
-        self.assertNotIn('127.0.0.1:8787', HTML_CONTENT)
+    def test_workgroup_page_uses_the_existing_message_api(self):
+        for marker in ('id="workgroupMembers"', 'id="workgroupMessages"', 'id="workgroupComposer"', "fetch('/workgroup/messages')", "method:'POST'", 'Gemma preprocessing'):
+            self.assertIn(marker, WORKGROUP_HTML)
 
-    def test_agent_panel_is_mounted_on_live_reply_and_tool_updates_are_independent(self):
-        self.assertIn("let currentDeveloper = null", HTML_CONTENT)
-        self.assertIn("let currentAgentSlot = null", HTML_CONTENT)
-        self.assertIn("currentDeveloper = window.AgentPanel.create(currentAgentSlot)", HTML_CONTENT)
-        self.assertIn("currentEvent === 'text_delta' || currentEvent === 'content'", HTML_CONTENT)
-        self.assertIn("currentEvent === 'tool_step_update' || currentEvent === 'agent_event'", HTML_CONTENT)
-        self.assertIn("className = 'agent-panel-slot'", HTML_CONTENT)
+    def test_workgroup_polling_preserves_a_user_scrolled_position(self):
+        self.assertIn('const followNewMessages=', WORKGROUP_HTML)
+        self.assertIn('if(followNewMessages)', WORKGROUP_HTML)
 
 
 if __name__ == "__main__":

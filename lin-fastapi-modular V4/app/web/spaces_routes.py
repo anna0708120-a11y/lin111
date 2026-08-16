@@ -15,13 +15,18 @@ router = APIRouter(tags=["lin-spaces"])
 
 
 def _group_url() -> str:
-    target = os.getenv("LIN_GROUP_CHAT_URL", "/?view=workgroup").strip()
-    return target if target.startswith(("/", "https://", "http://")) else "/?view=workgroup"
+    target = os.getenv("LIN_GROUP_CHAT_URL", "/workgroup").strip()
+    return target if target.startswith(("/", "https://", "http://")) else "/workgroup"
 
 
 @router.get("/spaces")
 def spaces_page() -> HTMLResponse:
     return HTMLResponse(SPACES_HTML.replace("__GROUP_URL__", _group_url()))
+
+
+@router.get("/workgroup")
+def workgroup_page() -> HTMLResponse:
+    return HTMLResponse(WORKGROUP_HTML)
 
 
 SPACES_HTML = r'''<!doctype html>
@@ -48,3 +53,14 @@ grid.appendChild(rot(card('',null,'悄悄话','你写的，我写的。谁都不
 function openLin(url,title){const wrap=document.createElement('div');wrap.innerHTML='<p>正在打开 Lin 的'+title+'…</p>';openSheet(title,wrap);fetch(url).then(()=>location.assign(url)).catch(()=>{sheetBody.innerHTML='<p>该 Lin 页面仍由原有功能管理。</p><a href="'+url+'">打开 '+title+'</a>'})}
 document.getElementById('theme').onclick=()=>{const root=document.documentElement;const now=root.dataset.theme==='dark'?'light':root.dataset.theme==='light'?'auto':'dark';if(now==='auto')delete root.dataset.theme;else root.dataset.theme=now;localStorage.setItem('homeTheme',now)};renderBento();
 </script></body></html>'''
+
+
+WORKGROUP_HTML = r'''<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Lin Workgroup</title>
+<style>
+:root{--cream:#faf9f5;--white:#fff;--border:#e8e5dc;--dark:#2b2a27;--muted:#8a867c;--rose-deep:#c96442}@media(prefers-color-scheme:dark){:root{--cream:#262624;--white:#30302e;--border:#3d3d3a;--dark:#f5f4ef;--muted:#a3a099}}*{box-sizing:border-box}html,body{height:100%;margin:0;background:var(--cream);color:var(--dark);font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Noto Sans TC",sans-serif}.workgroup-shell{height:100%;display:flex;flex-direction:column;background:var(--cream)}.workgroup-head{padding:16px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:var(--white)}.workgroup-head strong{display:block;font-size:17px}.workgroup-head small{display:block;color:var(--muted);font-size:11px;margin-top:3px}.workgroup-local{font-size:10px;color:var(--muted);border:1px solid var(--border);padding:4px 7px;border-radius:5px;text-decoration:none}.workgroup-members{display:flex;gap:12px;padding:10px 18px;border-bottom:1px solid var(--border);background:var(--white);font-size:12px;color:var(--muted)}.workgroup-member{display:flex;align-items:center;gap:5px}.workgroup-avatar{width:25px;height:25px;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:11px;font-weight:700}.workgroup-avatar.anna{background:#4b94c6}.workgroup-avatar.gemma{background:#8361bc}.workgroup-avatar.lin{background:#449669}.workgroup-messages{flex:1;overflow:auto;padding:16px;display:flex;flex-direction:column;gap:12px}.workgroup-message{display:flex;gap:7px;max-width:86%}.workgroup-message.anna{align-self:flex-end;flex-direction:row-reverse}.workgroup-message.gemma,.workgroup-message.lin{align-self:flex-start}.workgroup-bubble{padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:var(--white);line-height:1.45;white-space:pre-wrap}.workgroup-message.anna .workgroup-bubble{background:#e7f3ff}.workgroup-message.gemma .workgroup-bubble{background:#f1ebff}.workgroup-message.lin .workgroup-bubble{background:#e9f8ef}.workgroup-meta{font-size:10px;color:var(--muted);margin-bottom:3px}.workgroup-process{font-size:10px;color:#8361bc;margin-top:5px}.workgroup-composer{display:flex;gap:8px;padding:10px;border-top:1px solid var(--border);background:var(--white)}.workgroup-composer input{flex:1;min-width:0;padding:10px;border:1px solid var(--border);border-radius:6px;background:var(--cream);color:var(--dark);font:inherit}.workgroup-composer button{border:0;border-radius:6px;background:var(--rose-deep);color:#fff;padding:0 15px;font:inherit}.workgroup-composer button:disabled{opacity:.6}.es{color:var(--muted);margin:auto;text-align:center}
+</style></head><body><div class="workgroup-shell"><div class="workgroup-head"><div><strong>Internal Workgroup</strong><small>Anna · Gemma · Lin</small></div><a class="workgroup-local" href="/spaces">生活空间</a></div><div id="workgroupMembers" class="workgroup-members"></div><div id="workgroupMessages" class="workgroup-messages"><div class="es">连接工作群中...</div></div><form id="workgroupComposer" class="workgroup-composer"><input id="workgroupInput" placeholder="在内部工作群发消息..." autocomplete="off"><button type="submit">发送</button></form></div>
+<script>
+async function loadWorkgroup(){const membersEl=document.getElementById('workgroupMembers');const messagesEl=document.getElementById('workgroupMessages');if(!membersEl||!messagesEl)return;const followNewMessages=messagesEl.scrollHeight-messagesEl.scrollTop-messagesEl.clientHeight<=48;try{const r=await fetch('/workgroup/messages');if(!r.ok)throw new Error('load failed');const d=await r.json();membersEl.innerHTML=Object.entries(d.members||{}).map(([id,m])=>'<div class="workgroup-member"><span class="workgroup-avatar '+id+'">'+({anna:'A',gemma:'G',lin:'L'}[id]||'?')+'</span>'+m.name+'</div>').join('');messagesEl.innerHTML=(d.messages||[]).map(m=>'<article class="workgroup-message '+m.member+'"><span class="workgroup-avatar '+m.member+'">'+({anna:'A',gemma:'G',lin:'L'}[m.member]||'?')+'</span><div><div class="workgroup-meta">'+m.member_profile.name+'</div><div class="workgroup-bubble"></div>'+(m.member==='gemma'?'<div class="workgroup-process">Gemma preprocessing · '+(m.metadata?.model||'gemma4:31b')+'</div>':'')+'</div></article>').join('')||'<div class="es">还没有工作群消息</div>';(d.messages||[]).forEach((m,i)=>{const el=messagesEl.querySelectorAll('.workgroup-bubble')[i];if(el)el.textContent=m.text});if(followNewMessages)messagesEl.scrollTop=messagesEl.scrollHeight}catch(e){messagesEl.innerHTML='<div class="es">工作群暂时无法载入</div>'}}
++let workgroupPollTimer=null;function initWorkgroup(){loadWorkgroup();if(!workgroupPollTimer)workgroupPollTimer=setInterval(loadWorkgroup,3000);const form=document.getElementById('workgroupComposer');if(form&&!form.dataset.bound){form.dataset.bound='1';form.addEventListener('submit',async e=>{e.preventDefault();const input=document.getElementById('workgroupInput');const text=input.value.trim();if(!text)return;input.value='';input.disabled=true;try{const r=await fetch('/workgroup/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});if(r.ok)await loadWorkgroup()}finally{input.disabled=false;input.focus()}})}}initWorkgroup();
++</script></body></html>'''

@@ -16,7 +16,6 @@ HTML_CONTENT = """<!DOCTYPE html>
 <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
 <title>Lin</title>
 <script>
-window.LinChatPolicy = window.LinChatPolicy || { showThinking: false };
 (function(){
   try{
     var t=localStorage.getItem('lin_theme');
@@ -31,7 +30,7 @@ window.LinChatPolicy = window.LinChatPolicy || { showThinking: false };
 let voiceLoadingIdx=null;
 const CK='lin_audio_urls';
 async function playVoice(idx){
-  console.log('[TTS] playVoice clicked, idx:', idx);
+  if(voiceLoadingIdx===idx)return; // 正在生成中，避免连点重複请求
   const m=chatMemoryCache[idx];
   if(!m||m.r!=='lin')return;
   if(m.audioUrl){
@@ -50,8 +49,6 @@ async function playVoice(idx){
   }catch(e){}
   voiceLoadingIdx=null;
 }
-
-window.playVoice = playVoice;
 
 // 页面加载完成后,如果当前在Mine tab,立即加载经期数据
 document.addEventListener('DOMContentLoaded', () => {
@@ -194,55 +191,6 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 .qb{display:flex;align-items:center;padding:6px 0;font-size:11px;color:var(--muted);gap:10px;}
 .qt{flex:1;height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
 .qf{height:100%;background:var(--rose);border-radius:2px;transition:width .3s;}
-
-/* Life System read-only observability view */
-.life-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;}
-.life-section-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;}
-.life-section-heading .cl{margin:0;}
-.life-mode-toggle{display:inline-flex;align-items:center;gap:2px;padding:2px;background:var(--blush);border:1px solid var(--border);border-radius:999px;}
-.life-mode-toggle button{border:0;background:transparent;color:var(--muted);padding:3px 6px;border-radius:999px;font:10px 'DM Sans',sans-serif;cursor:pointer;}
-.life-mode-toggle button.active{background:var(--white);color:var(--rose-deep);box-shadow:0 1px 2px var(--shadow);}
-.life-device-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
-.life-device-item{min-width:0;padding:10px;background:var(--blush);border-radius:10px;}
-.life-device-icon{font-size:14px;margin-bottom:5px;}.life-device-label{font-size:10px;color:var(--muted);}.life-device-message{font-size:12px;color:var(--dark);line-height:1.45;margin-top:3px;word-break:break-word;}.life-device-time{font-size:10px;color:var(--muted);margin-top:4px;}
-.life-empty{padding:12px 0;color:var(--muted);font-size:12px;text-align:center;}
-.life-toolbar .cl{margin:0;}
-.life-refresh{border:1px solid var(--border);background:var(--white);color:var(--rose-deep);border-radius:8px;padding:7px 10px;font:11px 'DM Sans',sans-serif;cursor:pointer;}
-.life-refresh:hover{background:var(--blush);}
-.life-refresh-status{font-size:10px;color:var(--muted);min-height:14px;margin-top:-4px;margin-bottom:10px;}
-.life-refresh-status.life-error,.life-error{color:#bd5b59;}
-.life-state-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
-.life-location-card{border-left:3px solid var(--rose);}
-.life-location-value{font-size:16px;font-weight:500;}
-.life-location-meta{font-size:10px;color:var(--muted);margin-top:4px;word-break:break-word;}
-.life-state-item{min-width:0;padding:10px;background:var(--blush);border-radius:10px;}
-.life-state-label{font-size:10px;color:var(--muted);margin-bottom:4px;}
-.life-state-value{font-size:13px;color:var(--dark);line-height:1.45;word-break:break-word;white-space:pre-wrap;}
-.life-state-wide{grid-column:1 / -1;}
-.life-date-row{display:flex;align-items:center;gap:8px;margin-bottom:12px;}
-.life-date-row input{flex:1;min-width:0;border:1px solid var(--border);border-radius:8px;padding:8px 10px;background:var(--cream);color:var(--dark);font:12px 'DM Sans',sans-serif;}
-.life-event-list,.life-audit-list{display:flex;flex-direction:column;gap:8px;}
-.life-event-row{display:grid;grid-template-columns:42px 10px minmax(0,1fr);gap:8px;align-items:start;padding:9px 0;border-bottom:1px solid var(--border);}
-.life-event-row:last-child{border-bottom:none;}
-.life-event-time{font-size:10px;color:var(--muted);padding-top:2px;font-variant-numeric:tabular-nums;}
-.life-event-dot{width:8px;height:8px;border-radius:50%;background:var(--rose);margin-top:5px;box-shadow:0 0 0 3px var(--blush);}
-.life-event-body{min-width:0;}
-.life-event-label{font-size:13px;color:var(--dark);font-weight:500;}
-.life-event-type{font-size:10px;color:var(--rose-deep);margin-top:2px;}
-.life-event-payload{font-size:11px;color:var(--muted);line-height:1.45;margin-top:4px;white-space:pre-wrap;word-break:break-word;}
-.life-audit-row{padding:10px 0;border-bottom:1px solid var(--border);}
-.life-audit-row:last-child{border-bottom:none;}
-.life-audit-head{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;color:var(--dark);}
-.life-status{font-size:10px;color:var(--rose-deep);background:var(--blush);border-radius:8px;padding:2px 7px;white-space:nowrap;}
-.life-audit-meta,.life-audit-reason,.life-audit-candidate{font-size:10px;color:var(--muted);line-height:1.5;margin-top:4px;word-break:break-word;}
-.life-audit-candidate{color:var(--rose-deep);}
-.life-observation{padding:10px;background:var(--blush);border-radius:10px;font-size:12px;line-height:1.55;color:var(--dark);white-space:pre-wrap;word-break:break-word;}
-.life-observation-meta{font-size:10px;color:var(--muted);margin-top:6px;line-height:1.5;}
-.life-observation-stale{color:#bd5b59;}
-.life-context-block{padding:10px 0;border-bottom:1px solid var(--border);}.life-context-block:last-child{border-bottom:none;}
-.life-context-title{font-size:11px;font-weight:500;color:var(--rose-deep);margin-bottom:7px;}.life-context-json{margin:0;max-height:180px;overflow:auto;padding:9px;background:var(--blush);border-radius:8px;color:var(--dark);font:10px/1.5 ui-monospace,monospace;white-space:pre-wrap;word-break:break-word;}
-
-@media (max-width:480px){.life-state-grid{grid-template-columns:1fr;}.life-state-wide{grid-column:auto;}}
 
 /* 侧边栏 (Claude 风格) */
 .sidebar-btn{width:36px;height:36px;border:none;background:var(--white);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--dark);border-radius:6px;transition:background .2s;box-shadow:0 1px 3px var(--shadow);}
@@ -464,7 +412,7 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
 .maw{display:flex;flex-direction:column;gap:8px;margin-top:12px;}
 .msel,.minp{border:1.5px solid var(--border);border-radius:10px;padding:8px 12px;font-size:13px;font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);outline:none;}
 .minp{resize:none;min-height:72px;}
-.model-selector-current{font-size:14px;color:var(--dark);margin:8px 0 10px}.model-selector-current span{color:var(--rose-deep);font-weight:600}.model-selector-status{font-size:11px;color:var(--muted);min-height:16px;margin-top:6px}
+.msel:focus,.minp:focus{border-color:var(--rose);}
 .msave{background:var(--rose);color:white;border:none;border-radius:10px;padding:10px;font-size:13px;font-weight:600;cursor:pointer;}
 .cms{flex:1;overflow-y:auto;padding:16px 16px 8px;-webkit-overflow-scrolling:touch;position:relative;transition:opacity .15s ease;}
 .cms.fading{opacity:0;}
@@ -631,21 +579,12 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
   .ci { font-size: 13px !important; }
 }
 
-/* Agent panel: the only Agent lifecycle surface, rendered before the assistant reply. */
-.agent-panel-slot:empty{display:none;}
-.agent-panel{margin:0 0 6px 32px;max-width:calc(100% - 44px);border:1px solid var(--border);border-radius:8px;background:var(--white);overflow:hidden;box-shadow:0 1px 5px var(--shadow);}
-.agent-panel-header{width:100%;min-height:30px;padding:6px 9px;border:0;background:transparent;color:var(--dark);display:flex;align-items:center;gap:7px;text-align:left;cursor:pointer;font:11px 'DM Sans',sans-serif;}
-.agent-status,.agent-step-dot{width:7px;height:7px;border-radius:50%;flex:0 0 auto;background:var(--muted);border:1px solid var(--muted);}.agent-status.agent-pending,.agent-step.agent-pending .agent-step-dot{background:transparent;}.agent-status.agent-running,.agent-step.agent-running .agent-step-dot{background:#b47b27;border-color:#b47b27;animation:agentPulse 1s ease-in-out infinite;}.agent-status.agent-success,.agent-step.agent-success .agent-step-dot{background:#4f9662;border-color:#4f9662;}.agent-status.agent-error,.agent-step.agent-error .agent-step-dot{background:#bd5b59;border-color:#bd5b59;}.agent-status.agent-skipped,.agent-step.agent-skipped .agent-step-dot,.agent-status.agent-not_executed,.agent-step.agent-not_executed .agent-step-dot{background:var(--muted);border-color:var(--muted);}
-.agent-panel-title{font-weight:600;color:var(--rose-deep);}.agent-panel-summary{flex:1;min-width:0;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.agent-panel-count{font:10px ui-monospace,monospace;color:var(--muted);}.agent-panel-chevron{font-size:16px;line-height:1;color:var(--muted);transition:transform .2s ease;}.agent-panel-expanded .agent-panel-chevron{transform:rotate(180deg);}
-.agent-panel-body{display:none;border-top:1px solid var(--border);padding:4px 8px 7px;}.agent-panel-expanded .agent-panel-body{display:block;}.agent-step{border-radius:5px;}.agent-step-header{width:100%;border:0;background:transparent;display:flex;align-items:center;gap:7px;padding:6px 2px;color:var(--dark);cursor:pointer;text-align:left;font:11px 'DM Sans',sans-serif;}.agent-step-label{font-weight:500;}.agent-step-state{margin-left:auto;font-size:10px;color:var(--muted);text-transform:capitalize;}.agent-step-chevron{font-size:13px;color:var(--muted);transition:transform .2s ease;}.agent-step-detail{display:none;margin:0 0 5px 16px;padding:7px;background:var(--blush);border-radius:5px;color:var(--muted);font:10px/1.5 ui-monospace,monospace;white-space:pre-wrap;overflow-wrap:anywhere;}.agent-step-expanded .agent-step-detail{display:block;}.agent-step-expanded .agent-step-chevron{transform:rotate(180deg);}@keyframes agentPulse{0%,100%{opacity:.45;}50%{opacity:1;}}
+/* Developer Console compact entry: same event model as /developer, rendered above thinking and reply. */
+.developer-chat-row{margin:0 0 6px 0!important;align-items:flex-start;}
+.developer-compact{display:flex;align-items:center;gap:7px;min-width:190px;max-width:calc(100% - 34px);padding:7px 9px;border:1px solid var(--border);border-radius:8px;background:var(--white);color:var(--dark);font:11px 'DM Sans',sans-serif;cursor:pointer;text-align:left;box-shadow:0 1px 5px var(--shadow);}
+.developer-compact-title{font-weight:600;color:var(--rose-deep);}.developer-compact-state{flex:1;min-width:0;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.developer-compact-count{font:10px ui-monospace,monospace;color:var(--muted);}.developer-compact-arrow{font-size:18px;line-height:12px;color:var(--muted);}.developer-compact.is-complete{background:var(--blush);}
 .voice-btn{cursor:pointer;margin-right:6px;opacity:.8;}
 .voice-btn:active{opacity:1;}
-.workgroup-shell{height:100%;display:flex;flex-direction:column;background:var(--cream);}
-.workgroup-head{padding:16px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:var(--white);}
-.workgroup-head strong{display:block;font-size:17px;}.workgroup-head small{display:block;color:var(--muted);font-size:11px;margin-top:3px;}.workgroup-local{font-size:10px;color:var(--muted);border:1px solid var(--border);padding:4px 7px;border-radius:5px;}
-.workgroup-members{display:flex;gap:12px;padding:10px 18px;border-bottom:1px solid var(--border);background:var(--white);font-size:12px;color:var(--muted);}
-.workgroup-member{display:flex;align-items:center;gap:5px;}.workgroup-avatar{width:25px;height:25px;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:11px;font-weight:700;}.workgroup-avatar.anna{background:#4b94c6;}.workgroup-avatar.gemma{background:#8361bc;}.workgroup-avatar.lin{background:#449669;}
-.workgroup-messages{flex:1;overflow:auto;padding:16px;display:flex;flex-direction:column;gap:12px;}.workgroup-message{display:flex;gap:7px;max-width:86%;}.workgroup-message.anna{align-self:flex-end;flex-direction:row-reverse;}.workgroup-message.gemma,.workgroup-message.lin{align-self:flex-start;}.workgroup-bubble{padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:var(--white);line-height:1.45;white-space:pre-wrap;}.workgroup-message.anna .workgroup-bubble{background:#e7f3ff;}.workgroup-message.gemma .workgroup-bubble{background:#f1ebff;}.workgroup-message.lin .workgroup-bubble{background:#e9f8ef;}.workgroup-meta{font-size:10px;color:var(--muted);margin-bottom:3px;}.workgroup-process{font-size:10px;color:#8361bc;margin-top:5px;}.workgroup-composer{display:flex;gap:8px;padding:10px;border-top:1px solid var(--border);background:var(--white);}.workgroup-composer input{flex:1;min-width:0;padding:10px;border:1px solid var(--border);border-radius:6px;background:var(--cream);color:var(--dark);}.workgroup-composer button{border:0;border-radius:6px;background:var(--rose-deep);color:#fff;padding:0 15px;}
 </style>
 </head>
 <body>
@@ -739,16 +678,16 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
             <div class="intimacy-hero-bg" id="intimacyCycleBg"></div>
             <div style="position:relative;">
               <div class="intimacy-status-label">周期</div>
-              <div class="intimacy-status-value" id="cycleStage">載入中...</div>
-              <div class="intimacy-status-time" id="cycleDuration">—</div>
+              <div class="intimacy-status-value" id="cycleStage">平穩期</div>
+              <div class="intimacy-status-time" id="cycleDuration">68h 11m</div>
             </div>
           </div>
           <div class="intimacy-status-card" style="flex:0 0 calc(40% - 5px);cursor:pointer;position:relative;overflow:hidden;" onclick="document.getElementById('intimacyEventBgUpload').click()">
             <div class="intimacy-hero-bg" id="intimacyEventBg"></div>
             <div style="position:relative;">
               <div class="intimacy-status-label">事件</div>
-              <div class="intimacy-status-value" id="eventName">載入中...</div>
-              <div class="intimacy-status-time" id="eventDuration">—</div>
+              <div class="intimacy-status-value" id="eventName">等待焦躁</div>
+              <div class="intimacy-status-time" id="eventDuration">2h 32m</div>
             </div>
           </div>
         </div>
@@ -756,7 +695,7 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
         <!-- 自動變化 -->
         <div class="intimacy-auto-change">
           <div class="intimacy-auto-change-title">自動變化</div>
-          <div class="intimacy-auto-change-text" id="autoChangeDesc">載入中...</div>
+          <div class="intimacy-auto-change-text" id="autoChangeDesc">平穩期基線：熱度 30 -1.4/h，壓抑 25 -1.7/h，控制 75 +1/h，敏感 35 -1.7/h，蓄積 +0.4/h，占有 42 -3.7/h，疲惫 16 -1.2/h</div>
         </div>
 
         <!-- 數值區塊 -->
@@ -769,14 +708,14 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
               </div>
               <div class="intimacy-bar-label">蓄積感</div>
               <div class="intimacy-bar-value">
-                <span id="tensionVal">—</span>
-                <span class="intimacy-bar-level" id="tensionLevel">載入中</span>
+                <span id="tensionVal">85</span>
+                <span class="intimacy-bar-level" id="tensionLevel">高</span>
               </div>
             </div>
             <div class="intimacy-bar-track">
-              <div class="intimacy-bar-fill" id="tensionBar" style="width:0%"></div>
+              <div class="intimacy-bar-fill" id="tensionBar" style="width:85%"></div>
             </div>
-            <div class="intimacy-bar-desc" id="tensionDesc">載入中...</div>
+            <div class="intimacy-bar-desc" id="tensionDesc">累積到頂，普通克制已經很難壓住</div>
           </div>
           
           <!-- 熱度 -->
@@ -787,14 +726,14 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
               </div>
               <div class="intimacy-bar-label">熱度</div>
               <div class="intimacy-bar-value">
-                <span id="heatVal">—</span>
-                <span class="intimacy-bar-level" id="heatLevel">載入中</span>
+                <span id="heatVal">38</span>
+                <span class="intimacy-bar-level" id="heatLevel">中低</span>
               </div>
             </div>
             <div class="intimacy-bar-track">
-              <div class="intimacy-bar-fill" id="heatBar" style="width:0%"></div>
+              <div class="intimacy-bar-fill" id="heatBar" style="width:38%"></div>
             </div>
-            <div class="intimacy-bar-desc" id="heatDesc">載入中...</div>
+            <div class="intimacy-bar-desc" id="heatDesc">身體有一點熱意，但還能很快冷住</div>
           </div>
           
           <!-- 敏感度 -->
@@ -805,14 +744,14 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
               </div>
               <div class="intimacy-bar-label">敏感度</div>
               <div class="intimacy-bar-value">
-                <span id="sensitivityVal">—</span>
-                <span class="intimacy-bar-level" id="sensitivityLevel">載入中</span>
+                <span id="sensitivityVal">37</span>
+                <span class="intimacy-bar-level" id="sensitivityLevel">中低</span>
               </div>
             </div>
             <div class="intimacy-bar-track">
-              <div class="intimacy-bar-fill" id="sensitivityBar" style="width:0%"></div>
+              <div class="intimacy-bar-fill" id="sensitivityBar" style="width:37%"></div>
             </div>
-            <div class="intimacy-bar-desc" id="sensitivityDesc">載入中...</div>
+            <div class="intimacy-bar-desc" id="sensitivityDesc">有一點沒說出口的念，但還不重</div>
           </div>
           
           <!-- 控制力 -->
@@ -823,14 +762,14 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
               </div>
               <div class="intimacy-bar-label">控制力</div>
               <div class="intimacy-bar-value">
-                <span id="controlVal">—</span>
-                <span class="intimacy-bar-level" id="controlLevel">載入中</span>
+                <span id="controlVal">69</span>
+                <span class="intimacy-bar-level" id="controlLevel">中高</span>
               </div>
             </div>
             <div class="intimacy-bar-track">
-              <div class="intimacy-bar-fill" id="controlBar" style="width:0%"></div>
+              <div class="intimacy-bar-fill" id="controlBar" style="width:69%"></div>
             </div>
-            <div class="intimacy-bar-desc" id="controlDesc">載入中...</div>
+            <div class="intimacy-bar-desc" id="controlDesc">還能維持表面正常，但需要刻意壓直接的衝動</div>
           </div>
         </div>
       </div>
@@ -910,15 +849,6 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
   </div>
 </div>
 
-<div class="pg" id="pg-workgroup">
-  <div class="workgroup-shell">
-    <div class="workgroup-head"><div><strong>Internal Workgroup</strong><small>Anna · Gemma · Lin</small></div><span class="workgroup-local">本机私有</span></div>
-    <div id="workgroupMembers" class="workgroup-members"></div>
-    <div id="workgroupMessages" class="workgroup-messages"><div class="es">连接工作群中...</div></div>
-    <form id="workgroupComposer" class="workgroup-composer"><input id="workgroupInput" placeholder="在内部工作群发消息..." autocomplete="off"><button type="submit">发送</button></form>
-  </div>
-</div>
-
 <div class="pg" id="pg-memory">
   <div class="mtabs">
     <div class="mtab active" onclick="smtab(event,'lt')">長期記憶</div>
@@ -946,41 +876,6 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
   </div>
 </div>
 
-
-<div class="pg" id="pg-life">
-  <div class="card">
-    <div class="life-toolbar">
-      <div class="cl">Life State</div>
-      <button class="life-refresh" type="button" onclick="refreshLife()">↻ 更新</button>
-    </div>
-    <div class="life-refresh-status" id="lifeRefreshStatus" aria-live="polite"></div>
-    <div class="life-device-summary" id="lifeDeviceSummary"><div class="life-empty">載入裝置狀態…</div></div>
-  </div>
-
-  <div class="card">
-    <div class="life-section-heading"><div class="cl">Dynamic Observation</div><div class="life-mode-toggle" data-life-toggle="dynamic"><button type="button" class="active" onclick="setLifeMode('dynamic','readable')">顯示</button><button type="button" onclick="setLifeMode('dynamic','raw')">Raw</button></div></div>
-    <div id="lifeDynamicObservation"><div class="es">載入中…</div></div>
-  </div>
-
-  <div class="card">
-    <div class="life-section-heading"><div class="cl">Life Context</div><div class="life-mode-toggle" data-life-toggle="context"><button type="button" class="active" onclick="setLifeMode('context','readable')">顯示</button><button type="button" onclick="setLifeMode('context','raw')">Raw</button></div></div>
-    <div id="lifeContext"><div class="es">載入中…</div></div>
-  </div>
-
-  <div class="card">
-    <div class="life-section-heading"><div class="cl">Self Timeline</div><div class="life-mode-toggle" data-life-toggle="timeline"><button type="button" class="active" onclick="setLifeMode('timeline','readable')">顯示</button><button type="button" onclick="setLifeMode('timeline','raw')">Raw</button></div></div>
-    <div class="life-date-row">
-      <input id="lifeTimelineDate" type="date" aria-label="選擇 Life Timeline 日期" onchange="refreshLife()">
-      <button class="life-refresh" type="button" onclick="refreshLife()">查看</button>
-    </div>
-    <div class="life-event-list" id="lifeTimeline"><div class="es">載入中…</div></div>
-  </div>
-
-  <div class="card">
-    <div class="life-section-heading"><div class="cl">Life Activity / Audit</div><div class="life-mode-toggle" data-life-toggle="audit"><button type="button" class="active" onclick="setLifeMode('audit','readable')">顯示</button><button type="button" onclick="setLifeMode('audit','raw')">Raw</button></div></div>
-    <div class="life-audit-list" id="lifeAudit"><div class="es">載入中…</div></div>
-  </div>
-</div>
 
 <div class="pg" id="pg-mine">
   <div class="card period-card">
@@ -1017,28 +912,20 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
       </button>
     </div>
   </div>
-
-  <!-- 模型设置 -->
-  <div class="card model-selector-card" style="max-width: 60%; margin-left: auto; margin-right: auto;">
-    <div class="cl">模型切换</div>
-    <div class="model-selector-current">当前模型：<span id="current-model-label">DeepSeek V4 Flash</span></div>
-    <select id="main-model-select" class="msel" onchange="updateMainModel()" aria-label="选择聊天模型"></select>
-    <div id="main-model-status" class="model-selector-status" aria-live="polite"></div>
-  </div>
 </div>
 
-<div class="tab-bar">  <button class="tb active" id="tb-monitor" onclick="stab('monitor')"><span class="ti">🏠</span>Home</button>
+<div class="tab-bar">
+  <button class="tb active" id="tb-monitor" onclick="stab('monitor')"><span class="ti">🏠</span>Home</button>
   <button class="tb" id="tb-chat" onclick="stab('chat')"><span class="ti">💬</span>Chat</button>
   <button class="tb" id="tb-memory" onclick="stab('memory')"><span class="ti">🧠</span>Memory</button>
   <button class="tb" id="tb-life" onclick="stab('life')"><span class="ti">◌</span>Life</button>
-  <button class="tb" id="tb-workgroup" onclick="stab('workgroup')"><span class="ti">👥</span>Workgroup</button>
+  <button class="tb" id="tb-workgroup" type="button" onclick="location.assign('/spaces')"><span class="ti">👥</span>Workgroup</button>
   <button class="tb" id="tb-mine" onclick="stab('mine')"><span class="ti">🌙</span>Mine</button>
 </div>
 
 <script src="/static/js/session_manager.js"></script>
 <script src="/static/js/sidebar.js"></script>
 <script src="/static/js/chat_view.js"></script>
-<script src="/static/js/life_view.js"></script>
 <script src="/static/js/dev_panel.js"></script>
 <script>
 const AU = window.location.origin;
@@ -1191,38 +1078,42 @@ function switchIntimacyTab(tab){
   if(tab==='events' && !eventsLoaded){ loadEventTimeline(); eventsLoaded=true; }
 }
 
-/* ===== 事件日誌（後端真實資料） ===== */
+/* ===== 事件日誌（V3 架構預留，假資料） ===== */
 let eventsLoaded=false;
 let eventsFilter='all';
-let loadedEvents=[];
+const MOCK_EVENTS=[
+  {type:'cycle', title:'進入平穩期', desc:'熱度與敏感度逐漸回落，控制力緩慢回升。', time:'今天 08:12'},
+  {type:'event', title:'等待焦躁', desc:'持續 2 小時未收到訊息，占有欲小幅上升。', time:'今天 10:44'},
+  {type:'dream', title:'夢境片段', desc:'夢到與妳在雨中散步，醒來後蓄積感 +5。', time:'今天 06:30'},
+  {type:'settlement', title:'每日結算', desc:'昨日互動次數 12 次，親密度 +3。', time:'昨天 23:59'},
+  {type:'cycle', title:'結束高峰期', desc:'熱度從 78 回落至 52，進入緩和階段。', time:'昨天 20:15'},
+  {type:'event', title:'突然的想念', desc:'蓄積感短時間內 +8，敏感度同步上升。', time:'昨天 15:02'}
+];
 
 function filterEvents(type){
   eventsFilter=type;
   document.querySelectorAll('.event-filter-chip').forEach(c=>{
     c.classList.toggle('active', c.getAttribute('data-filter')===type);
   });
-  renderEventTimeline(loadedEvents);
+  renderEventTimeline();
 }
 
 async function loadEventTimeline(){
   const wrap=document.getElementById('eventTimeline');
   try{
     const r=await fetch(AU+'/intimacy/events');
-    if(!r.ok) throw new Error('event timeline request failed');
     const d=await r.json();
-    loadedEvents = Array.isArray(d) ? d : (d.events || []);
-    renderEventTimeline(loadedEvents);
+    renderEventTimeline(Array.isArray(d)?d:d.events);
   }catch(e){
-    console.error('[loadEventTimeline]', e);
-    loadedEvents=[];
-    if(wrap) wrap.innerHTML='<div class="es">事件資料暫時無法載入</div>';
+    // API 尚未提供事件日誌時，先用假資料呈現版面
+    renderEventTimeline(MOCK_EVENTS);
   }
 }
 
 function renderEventTimeline(list){
   const wrap=document.getElementById('eventTimeline');
   if(!wrap) return;
-  const data = Array.isArray(list) ? list : [];
+  const data = list || MOCK_EVENTS;
   const filtered = eventsFilter==='all' ? data : data.filter(e=>e.type===eventsFilter);
   if(!filtered.length){
     wrap.innerHTML='<div class="es">目前沒有符合的事件</div>';
@@ -1233,8 +1124,9 @@ function renderEventTimeline(list){
       '<div class="event-item-dot"></div>'+
       '<div class="event-item-body">'+
         '<div class="event-item-title">'+e.title+'</div>'+
-        '<div class="event-item-desc">'+(e.detail_text || e.desc || '')+'</div>'+
-        '<div class="event-item-time">'+(e.timestamp || e.time || '')+'</div>'+
+        '<div class="event-item-desc">'+e.desc+'</div>'+
+        '<div class="event-item-time">'+e.time+'</div>'+
+        (e.type==='settlement' ? '<div class="event-item-action" onclick="showSettlementDetail(this)">查看結算詳情</div>' : '')+
       '</div>'+
     '</div>'
   ).join('');
@@ -1261,6 +1153,11 @@ function intimacyLevel(val){
 async function loadIntimacy(){
   try{
     const r=await fetch(AU+'/intimacy/status');
+    if (!r.ok) {
+      const text = await r.text();
+      console.error("[VERIFY] 接口返回错误:", text);
+      return;
+    }
     const d=await r.json();
     renderIntimacy(d);
   }catch(e){console.error('[loadIntimacy]',e);}
@@ -1301,34 +1198,19 @@ function renderIntimacy(d){
     if(descEl) descEl.textContent = desc;
   });
   
-  // 周期資訊：完全使用後端狀態，不在前端推導時間。
+  // 周期資訊 - 時間格式改為 68h 11m
   if(d.cycle){
     const cycleEl = document.getElementById('cycleStage');
     const durationEl = document.getElementById('cycleDuration');
-    if(cycleEl) cycleEl.textContent = d.cycle.label || '未初始化';
-    if(durationEl) durationEl.textContent = d.cycle.remaining_text || '—';
+    if(cycleEl) cycleEl.textContent = d.cycle.label || '平穩期';
+    if(durationEl){
+      const hours = d.cycle.hours_elapsed || 0;
+      const h = Math.floor(hours);
+      const m = Math.floor((hours % 1) * 60);
+      durationEl.textContent = h + 'h ' + m + 'm';
+    }
   }
-
-  // 當前事件與餘波都由後端提供；沒有 active event 時才展示最接近到期的餘波。
-  const eventEl = document.getElementById('eventName');
-  const eventDurationEl = document.getElementById('eventDuration');
-  const activeEvent = d.active_event;
-  const afterEffects = Array.isArray(d.after_effects) ? d.after_effects : [];
-  const visibleEffect = afterEffects[0];
-  if(activeEvent){
-    if(eventEl) eventEl.textContent = activeEvent.label;
-    if(eventDurationEl) eventDurationEl.textContent = activeEvent.remaining_text || '—';
-    if(eventEl) eventEl.title = activeEvent.description || '';
-  }else if(visibleEffect){
-    if(eventEl) eventEl.textContent = '餘波';
-    if(eventDurationEl) eventDurationEl.textContent = visibleEffect.remaining_text || '—';
-    if(eventEl) eventEl.title = visibleEffect.description || '';
-  }else{
-    if(eventEl) eventEl.textContent = '無';
-    if(eventDurationEl) eventDurationEl.textContent = '目前沒有短期事件';
-    if(eventEl) eventEl.title = '';
-  }
-
+  
   // 自動變化描述
   if(d.auto_change_desc){
     const autoEl = document.getElementById('autoChangeDesc');
@@ -1419,38 +1301,15 @@ function updateCatExpression(mood){
 loadMood();
 loadCollapsedAtmosphere();
 
-// Life System is intentionally read-only in this first frontend phase.
-if(document.getElementById('pg-life')?.classList.contains('active')){initLifeView();}
-
 // ---------- PWA ----------
 if('serviceWorker' in navigator){
   window.addEventListener('load', ()=>{ navigator.serviceWorker.register('/sw.js').catch(()=>{}); });
 }
 
 
-async function loadWorkgroup(){
-  const membersEl=document.getElementById('workgroupMembers');
-  const messagesEl=document.getElementById('workgroupMessages');
-  if(!membersEl||!messagesEl)return;
-  const followNewMessages = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight <= 48;
-  try{
-    const r=await fetch(AU+'/workgroup/messages');
-    const d=await r.json();
-    membersEl.innerHTML=Object.entries(d.members||{}).map(([id,m])=>'<div class="workgroup-member"><span class="workgroup-avatar '+id+'">'+({anna:'A',gemma:'G',lin:'L'}[id]||'?')+'</span>'+m.name+'</div>').join('');
-    messagesEl.innerHTML=(d.messages||[]).map(m=>'<article class="workgroup-message '+m.member+'"><span class="workgroup-avatar '+m.member+'">'+({anna:'A',gemma:'G',lin:'L'}[m.member]||'?')+'</span><div><div class="workgroup-meta">'+m.member_profile.name+'</div><div class="workgroup-bubble"></div>'+(m.member==='gemma'?'<div class="workgroup-process">Gemma preprocessing · '+(m.metadata?.model||'gemma4:31b')+'</div>':'')+'</div></article>').join('')||'<div class="es">还没有工作群消息</div>';
-    (d.messages||[]).forEach((m,i)=>{const el=messagesEl.querySelectorAll('.workgroup-bubble')[i];if(el)el.textContent=m.text;});
-    if(followNewMessages)messagesEl.scrollTop=messagesEl.scrollHeight;
-  }catch(e){messagesEl.innerHTML='<div class="es">工作群暂时无法载入</div>';}
-}
-let workgroupPollTimer=null;
-function initWorkgroup(){
-  loadWorkgroup();
-  if(!workgroupPollTimer){workgroupPollTimer=setInterval(()=>{if(document.getElementById('pg-workgroup')?.classList.contains('active'))loadWorkgroup();},3000);}
-  const form=document.getElementById('workgroupComposer');
-  if(form&&!form.dataset.bound){form.dataset.bound='1';form.addEventListener('submit',async e=>{e.preventDefault();const input=document.getElementById('workgroupInput');const text=input.value.trim();if(!text)return;input.value='';input.disabled=true;try{const r=await fetch(AU+'/workgroup/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});if(r.ok){await loadWorkgroup();}}finally{input.disabled=false;input.focus();}});}
-}
 function stab(tab){
   document.querySelectorAll('.tb').forEach(e=>e.classList.remove('active'));
+  document.getElementById('tb-'+tab).classList.add('active');
   document.querySelectorAll('.pg').forEach(e=>{e.style.display='none';e.classList.remove('active');});
   const pg=document.getElementById('pg-'+tab);
   if(tab==='chat'){
@@ -1458,10 +1317,10 @@ function stab(tab){
     setTimeout(()=>{const c=document.getElementById('cm');c.scrollTop=c.scrollHeight;},50);
     if(!sessionManager.currentSessionId && sessionManager.sessions.length === 0){sidebar.handleNewChat();}
   }
-  else{pg.style.display='block';pg.classList.add('active');if(tab==='memory')rmem();if(tab==='monitor')loadMood();if(tab==='life')initLifeView();if(tab==='workgroup')initWorkgroup();if(tab==='mine'){loadPeriod();loadChatConfig();loadMainModelConfig();loadTogetherDays();}}
+  else{pg.style.display='block';pg.classList.add('active');if(tab==='memory')rmem();if(tab==='monitor')loadMood();if(tab==='mine'){loadPeriod();loadChatConfig();loadTogetherDays();}}
 }
 // 页面加载时如果是Mine tab,立即展开
-if(document.getElementById('pg-mine')?.classList.contains('active')){loadPeriod();loadChatConfig();loadMainModelConfig();}
+if(document.getElementById('pg-mine')?.classList.contains('active')){loadPeriod();loadChatConfig();}
 loadTogetherDays(); // 页面加载时初始化在一起日子
 
 // /spaces only supplies a view selector. Existing tab renderers remain the data/UI owners.
@@ -1523,9 +1382,10 @@ function renderMessages(history){
   // Wrapper: 委托给 ChatView，保持旧代码调用兼容性
   if (typeof chatView !== 'undefined' && chatView.renderMessages) {
     chatView.renderMessages(history);
-    addVoiceButtons();
-  }
+  addVoiceButtons();
 }
+}
+
 
 function addVoiceButtons(){
   document.querySelectorAll('#cm .msg.lin').forEach(el=>{
@@ -1536,16 +1396,10 @@ function addVoiceButtons(){
     const btn=document.createElement('button');
     btn.className='voice-btn';
     btn.textContent='🔊';
-    btn.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      console.log('[TTS] voice button clicked, idx:', idx);
-      window.playVoice(idx);
-    });
+    btn.onclick=e=>{e.stopPropagation();playVoice(idx);};
     meta.prepend(btn);
   });
 }
-
 function lchat(){
   // Wrapper: 委托给 ChatView.refresh()，换头像等场景调用
   if (typeof chatView !== 'undefined' && chatView.refresh) {
@@ -1554,6 +1408,9 @@ function lchat(){
 }
 
 function renderOnly(history){
+  console.log("[DEBUG renderOnly] 被调用，history 长度:", history ? history.length : 0);
+  console.log("[DEBUG renderOnly] 调用前 chatMemoryCache 最后一条:", chatMemoryCache[chatMemoryCache.length - 1]);
+  console.trace("[DEBUG renderOnly] 调用栈");
   const serverMessages = (history || []).map(m => {
     const iso = m.iso || m.time || new Date().toISOString();
     let display = '';
@@ -1567,24 +1424,70 @@ function renderOnly(history){
       iso: iso,
       time: display,
       think: m.thinking || m.think,
-      trace: m.trace,
       message_id: m.message_id,
-      model: m.trace && m.trace.model ? modelDisplayName(m.trace.model.model) : undefined
+      trace: m.trace
     };
   });
-  chatMemoryCache = serverMessages;
+  
+  // 智能合并：服务器数据 + 本地 pending 消息
+  const serverIds = new Set(serverMessages.map(m => m.message_id));
+  
+  // 检查最后一条服务器消息的时间
+  const lastServerTime = serverMessages.length > 0 ? new Date(serverMessages[serverMessages.length - 1].iso).getTime() : 0;  
+
+    const localPending = chatMemoryCache.filter(m => {
+  const id = m.message_id;
+  // 保留没有 message_id 的消息（可能是刚发送还未保存到数据库的）
+  if (!id) return true;  // ← 修改为 return true
+    
+    // 如果服务器已有这个 ID，跳过
+    if (serverIds.has(id)) return false;
+    
+    // 临时消息：如果它比服务器最后一条消息更新，保留它（可能还没保存到数据库）
+    if (id.toString().startsWith('temp_')) {
+      const msgTime = new Date(m.iso).getTime();
+      return msgTime > lastServerTime;
+    }
+    
+    // 其他 pending 消息保留
+    return true;
+  });
+  
+  console.log("[DEBUG] 合并前 chatMemoryCache 最后一条:", chatMemoryCache[chatMemoryCache.length - 1]);
+  console.log("[DEBUG] serverMessages 数量:", serverMessages.length, "localPending 数量:", localPending.length);
+  if (localPending.length > 0) console.log("[DEBUG] localPending:", localPending);
+  
+  // 修复：如果 localPending 为空，检查是否有未保存的临时消息
+  if (localPending.length === 0 && chatMemoryCache.length > 0) {
+    const last = chatMemoryCache[chatMemoryCache.length - 1];
+    if (last.message_id && last.message_id.toString().startsWith('temp_')) {
+      // 临时消息还在，说明后端还没保存，保留它
+      console.log("[DEBUG] 保留未保存的临时消息:", last.message_id);
+      localPending.push(last);
+    }
+  }
+  
+  chatMemoryCache = [...serverMessages, ...localPending];
+  
   if (typeof chatView !== 'undefined' && chatView.renderMessages) {
     chatView.renderMessages(chatMemoryCache);
   }
   addVoiceButtons();
 }
 
+
 async function syncChat(){
+  console.log("[DEBUG syncChat] 被调用");
+  console.log("[DEBUG syncChat] 调用前 chatMemoryCache 最后一条:", chatMemoryCache[chatMemoryCache.length - 1]);
+  console.trace("[DEBUG syncChat] 调用栈");
   // 跨装置同步：直接从 Supabase 拉当前 session 的聊天记录渲染，
   // 数据库是唯一真相来源，不写入 localStorage，只更新内存缓存。
   try{
     const r = await fetch(AU+'/conversation');
     const d = await r.json();
+    console.log("[VERIFY] 返回的 messages 数量:", d.messages ? d.messages.length : 0);
+    if (d.messages && d.messages.length > 0) {
+    }
     if(d && Array.isArray(d.messages)){
       renderOnly(d.messages);
     }
@@ -1593,8 +1496,6 @@ async function syncChat(){
   }
 }
 
-  setInterval(syncChat, 5000);
-
 function smsg(role,text,think,trace){
   // Wrapper: 委托给 ChatView.appendLiveMessage()，保持旧代码调用兼容性
   if (typeof chatView !== 'undefined' && chatView.appendLiveMessage) {
@@ -1602,6 +1503,8 @@ function smsg(role,text,think,trace){
   }
   return chatMemoryCache;
 }
+
+
 
 function addMsg(role, text, think) {
   // Wrapper: 保持旧接口，内部调用 smsg (已委托给 ChatView)
@@ -1716,6 +1619,7 @@ async function confirmImageSend() {
   
   try {
     const currentSessionId = sessionManager.currentSessionId;
+    console.trace("[WATCH SEND]", { activity: txt || "看圖片", image: true, from: "confirmImageSend()" });
     const response = await fetch(AU + '/watch', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
@@ -1730,68 +1634,36 @@ async function confirmImageSend() {
     let reasoningBuffer = '';
     let contentBuffer = '';
     let currentMsgDiv = null;
-    let liveAssistantEntry = null;
-    let activeModelLabel = '';
-    let currentDeveloper = null;
-    let currentAgentSlot = null;
+    const currentDeveloper = window.DeveloperConsole ? window.DeveloperConsole.createCompact(document.getElementById('cm')) : null;
+    publishDevEvent('api_start', {model: 'watch', input: 'image'});
     let currentEvent = null;
     let sseBuffer = '';
     
     typing(false);
-
-    function ensureLiveAssistantMessage() {
-      if (currentMsgDiv) return currentMsgDiv.closest('.msg.lin');
-
-      const msgDiv = document.createElement('div');
-      msgDiv.className = 'msg lin';
-      const agentSlot = document.createElement('div');
-      agentSlot.className = 'agent-panel-slot';
-      msgDiv.appendChild(agentSlot);
-      const rowDiv = document.createElement('div');
-      rowDiv.className = 'msg-row';
-      rowDiv.innerHTML = avatarHtml('lin');
-      const bubDiv = document.createElement('div');
-      bubDiv.className = 'bub';
-      rowDiv.appendChild(bubDiv);
-      msgDiv.appendChild(rowDiv);
-      document.getElementById('cm').appendChild(msgDiv);
-
-      currentMsgDiv = bubDiv;
-      currentAgentSlot = agentSlot;
-      liveAssistantEntry = {
-        r: 'lin',
-        t: '',
-        time: ts(),
-        iso: new Date().toISOString(),
-        message_id: 'live-' + Date.now(),
-        model: activeModelLabel || undefined
-      };
-      chatMemoryCache.push(liveAssistantEntry);
-      return msgDiv;
-    }
     
     function processChunk({done, value}) {
       if (done) {
-        if (currentDeveloper) currentDeveloper.complete();
-        if (liveAssistantEntry) {
-          liveAssistantEntry.t = contentBuffer;
-          if (reasoningBuffer) liveAssistantEntry.think = reasoningBuffer;
-          if (currentDeveloper) liveAssistantEntry.trace = currentDeveloper.snapshot();
-        } else if (contentBuffer) {
-          chatMemoryCache.push({
-            r: 'lin',
-            t: contentBuffer,
-            time: ts(),
-            iso: new Date().toISOString(),
-            message_id: 'live-' + Date.now(),
-            think: reasoningBuffer || undefined,
-            trace: currentDeveloper ? currentDeveloper.snapshot() : undefined
-          });
-        }
-        if (contentBuffer || liveAssistantEntry) {
+        console.log('[DEBUG] Image stream done. contentBuffer:', contentBuffer, 'reasoningBuffer:', reasoningBuffer);
+        // 修復：與 send() 保持一致，不要調用 smsg()
+        // 直接將消息添加到內存緩存並保存到資料庫
+        if(contentBuffer){
+          const entry = { 
+            r: 'lin', 
+            t: contentBuffer, 
+            time: ts(), 
+            iso: new Date().toISOString() 
+          };
+          if(reasoningBuffer) entry.think = reasoningBuffer;
+          
+          chatMemoryCache.push(entry);
+          if(chatMemoryCache.length > 200) chatMemoryCache = chatMemoryCache.slice(-200);
+          
+          // 異步保存到後端，不阻塞 UI
           syncChat().catch(e => console.error('[DEBUG] Failed to sync image chat:', e));
         }
-        if(document.getElementById('tb-memory')?.classList.contains('active')) rmem();
+        publishDevEvent('done', {});
+        if (currentDeveloper) currentDeveloper.complete();
+        window.DeveloperConsole.refreshState();
         scrollDown();
         pendingImageDataUrl = null;
         return;
@@ -1815,19 +1687,38 @@ async function confirmImageSend() {
             const data = JSON.parse(line.slice(6));
             
             if (currentEvent === 'reasoning' && data.content !== undefined) {
-              if (currentDeveloper) currentDeveloper.ingest(window.AgentPanel.fromSse('reasoning', data));
+              const developerEvent = publishDevEvent('reasoning', data);
+              if (currentDeveloper) currentDeveloper.ingest(developerEvent);
               reasoningBuffer += data.content;
               scrollDown();
             }
             
-            else if ((currentEvent === 'text_delta' || currentEvent === 'content') && data.delta !== undefined) {
+            else if (currentEvent === 'content' && data.delta !== undefined) {
+              const developerEvent = publishDevEvent('content', data);
+              if (currentDeveloper) currentDeveloper.ingest(developerEvent);
               contentBuffer += data.delta;
               
               if (!currentMsgDiv) {
-                ensureLiveAssistantMessage();
+                const msgDiv = document.createElement('div');
+                msgDiv.className = 'msg lin';
+                
+                const rowDiv = document.createElement('div');
+                rowDiv.className = 'msg-row';
+                rowDiv.innerHTML = avatarHtml('lin');
+                
+                const bubDiv = document.createElement('div');
+                bubDiv.className = 'bub';
+                bubDiv.textContent = contentBuffer;
+                
+                rowDiv.appendChild(bubDiv);
+                msgDiv.appendChild(rowDiv);
+                document.getElementById('cm').appendChild(msgDiv);
+                console.log('[DEBUG] Content msgDiv appended to #cm');
+                
+                currentMsgDiv = bubDiv;
+              } else {
+                currentMsgDiv.textContent = contentBuffer;
               }
-              currentMsgDiv.textContent = contentBuffer;
-              if (liveAssistantEntry) liveAssistantEntry.t = contentBuffer;
               scrollDown();
             }
             
@@ -1838,26 +1729,9 @@ async function confirmImageSend() {
               }
             }
 
-            else if (currentEvent === 'model') {
-              const modelLabel = modelDisplayName(data.model || '');
-              activeModelLabel = modelLabel;
-              if (currentDeveloper) currentDeveloper.ingest(window.AgentPanel.fromSse('model', data));
-              if (liveAssistantEntry) liveAssistantEntry.model = modelLabel;
-            }
-
-            else if ((currentEvent === 'tool_step_update' || currentEvent === 'agent_event')) {
-              const step = window.AgentPanel ? window.AgentPanel.fromSse(currentEvent, data) : null;
-              const messageEl = ensureLiveAssistantMessage();
-              if (!currentDeveloper && step && currentAgentSlot) currentDeveloper = window.AgentPanel.create(currentAgentSlot);
-              if (currentDeveloper) currentDeveloper.ingest(step);
-              if (messageEl && currentDeveloper) {
-                liveAssistantEntry.trace = currentDeveloper.snapshot();
-              }
-            }
-
-            else if (currentEvent === 'body_state') {
-              if (currentDeveloper) currentDeveloper.ingest(window.AgentPanel.fromSse('body_state', data));
-              renderIntimacy(data);
+            else if (currentEvent === 'agent_event') {
+              const developerEvent = publishDevEvent('agent_event', data);
+              if (currentDeveloper) currentDeveloper.ingest(developerEvent);
             }
             
           } catch(e) {
@@ -1892,6 +1766,7 @@ async function send(){
   
   try{
     const currentSessionId = sessionManager.currentSessionId;
+    console.trace("[WATCH SEND]", { activity: txt, from: "send()" });
     const response = await fetch(AU+'/watch', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
@@ -1899,6 +1774,7 @@ async function send(){
     });
     
     if(!response.ok) throw new Error('Network error');
+    publishDevEvent('api_start', {model: 'watch'});
     
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
@@ -1906,68 +1782,36 @@ async function send(){
     let reasoningBuffer = '';
     let contentBuffer = '';
     let currentMsgDiv = null;
-    let liveAssistantEntry = null;
-    let activeModelLabel = '';
-    let currentDeveloper = null;
-    let currentAgentSlot = null;
+    const currentDeveloper = window.DeveloperConsole ? window.DeveloperConsole.createCompact(document.getElementById('cm')) : null;
     let currentEvent = null;
     let sseBuffer = '';
     
     typing(false);
-
-    function ensureLiveAssistantMessage() {
-      if (currentMsgDiv) return currentMsgDiv.closest('.msg.lin');
-
-      const msgDiv = document.createElement('div');
-      msgDiv.className = 'msg lin';
-      const agentSlot = document.createElement('div');
-      agentSlot.className = 'agent-panel-slot';
-      msgDiv.appendChild(agentSlot);
-      const rowDiv = document.createElement('div');
-      rowDiv.className = 'msg-row';
-      rowDiv.innerHTML = avatarHtml('lin');
-      const bubDiv = document.createElement('div');
-      bubDiv.className = 'bub';
-      rowDiv.appendChild(bubDiv);
-      msgDiv.appendChild(rowDiv);
-      document.getElementById('cm').appendChild(msgDiv);
-
-      currentMsgDiv = bubDiv;
-      currentAgentSlot = agentSlot;
-      liveAssistantEntry = {
-        r: 'lin',
-        t: '',
-        time: ts(),
-        iso: new Date().toISOString(),
-        message_id: 'live-' + Date.now(),
-        model: activeModelLabel || undefined
-      };
-      chatMemoryCache.push(liveAssistantEntry);
-      return msgDiv;
-    }
     
     function processChunk({done, value}){
+      console.log('[DEBUG] processChunk called, done:', done);
       if(done){
-        if (currentDeveloper) currentDeveloper.complete();
-        if (liveAssistantEntry) {
-          liveAssistantEntry.t = contentBuffer;
-          if (reasoningBuffer) liveAssistantEntry.think = reasoningBuffer;
-          if (currentDeveloper) liveAssistantEntry.trace = currentDeveloper.snapshot();
-        } else if (contentBuffer) {
-          chatMemoryCache.push({
-            r: 'lin',
-            t: contentBuffer,
-            time: ts(),
-            iso: new Date().toISOString(),
-            message_id: 'live-' + Date.now(),
-            think: reasoningBuffer || undefined,
-            trace: currentDeveloper ? currentDeveloper.snapshot() : undefined
-          });
-        }
-        if (contentBuffer || liveAssistantEntry) {
+        console.log('[DEBUG] Stream done. contentBuffer:', contentBuffer, 'reasoningBuffer:', reasoningBuffer);
+        // 修復：不要調用 smsg()，因為消息已經在串流過程中顯示
+        // 直接將消息添加到內存緩存並保存到資料庫
+        if(contentBuffer){
+          const entry = { 
+            r: 'lin', 
+            t: contentBuffer, 
+            time: ts(), 
+            iso: new Date().toISOString() 
+          };
+          if(reasoningBuffer) entry.think = reasoningBuffer;
+          
+          chatMemoryCache.push(entry);
+          if(chatMemoryCache.length > 200) chatMemoryCache = chatMemoryCache.slice(-200);
+          
+          // 異步保存到後端，不阻塞 UI
           syncChat().catch(e => console.error('[DEBUG] Failed to sync chat:', e));
         }
-        if(document.getElementById('tb-memory')?.classList.contains('active')) rmem();
+        publishDevEvent('done', {});
+        if (currentDeveloper) currentDeveloper.complete();
+        window.DeveloperConsole.refreshState();
         scrollDown();
         return;
       }
@@ -1989,20 +1833,33 @@ async function send(){
           try{
             const data = JSON.parse(line.slice(6));
             
-            if(currentEvent === 'reasoning' && data.content !== undefined){
-              if (currentDeveloper) currentDeveloper.ingest(window.AgentPanel.fromSse('reasoning', data));
+            if (currentEvent === 'reasoning' && data.content !== undefined) {
+              const developerEvent = publishDevEvent('reasoning', data);
+              if (currentDeveloper) currentDeveloper.ingest(developerEvent);
               reasoningBuffer += data.content;
               scrollDown();
             }
             
-            else if ((currentEvent === 'text_delta' || currentEvent === 'content') && data.delta !== undefined) {
+            else if (currentEvent === 'content' && data.delta !== undefined) {
+              const developerEvent = publishDevEvent('content', data);
+              if (currentDeveloper) currentDeveloper.ingest(developerEvent);
               contentBuffer += data.delta;
-              
-              if(!currentMsgDiv){
-                ensureLiveAssistantMessage();
+              if (!currentMsgDiv) {
+                const msgDiv = document.createElement('div');
+                msgDiv.className = 'msg lin';
+                const rowDiv = document.createElement('div');
+                rowDiv.className = 'msg-row';
+                rowDiv.innerHTML = avatarHtml('lin');
+                const bubDiv = document.createElement('div');
+                bubDiv.className = 'bub';
+                bubDiv.textContent = contentBuffer;
+                rowDiv.appendChild(bubDiv);
+                msgDiv.appendChild(rowDiv);
+                document.getElementById('cm').appendChild(msgDiv);
+                currentMsgDiv = bubDiv;
+              } else {
+                currentMsgDiv.textContent = contentBuffer;
               }
-              currentMsgDiv.textContent = contentBuffer;
-              if (liveAssistantEntry) liveAssistantEntry.t = contentBuffer;
               scrollDown();
             }
             
@@ -2013,26 +1870,9 @@ async function send(){
               }
             }
 
-            else if(currentEvent === 'model') {
-              const modelLabel = modelDisplayName(data.model || '');
-              activeModelLabel = modelLabel;
-              if (currentDeveloper) currentDeveloper.ingest(window.AgentPanel.fromSse('model', data));
-              if (liveAssistantEntry) liveAssistantEntry.model = modelLabel;
-            }
-
-            else if ((currentEvent === 'tool_step_update' || currentEvent === 'agent_event')) {
-              const step = window.AgentPanel ? window.AgentPanel.fromSse(currentEvent, data) : null;
-              const messageEl = ensureLiveAssistantMessage();
-              if (!currentDeveloper && step && currentAgentSlot) currentDeveloper = window.AgentPanel.create(currentAgentSlot);
-              if (currentDeveloper) currentDeveloper.ingest(step);
-              if (messageEl && currentDeveloper) {
-                liveAssistantEntry.trace = currentDeveloper.snapshot();
-              }
-            }
-
-            else if(currentEvent === 'body_state'){
-              if (currentDeveloper) currentDeveloper.ingest(window.AgentPanel.fromSse('body_state', data));
-              renderIntimacy(data);
+            else if(currentEvent === 'agent_event'){
+              const developerEvent = publishDevEvent('agent_event', data);
+              if (currentDeveloper) currentDeveloper.ingest(developerEvent);
             }
             
           }catch(e){
@@ -2070,15 +1910,23 @@ async function llogs(){
     const lc=document.getElementById('lc');
     if(ev){
       let html='';
-      // ── 監控日誌：Life 狀態已遷移，這裡只保留活動流 ──────
+      // 持久狀態列（Mac / 定位 / 螢幕）
+      const PORDER=['app','mac','location','screentime','weather'];
+      const pItems=PORDER.map(k=>ev.persistent[k]).filter(Boolean);
+      if(pItems.length>0){
+        html+='<div style="display:flex;flex-wrap:wrap;gap:6px;padding:4px 0 10px">';
+        html+=pItems.map(e=>'<div style="font-size:11px;background:var(--blush);color:var(--rose-deep);border-radius:8px;padding:3px 8px;line-height:1.4"><span style="opacity:.65">'+e.time+'</span>  '+e.message+'</div>').join('');
+        html+='</div>';
+      }
+      // 活動流
       const acts=ev.activity||[];
       const LEVEL_COLOR={info:'var(--rose-deep)',warn:'#b86e00',alert:'#c0392b'};
       if(acts.length>0){
-        html=acts.map(e=>{
+        html+=acts.map(e=>{
           const col=LEVEL_COLOR[e.level]||'var(--rose-deep)';
           return '<div class="li"><div class="lm"><span class="lt" style="color:'+col+'">'+e.type+'</span><span class="ltime">'+e.time+'</span></div><div>'+e.message+'</div></div>';
         }).join('');
-      } else {
+      } else if(pItems.length===0){
         html='<div class="es">📡 等待系統事件...</div>';
       }
       lc.innerHTML=html;
@@ -2385,59 +2233,6 @@ async function updateChatLimit() {
 
 
 
-async function loadMainModelConfig() {
-  try {
-    const response = await fetch(AU + '/model-config');
-    const data = await response.json();
-    const select = document.getElementById('main-model-select');
-    const label = document.getElementById('current-model-label');
-    if (!select || !label || !data.current) return;
-    select.innerHTML = (data.models || []).map(item =>
-      '<option value="' + item.model + '">' + modelDisplayName(item.model) + '</option>'
-    ).join('');
-    select.value = data.current.model;
-    label.textContent = modelDisplayName(data.current.model);
-  } catch (err) {
-    console.error('Failed to load main model config:', err);
-  }
-}
-
-function modelDisplayName(model) {
-  const labels = {
-    'gpt-5.6-terra': 'GPT-5.6 Terra',
-    'gpt-5.6-luna': 'GPT-5.6 Luna',
-    'gpt-5.4-mini': 'GPT-5.4 Mini',
-    'claude-sonnet-5': 'Claude Sonnet 5',
-    'claude-haiku-4-5': 'Claude Haiku 4.5',
-    'deepseek-v4-flash': 'DeepSeek V4 Flash'
-  };
-  return labels[model] || model;
-}
-
-async function updateMainModel() {
-  const select = document.getElementById('main-model-select');
-  const label = document.getElementById('current-model-label');
-  const status = document.getElementById('main-model-status');
-  const item = select && select.options[select.selectedIndex];
-  if (!select || !item) return;
-  try {
-    const response = await fetch(AU + '/model-config', {
-      method: 'PATCH',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({model: select.value})
-    });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.detail || '模型设置失败');
-    label.textContent = modelDisplayName(data.current.model);
-    status.textContent = '已保存：' + modelDisplayName(data.current.model);
-    setTimeout(() => { status.textContent = ''; }, 1800);
-  } catch (err) {
-    status.textContent = '保存失败';
-    console.error('Failed to update main model:', err);
-    loadMainModelConfig();
-  }
-}
-
 // ========== 在一起日子 ==========
 async function loadTogetherDays() {
   try {
@@ -2498,28 +2293,52 @@ const sidebar = new Sidebar(sessionManager);
 const chatView = new ChatView();
 
 async function renderActiveSession(sessionId, { fresh = false, skipFeedback = false } = {}) {
+  console.log("[SESSION TRACE] STEP1: renderActiveSession called, sessionId:", sessionId, "fresh:", fresh);
   const cm = document.getElementById('cm');
-  cm.classList.add('fading');
-
-  await new Promise(r => setTimeout(r, 120));
-
-  if (fresh) {
-    chatMemoryCache = [];
-    chatView.clear();
-  } else {
-    const messages = await sessionManager.getMessages(sessionId);
-    chatView.renderHistory(messages);
+  console.log("[SESSION TRACE] STEP1.5: cm element found:", cm !== null);
+  if (!cm) {
+    console.error("[SESSION TRACE] ERROR: cm element not found!");
+    return;
+  }
+  try {
+    cm.classList.add('fading');
+    console.log("[SESSION TRACE] STEP2: fading added");
+  } catch (e) {
+    console.error("[SESSION TRACE] ERROR in classList.add:", e);
   }
 
+  await new Promise(r => setTimeout(r, 120));
+  console.log("[SESSION TRACE] STEP3: after timeout");
+  
+  if (fresh) {
+    console.log("[SESSION TRACE] STEP4a: fresh=true, rendering empty history");
+    chatView.renderHistory([]);  // ← 直接渲染空历史，不清空全局缓存
+    console.log("[SESSION TRACE] STEP4b: renderHistory([]) finished");
+  } else {
+    console.log("[SESSION TRACE] STEP4a: fresh=false, fetching messages");
+    const messages = await sessionManager.getMessages(sessionId);
+    console.log("[SESSION TRACE] STEP4b: getMessages 返回 messages.length:", messages ? messages.length : 0);
+    chatView.renderHistory(messages);
+    console.log("[SESSION TRACE] STEP4c: renderHistory called");
+  }
+
+  console.log("[SESSION TRACE] STEP5: getting current session");
   const session = sessionManager.getCurrentSession();
   chatView.updateHeader(session ? session.title : '新对话');
+  console.log("[SESSION TRACE] STEP6: updateHeader called");
+  
   chatView.scrollToBottom();
+  console.log("[SESSION TRACE] STEP7: scrollToBottom called");
 
   cm.classList.remove('fading');
+  console.log("[SESSION TRACE] STEP8: fading removed");
+  
   // 頁面初始化時不顯示「已切換聊天」提示
   if (!skipFeedback) {
     chatView.showFeedback(fresh ? '已建立新聊天' : '已切換聊天');
+    console.log("[SESSION TRACE] STEP9: showFeedback called");
   }
+  console.log("[SESSION TRACE] STEP10: renderActiveSession finished");
 }
 
 sidebar.onNewChat = (sessionId) => renderActiveSession(sessionId, { fresh: true });
@@ -2543,6 +2362,7 @@ async function initChatExperience() {
 }
 
 document.addEventListener('DOMContentLoaded', initChatExperience);
+
 
 </script>
 </body>

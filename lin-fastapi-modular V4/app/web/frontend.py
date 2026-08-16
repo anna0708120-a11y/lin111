@@ -1464,6 +1464,29 @@ function stab(tab){
 if(document.getElementById('pg-mine')?.classList.contains('active')){loadPeriod();loadChatConfig();loadMainModelConfig();}
 loadTogetherDays(); // 页面加载时初始化在一起日子
 
+// /spaces only supplies a view selector. Existing tab renderers remain the data/UI owners.
+function openDeepLinkedView(){
+  const view=new URLSearchParams(window.location.search).get('view');
+  if(!view)return;
+  if(view==='diary'){
+    stab('memory');
+    const archiveTab=document.querySelector('.mtab[onclick*="\'ar\'"]');
+    if(archiveTab)smtab({target:archiveTab},'ar');
+    return;
+  }
+  if(view==='time'){
+    stab('monitor');
+    const timeline=document.getElementById('eventTimeline');
+    if(timeline)setTimeout(()=>timeline.scrollIntoView({behavior:'smooth',block:'start'}),0);
+    return;
+  }
+  if(view==='favorites'){
+    stab('memory');
+    return;
+  }
+  if(view==='whispers')stab('chat');
+}
+
 function toggleThink(el){
   const box=el.nextElementSibling;
   const open=box.style.display!=='none';
@@ -2516,6 +2539,7 @@ async function initChatExperience() {
   } else {
     chatView.updateHeader('新对话');
   }
+  openDeepLinkedView();
 }
 
 document.addEventListener('DOMContentLoaded', initChatExperience);

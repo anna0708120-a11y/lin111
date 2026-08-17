@@ -877,8 +877,27 @@ html,body{height:100%;background:var(--cream);font-family:var(--font-sans);color
 
 <div class="pg" id="pg-life">
   <div class="card">
-    <div class="cl">Life</div>
-    <div class="es">Life System is available through the existing Lin runtime.</div>
+    <div class="life-toolbar">
+      <div class="cl">Life State</div>
+      <button class="life-refresh" type="button" onclick="refreshLife()">Refresh</button>
+    </div>
+    <div class="life-refresh-status" id="lifeRefreshStatus" aria-live="polite"></div>
+    <div class="life-device-summary" id="lifeDeviceSummary"><div class="life-empty">Loading device state...</div></div>
+  </div>
+  <div class="card"><div class="life-section-heading"><div class="cl">Dynamic Observation</div><div class="life-mode-toggle" data-life-toggle="dynamic"><button type="button" class="active" onclick="setLifeMode('dynamic','readable')">Show</button><button type="button" onclick="setLifeMode('dynamic','raw')">Raw</button></div></div><div id="lifeDynamicObservation"><div class="es">Loading...</div></div></div>
+  <div class="card"><div class="life-section-heading"><div class="cl">Life Context</div><div class="life-mode-toggle" data-life-toggle="context"><button type="button" class="active" onclick="setLifeMode('context','readable')">Show</button><button type="button" onclick="setLifeMode('context','raw')">Raw</button></div></div><div id="lifeContext"><div class="es">Loading...</div></div></div>
+  <div class="card"><div class="life-section-heading"><div class="cl">Self Timeline</div><div class="life-mode-toggle" data-life-toggle="timeline"><button type="button" class="active" onclick="setLifeMode('timeline','readable')">Show</button><button type="button" onclick="setLifeMode('timeline','raw')">Raw</button></div></div><div class="life-date-row"><input id="lifeTimelineDate" type="date" aria-label="Select Life Timeline date" onchange="refreshLife()"><button class="life-refresh" type="button" onclick="refreshLife()">View</button></div><div class="life-event-list" id="lifeTimeline"><div class="es">Loading...</div></div></div>
+  <div class="card"><div class="life-section-heading"><div class="cl">Life Activity / Audit</div><div class="life-mode-toggle" data-life-toggle="audit"><button type="button" class="active" onclick="setLifeMode('audit','readable')">Show</button><button type="button" onclick="setLifeMode('audit','raw')">Raw</button></div></div><div class="life-audit-list" id="lifeAudit"><div class="es">Loading...</div></div></div>
+</div>
+
+<div class="pg" id="pg-workgroup">
+  <iframe id="workgroupSpace" title="Lin Workgroup" src="/spaces/embed" style="width:100%;height:55%;border:0;background:var(--cream);"></iframe>
+  <div class="card" id="workgroupChat">
+    <div class="cl">Internal Workgroup</div>
+    <div id="workgroupMembers" class="workgroup-members"></div>
+    <div id="workgroupMessages" class="workgroup-messages"><div class="es">Loading workgroup...</div></div>
+    <form id="workgroupComposer" class="workgroup-composer"><input id="workgroupInput" placeholder="Message the internal Workgroup..." autocomplete="off"><button type="submit">Send</button></form>
+    <div id="workgroupPlaceholder"></div>
   </div>
 </div>
 
@@ -924,13 +943,14 @@ html,body{height:100%;background:var(--cream);font-family:var(--font-sans);color
   <button class="tb" id="tb-chat" onclick="stab('chat')"><span class="ti">💬</span>Chat</button>
   <button class="tb" id="tb-memory" onclick="stab('memory')"><span class="ti">🧠</span>Memory</button>
   <button class="tb" id="tb-life" onclick="stab('life')"><span class="ti">◌</span>Life</button>
-  <button class="tb" id="tb-workgroup" type="button" onclick="location.assign('/spaces')"><span class="ti">👥</span>Workgroup</button>
+  <button class="tb" id="tb-workgroup" type="button" onclick="stab('workgroup')"><span class="ti">👥</span>Workgroup</button>
   <button class="tb" id="tb-mine" onclick="stab('mine')"><span class="ti">🌙</span>Mine</button>
 </div>
 
 <script src="/static/js/session_manager.js"></script>
 <script src="/static/js/sidebar.js"></script>
 <script src="/static/js/chat_view.js"></script>
+<script src="/static/js/life_view.js"></script>
 <script src="/static/js/dev_panel.js"></script>
 <script>
 const AU = window.location.origin;
@@ -1306,6 +1326,8 @@ function updateCatExpression(mood){
 loadMood();
 loadCollapsedAtmosphere();
 
+if(document.getElementById('pg-life')?.classList.contains('active')){initLifeView();}
+
 // ---------- PWA ----------
 if('serviceWorker' in navigator){
   window.addEventListener('load', ()=>{ navigator.serviceWorker.register('/sw.js').catch(()=>{}); });
@@ -1325,11 +1347,16 @@ function stab(tab){
     setTimeout(()=>{const c=document.getElementById('cm');c.scrollTop=c.scrollHeight;},50);
     if(!sessionManager.currentSessionId && sessionManager.sessions.length === 0){sidebar.handleNewChat();}
   }
-  else{pg.style.display='block';pg.classList.add('active');if(tab==='memory')rmem();if(tab==='monitor')loadMood();if(tab==='mine'){loadPeriod();loadChatConfig();loadTogetherDays();}}
+  else{pg.style.display='block';pg.classList.add('active');if(tab==='memory')rmem();if(tab==='monitor')loadMood();if(tab==='life')initLifeView();if(tab==='workgroup')initWorkgroup();if(tab==='mine'){loadPeriod();loadChatConfig();loadTogetherDays();}}
 }
 // 页面加载时如果是Mine tab,立即展开
 if(document.getElementById('pg-mine')?.classList.contains('active')){loadPeriod();loadChatConfig();}
 loadTogetherDays(); // 页面加载时初始化在一起日子
+
+let workgroupPollTimer=null;
+async function loadWorkgroup(){const membersEl=document.getElementById('workgroupMembers'),messagesEl=document.getElementById('workgroupMessages');if(!membersEl||!messagesEl)return;const follow=messagesEl.scrollHeight-messagesEl.scrollTop-messagesEl.clientHeight<=48;try{const r=await fetch('/workgroup/messages');if(!r.ok)throw new Error('load failed');const d=await r.json();membersEl.innerHTML=Object.entries(d.members||{}).map(([id,m])=>'<div class="workgroup-member"><span class="workgroup-avatar '+id+'">'+({anna:'A',gemma:'G',lin:'L'}[id]||'?')+'</span>'+m.name+'</div>').join('');messagesEl.innerHTML=(d.messages||[]).map(m=>'<article class="workgroup-message '+m.member+'"><span class="workgroup-avatar '+m.member+'">'+({anna:'A',gemma:'G',lin:'L'}[m.member]||'?')+'</span><div><div class="workgroup-meta">'+m.member_profile.name+'</div><div class="workgroup-bubble"></div>'+(m.member==='gemma'?'<div class="workgroup-process">Gemma preprocessing · '+(m.metadata?.model||'gemma4:31b')+'</div>':'')+'</div></article>').join('')||'<div class="es">No workgroup messages yet</div>';(d.messages||[]).forEach((m,i)=>{const el=messagesEl.querySelectorAll('.workgroup-bubble')[i];if(el)el.textContent=m.text});if(follow)messagesEl.scrollTop=messagesEl.scrollHeight}catch(e){messagesEl.innerHTML='<div class="es">Workgroup is unavailable</div>'}}
+function initWorkgroup(){loadWorkgroup();if(!workgroupPollTimer)workgroupPollTimer=setInterval(loadWorkgroup,3000);const form=document.getElementById('workgroupComposer');if(form&&!form.dataset.bound){form.dataset.bound='1';form.addEventListener('submit',async e=>{e.preventDefault();const input=document.getElementById('workgroupInput'),text=input.value.trim();if(!text)return;input.value='';input.disabled=true;try{const r=await fetch('/workgroup/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});if(r.ok)await loadWorkgroup()}finally{input.disabled=false;input.focus()}})}}
+window.addEventListener('message',event=>{if(event.origin!==window.location.origin||event.data?.source!=='lin-spaces')return;if(event.data.action==='workgroup-chat'){document.getElementById('workgroupChat')?.scrollIntoView({behavior:'smooth',block:'start'});return}if(event.data.action?.startsWith('placeholder:')){document.getElementById('workgroupPlaceholder').innerHTML='<div class="es">'+event.data.action.slice(12)+' space is reserved.</div>'}});
 
 // /spaces only supplies a view selector. Existing tab renderers remain the data/UI owners.
 function openDeepLinkedView(){
@@ -1352,6 +1379,7 @@ function openDeepLinkedView(){
     return;
   }
   if(view==='whispers')stab('chat');
+  if(view==='workgroup')stab('workgroup');
 }
 
 function toggleThink(el){

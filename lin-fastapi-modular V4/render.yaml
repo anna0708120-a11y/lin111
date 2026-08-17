@@ -8,6 +8,18 @@ services:
     envVars:
       - key: A6API_API_KEY
         sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: HERMES_RUNTIME_URL
+        sync: false
+      - key: HERMES_RUNTIME_TOKEN
+        sync: false
+      - key: HERMES_MANAGEMENT_URL
+        sync: false
+      - key: HERMES_MANAGEMENT_TOKEN
+        sync: false
       - key: DEEPSEEK_API_KEY
         sync: false
       - key: DEEPSEEK_BASE_URL

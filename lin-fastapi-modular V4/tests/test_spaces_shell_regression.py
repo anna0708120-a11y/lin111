@@ -9,20 +9,20 @@ SPACES = ROOT / "app/web/spaces_routes.py"
 def test_spaces_has_six_cards_and_preserves_lin_entry_points():
     spaces = SPACES.read_text()
     assert spaces.count("grid.appendChild(rot(card(") == 6
-    assert "location.assign('/?view=time')" in spaces
-    assert "location.assign('/?view=diary')" in spaces
-    assert "location.assign('/?view=favorites')" in spaces
-    assert "location.assign('/?view=whispers')" in spaces
-    assert "location.assign('/agent-settings')" in spaces
+    assert "parentAction('placeholder:时间')" in spaces
+    assert "parent.location.assign('/?view=diary')" in spaces
+    assert "parentAction('placeholder:最喜欢的话')" in spaces
+    assert "parent.location.assign('/agent-settings')" in spaces
+    assert "parentAction('placeholder:悄悄话')" in spaces
 
 
 def test_lin_shell_has_all_bottom_tabs_and_matching_pages():
     frontend = FRONTEND.read_text()
-    for tab in ("monitor", "chat", "memory", "life", "mine"):
+    for tab in ("monitor", "chat", "memory", "life", "workgroup", "mine"):
         assert f'id="tb-{tab}"' in frontend
         assert f'id="pg-{tab}"' in frontend
-    assert 'id="tb-workgroup"' in frontend
-    assert "location.assign('/spaces')" in frontend
+    assert "stab('workgroup')" in frontend
+    assert 'src="/spaces/embed"' in frontend
 
 
 def test_frontend_has_no_external_google_font_import_and_stab_guards_missing_pages():

@@ -10,21 +10,26 @@ RENDER = (ROOT / "render.yaml").read_text()
 
 def test_workgroup_is_a_lin_shell_page_with_legacy_spaces_links_redirected():
     assert 'id="pg-workgroup"' in FRONTEND
+    assert 'id="workgroupHome"' in FRONTEND
+    assert 'id="workgroupChat"' in FRONTEND
     assert "location.assign('/spaces')" not in FRONTEND
     assert "stab('workgroup')" in FRONTEND
     assert 'id="tb-workgroup"' in FRONTEND
-    assert 'src="/spaces/embed"' in FRONTEND
+    assert "iframe" not in FRONTEND[FRONTEND.index('id=\"pg-workgroup\"'):FRONTEND.index('id=\"pg-mine\"')]
     assert '@router.get("/spaces")' in SPACES
     assert 'RedirectResponse("/?view=workgroup", status_code=307)' in SPACES
+    assert "/spaces/embed" not in SPACES
 
 
-def test_embedded_dwell_keeps_six_cards_and_uses_existing_workgroup_api():
-    assert SPACES.count("grid.appendChild(rot(card(") == 6
-    assert "workgroup-chat" in SPACES
-    assert "fetch('/workgroup/messages')" in FRONTEND
-    assert "method:'POST'" in FRONTEND
-    assert "parent.location.assign('/?view=diary')" in SPACES
-    assert "parent.location.assign('/agent-settings')" in SPACES
+def test_dwell_bento_is_directly_rendered_in_workgroup_home_and_opens_native_chat():
+    assert FRONTEND.count("grid.appendChild(rot(card(") == 6
+    assert "showWorkgroupChat" in FRONTEND
+    assert "fetch(AU+'/workgroup/messages')" in FRONTEND
+    assert "id=\"workgroupMembers\"" in FRONTEND
+    assert "id=\"workgroupMessages\"" in FRONTEND
+    assert "id=\"workgroupComposer\"" in FRONTEND
+    assert "location.assign('/?view=diary')" in FRONTEND
+    assert "location.assign('/agent-settings')" in FRONTEND
 
 
 def test_life_tab_uses_existing_read_only_life_endpoints():

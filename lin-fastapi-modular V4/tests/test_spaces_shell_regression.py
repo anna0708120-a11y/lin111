@@ -6,14 +6,15 @@ FRONTEND = ROOT / "app/web/frontend.py"
 SPACES = ROOT / "app/web/spaces_routes.py"
 
 
-def test_spaces_has_six_cards_and_preserves_lin_entry_points():
-    spaces = SPACES.read_text()
-    assert spaces.count("grid.appendChild(rot(card(") == 6
-    assert "parentAction('placeholder:时间')" in spaces
-    assert "parent.location.assign('/?view=diary')" in spaces
-    assert "parentAction('placeholder:最喜欢的话')" in spaces
-    assert "parent.location.assign('/agent-settings')" in spaces
-    assert "parentAction('placeholder:悄悄话')" in spaces
+def test_workgroup_bento_has_six_cards_and_preserves_lin_entry_points():
+    frontend = FRONTEND.read_text()
+    assert frontend.count("grid.appendChild(rot(card(") == 6
+    assert "showWorkgroupPlaceholder('时间')" in frontend
+    assert "location.assign('/?view=diary')" in frontend
+    assert "showWorkgroupPlaceholder('最喜欢的话')" in frontend
+    assert "location.assign('/agent-settings')" in frontend
+    assert "showWorkgroupPlaceholder('悄悄话')" in frontend
+    assert '@router.get("/spaces")' in SPACES.read_text()
 
 
 def test_lin_shell_has_all_bottom_tabs_and_matching_pages():
@@ -22,7 +23,8 @@ def test_lin_shell_has_all_bottom_tabs_and_matching_pages():
         assert f'id="tb-{tab}"' in frontend
         assert f'id="pg-{tab}"' in frontend
     assert "stab('workgroup')" in frontend
-    assert 'src="/spaces/embed"' in frontend
+    workgroup = frontend[frontend.index('id="pg-workgroup"'):frontend.index('id="pg-mine"')]
+    assert "iframe" not in workgroup
 
 
 def test_frontend_has_no_external_google_font_import_and_stab_guards_missing_pages():

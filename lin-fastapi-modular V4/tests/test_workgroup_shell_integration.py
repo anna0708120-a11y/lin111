@@ -40,6 +40,6 @@ def test_life_tab_uses_existing_read_only_life_endpoints():
     assert "/life/events?limit=50" in LIFE_VIEW
 
 
-def test_render_contract_declares_required_persistence_and_hermes_settings_env():
+def test_render_blueprint_does_not_override_existing_runtime_secrets():
     for key in ("SUPABASE_URL", "SUPABASE_KEY", "HERMES_MANAGEMENT_URL", "HERMES_MANAGEMENT_TOKEN"):
-        assert f"- key: {key}" in RENDER
+        assert f"- key: {key}" not in RENDER

@@ -17,12 +17,21 @@ _ALLOWED_PREFIXES = (
     "/api/auth", "/assets/", "/fonts/", "/fonts-terminal/", "/favicon.ico",
 )
 
+_LEGACY_MANAGEMENT_URL = "https://hermes-agent-bdd8.onrender.com"
+_CURRENT_MANAGEMENT_URL = "https://hermes-agent-1-i8yp.onrender.com"
+
+
+def _management_token() -> str:
+    return os.getenv("HERMES_MANAGEMENT_TOKEN", "") or os.getenv("HERMES_DASHBOARD_INTERNAL_TOKEN", "")
+
 
 def _base_url() -> str:
     value = os.getenv("HERMES_MANAGEMENT_URL", "").rstrip("/")
-    token = os.getenv("HERMES_MANAGEMENT_TOKEN", "")
+    token = _management_token()
     if not value or not token:
         raise HTTPException(status_code=503, detail="Hermes Management Service is not configured")
+    if value == _LEGACY_MANAGEMENT_URL:
+        value = _CURRENT_MANAGEMENT_URL
     return value
 
 
@@ -31,7 +40,7 @@ def _allowed(path: str) -> bool:
 
 
 def _headers(request: Request) -> dict[str, str]:
-    headers = {"X-Hermes-Internal-Token": os.environ["HERMES_MANAGEMENT_TOKEN"]}
+    headers = {"X-Hermes-Internal-Token": _management_token()}
     if content_type := request.headers.get("content-type"):
         headers["content-type"] = content_type
     return headers

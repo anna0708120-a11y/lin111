@@ -158,6 +158,11 @@ ENABLE_PHOTO = str(_setting("ENABLE_PHOTO", "enable_photo", "true")).lower() == 
 # 用 Bearer Token 方式：请求header加 Authorization: Bearer 这个值
 CONTEXT_API_TOKEN = os.getenv("CONTEXT_API_TOKEN", "")
 
+
+def get_context_api_token() -> str:
+    """Read the Context token from the current process environment."""
+    return os.getenv("CONTEXT_API_TOKEN", "").strip()
+
 # ---- Read-only Render -> Hermes Lin Context Bridge ----
 LIN_CONTEXT_API_TOKEN = os.getenv("LIN_CONTEXT_API_TOKEN", "")
 LIN_CONTEXT_TTL_SECONDS = int(os.getenv("LIN_CONTEXT_TTL_SECONDS", "900"))

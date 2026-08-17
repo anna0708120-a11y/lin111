@@ -60,12 +60,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
 </script>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap');
-:root{--cream:#FAF8F5;--white:#FFF;--blush:#F2E8E4;--rose:#C9897A;--rose-deep:#A86556;--muted:#9B8F8A;--dark:#2C2320;--border:#E8DDD9;--shadow:rgba(44,35,32,.08);--safe-top:env(safe-area-inset-top);--safe-bottom:env(safe-area-inset-bottom);--header-height:calc(65px + var(--safe-top));}
+:root{--cream:#FAF8F5;--white:#FFF;--blush:#F2E8E4;--rose:#C9897A;--rose-deep:#A86556;--muted:#9B8F8A;--dark:#2C2320;--border:#E8DDD9;--shadow:rgba(44,35,32,.08);--safe-top:env(safe-area-inset-top);--safe-bottom:env(safe-area-inset-bottom);--header-height:calc(65px + var(--safe-top));--font-sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang TC","Noto Sans TC",sans-serif;--font-serif:Georgia,"Times New Roman","Songti TC","Noto Serif TC",serif;}
 [data-theme="dark"]{--cream:#000;--white:#1C1C1E;--blush:#2C2C2E;--rose:#E0997F;--rose-deep:#F0AC94;--muted:#8E8E93;--dark:#F2F2F7;--border:#38383A;--shadow:rgba(0,0,0,.4);}
 body,.hdr,.card,.tab-bar,.bub,.pill,.mtab,.msel,.minp,.ci,.theme-toggle{transition:background-color .2s ease,color .2s ease,border-color .2s ease;}
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;color:var(--dark);overflow:hidden;}
+html,body{height:100%;background:var(--cream);font-family:var(--font-sans);color:var(--dark);overflow:hidden;}
 .together-card{position:relative;width:100%;height:140px;margin-bottom:16px;border-radius:20px;overflow:hidden;background:var(--blush);}
 .together-bg{position:absolute;top:0;left:0;right:0;bottom:0;background-size:cover;background-position:center;opacity:0.90;}
 .together-content{position:relative;z-index:1;display:flex;align-items:center;padding:20px;height:100%;}
@@ -876,6 +875,12 @@ html,body{height:100%;background:var(--cream);font-family:'DM Sans',sans-serif;c
   </div>
 </div>
 
+<div class="pg" id="pg-life">
+  <div class="card">
+    <div class="cl">Life</div>
+    <div class="es">Life System is available through the existing Lin runtime.</div>
+  </div>
+</div>
 
 <div class="pg" id="pg-mine">
   <div class="card period-card">
@@ -1308,10 +1313,13 @@ if('serviceWorker' in navigator){
 
 
 function stab(tab){
-  document.querySelectorAll('.tb').forEach(e=>e.classList.remove('active'));
-  document.getElementById('tb-'+tab).classList.add('active');
-  document.querySelectorAll('.pg').forEach(e=>{e.style.display='none';e.classList.remove('active');});
   const pg=document.getElementById('pg-'+tab);
+  const tabButton=document.getElementById('tb-'+tab);
+  if(!pg)return;
+  if(!tabButton)return;
+  document.querySelectorAll('.tb').forEach(e=>e.classList.remove('active'));
+  tabButton.classList.add('active');
+  document.querySelectorAll('.pg').forEach(e=>{e.style.display='none';e.classList.remove('active');});
   if(tab==='chat'){
     pg.style.display='flex';pg.classList.add('active');
     setTimeout(()=>{const c=document.getElementById('cm');c.scrollTop=c.scrollHeight;},50);

@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 from fastapi import HTTPException
+from starlette.requests import Request
 
 
 ROOT = Path(__file__).parents[1]
@@ -36,3 +37,13 @@ def test_management_proxy_requires_url_and_token(monkeypatch):
         proxy._base_url()
 
     assert error.value.status_code == 503
+
+
+def test_management_proxy_forwards_lin_path_prefix_and_agent_management_assets(monkeypatch):
+    monkeypatch.setenv("HERMES_MANAGEMENT_TOKEN", "management-token")
+
+    assert proxy._allowed("/dashboard-plugins/example/plugin.js")
+    assert proxy._allowed("/ds-assets/fonts/example.woff2")
+    assert proxy._allowed("/api/dashboard/themes")
+    request = Request({"type": "http", "headers": []})
+    assert proxy._headers(request)["X-Forwarded-Prefix"] == "/agent-settings/hermes"

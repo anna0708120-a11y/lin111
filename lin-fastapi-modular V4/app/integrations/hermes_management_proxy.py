@@ -13,8 +13,10 @@ from fastapi.responses import HTMLResponse, Response
 router = APIRouter(prefix="/agent-settings/hermes", tags=["hermes-management"])
 
 _ALLOWED_PREFIXES = (
-    "/api/config", "/api/model", "/api/skills", "/api/tools/toolsets", "/api/mcp",
-    "/api/auth", "/assets/", "/fonts/", "/fonts-terminal/", "/favicon.ico",
+    "/api/auth", "/api/config", "/api/dashboard/", "/api/env", "/api/mcp",
+    "/api/model", "/api/skills", "/api/status", "/api/tools/toolsets",
+    "/assets/", "/dashboard-plugins/", "/ds-assets/", "/fonts/",
+    "/fonts-terminal/", "/favicon.ico",
 )
 
 _LEGACY_MANAGEMENT_URL = "https://hermes-agent-bdd8.onrender.com"
@@ -40,7 +42,10 @@ def _allowed(path: str) -> bool:
 
 
 def _headers(request: Request) -> dict[str, str]:
-    headers = {"X-Hermes-Internal-Token": _management_token()}
+    headers = {
+        "X-Hermes-Internal-Token": _management_token(),
+        "X-Forwarded-Prefix": "/agent-settings/hermes",
+    }
     if content_type := request.headers.get("content-type"):
         headers["content-type"] = content_type
     return headers

@@ -12,7 +12,10 @@ def test_workgroup_bento_has_six_cards_and_preserves_lin_entry_points():
     assert "showWorkgroupPlaceholder('时间')" in frontend
     assert "location.assign('/?view=diary')" in frontend
     assert "showWorkgroupPlaceholder('最喜欢的话')" in frontend
-    assert "location.assign('/agent-settings')" in frontend
+    assert "showHermesAgentCard" in frontend
+    assert "fetch(AU+'/api/hermes/status')" in frontend
+    assert "fetch(AU+'/api/hermes/models')" in frontend
+    assert "fetch(AU+'/api/hermes/task'" in frontend
     assert "showWorkgroupPlaceholder('悄悄话')" in frontend
     assert '@router.get("/spaces")' in SPACES.read_text()
 

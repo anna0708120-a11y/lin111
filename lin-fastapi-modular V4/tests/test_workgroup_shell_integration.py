@@ -29,7 +29,8 @@ def test_dwell_bento_is_directly_rendered_in_workgroup_home_and_opens_native_cha
     assert "id=\"workgroupMessages\"" in FRONTEND
     assert "id=\"workgroupComposer\"" in FRONTEND
     assert "location.assign('/?view=diary')" in FRONTEND
-    assert "location.assign('/agent-settings')" in FRONTEND
+    assert "showHermesAgentCard" in FRONTEND
+    assert "fetch(AU+'/api/hermes/task'" in FRONTEND
 
 
 def test_life_tab_uses_existing_read_only_life_endpoints():

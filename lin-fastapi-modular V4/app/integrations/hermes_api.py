@@ -11,6 +11,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 
 import requests
 
@@ -30,12 +31,32 @@ class HermesAPIConfig:
     @classmethod
     def from_env(cls) -> "HermesAPIConfig":
         return cls(
-            base_url=os.getenv("HERMES_API_URL", "").rstrip("/"),
-            api_key=os.getenv("HERMES_API_KEY", ""),
-            model=os.getenv("HERMES_MODEL", ""),
+            base_url=os.getenv("HERMES_API_URL", "").strip(),
+            api_key=os.getenv("HERMES_API_KEY", "").strip(),
+            model=os.getenv("HERMES_MODEL", "").strip(),
             connect_timeout=float(os.getenv("HERMES_API_CONNECT_TIMEOUT", "5")),
             read_timeout=float(os.getenv("HERMES_API_READ_TIMEOUT", "120")),
         )
+
+    def normalized_base_url(self) -> str:
+        """Return the API origin, accepting either origin or origin/v1."""
+        raw = self.base_url.strip().rstrip("/")
+        if not raw:
+            return ""
+        try:
+            parsed = urlsplit(raw)
+        except ValueError as exc:
+            raise HermesAPIError("HERMES_API_URL is invalid") from exc
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise HermesAPIError("HERMES_API_URL must be an absolute http(s) URL")
+        if parsed.query or parsed.fragment:
+            raise HermesAPIError("HERMES_API_URL must not contain a query or fragment")
+        path = parsed.path.rstrip("/")
+        if path == "/v1":
+            path = ""
+        elif path.endswith("/v1"):
+            path = path[:-3].rstrip("/")
+        return urlunsplit((parsed.scheme, parsed.netloc, path, "", ""))
 
     def validate(self) -> None:
         missing = [
@@ -69,27 +90,40 @@ class HermesAPIClient:
 
     def _request(self, method: str, path: str, **kwargs: Any) -> requests.Response:
         try:
+            self.config.validate()
+            url = f"{self.config.normalized_base_url()}{path}"
             response = self.session.request(
                 method,
-                f"{self.config.base_url}{path}",
+                url,
                 headers=self._headers(),
                 timeout=(self.config.connect_timeout, self.config.read_timeout),
                 **kwargs,
             )
-        except requests.RequestException as exc:
-            raise HermesAPIError("Hermes API is unavailable") from exc
+        except HermesAPIError:
+            raise
+        except (requests.RequestException, ValueError) as exc:
+            raise HermesAPIError("Hermes API request could not be constructed or sent") from exc
         if response.status_code >= 400:
             try:
                 payload = response.json()
                 detail = payload.get("error", {}).get("message", "")
             except (ValueError, AttributeError):
-                detail = ""
+                detail = "non-JSON response"
             suffix = f": {detail[:300]}" if detail else ""
             raise HermesAPIError(f"Hermes API returned {response.status_code}{suffix}")
         return response
 
+    def _json(self, response: requests.Response, endpoint: str) -> Any:
+        try:
+            return response.json()
+        except (ValueError, TypeError) as exc:
+            raise HermesAPIError(
+                f"Hermes API {endpoint} returned a non-JSON response; "
+                "HERMES_API_URL must point to the API Server, not the Dashboard"
+            ) from exc
+
     def list_models(self) -> list[dict[str, Any]]:
-        payload = self._request("GET", "/v1/models").json()
+        payload = self._json(self._request("GET", "/v1/models"), "/v1/models")
         models = payload.get("data") if isinstance(payload, dict) else None
         if not isinstance(models, list):
             raise HermesAPIError("Hermes API returned an invalid /v1/models response")
@@ -101,16 +135,19 @@ class HermesAPIClient:
         ``store`` is false because Phase 2 intentionally does not make Hermes
         the owner of Lin's long-term memory or conversation state.
         """
-        payload = self._request(
-            "POST",
+        payload = self._json(
+            self._request(
+                "POST",
+                "/v1/responses",
+                json={
+                    "model": self.config.model,
+                    "input": task,
+                    "store": False,
+                    "stream": False,
+                },
+            ),
             "/v1/responses",
-            json={
-                "model": self.config.model,
-                "input": task,
-                "store": False,
-                "stream": False,
-            },
-        ).json()
+        )
         return parse_response(payload)
 
 

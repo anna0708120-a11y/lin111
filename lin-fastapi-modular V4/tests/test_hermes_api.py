@@ -85,6 +85,29 @@ def test_list_models_uses_official_models_endpoint():
     assert session.calls[0][1] == "https://hermes.example/v1/models"
 
 
+def test_base_url_normalization_accepts_root_and_v1_forms():
+    assert HermesAPIConfig("https://hermes.example/", "k", "m").normalized_base_url() == "https://hermes.example"
+    assert HermesAPIConfig("https://hermes.example/v1", "k", "m").normalized_base_url() == "https://hermes.example"
+    assert HermesAPIConfig("https://hermes.example/api/v1/", "k", "m").normalized_base_url() == "https://hermes.example/api"
+
+
+def test_base_url_rejects_non_http_or_query_urls():
+    for value in ("hermes.example", "https://hermes.example?x=1", "https://"):
+        with pytest.raises(HermesAPIError, match="HERMES_API_URL"):
+            HermesAPIConfig(value, "k", "m").normalized_base_url()
+
+
+def test_client_converts_non_json_success_response():
+    class HtmlResponse(FakeResponse):
+        def json(self):
+            raise ValueError("not JSON")
+
+    session = FakeSession(HtmlResponse("<html>Dashboard</html>"))
+    config = HermesAPIConfig("https://hermes.example", "secret-value", "configured-model")
+    with pytest.raises(HermesAPIError, match="not the Dashboard"):
+        HermesAPIClient(config, session=session).list_models()
+
+
 def test_parse_response_rejects_missing_final_text():
     with pytest.raises(HermesAPIError, match="final assistant text"):
         parse_response({"object": "response", "output": []})

@@ -28,7 +28,18 @@ def _client() -> HermesAPIClient:
 def hermes_api_status() -> dict[str, Any]:
     config = HermesAPIConfig.from_env()
     configured = all((config.base_url, config.api_key, config.model))
-    return {"configured": configured}
+    try:
+        endpoint = f"{config.normalized_base_url()}/v1" if config.base_url else None
+        url_valid = bool(endpoint)
+    except HermesAPIError:
+        endpoint = None
+        url_valid = False
+    return {
+        "configured": configured and url_valid,
+        "url_valid": url_valid,
+        "api_base": endpoint,
+        "model_configured": bool(config.model),
+    }
 
 
 @router.get("/models")

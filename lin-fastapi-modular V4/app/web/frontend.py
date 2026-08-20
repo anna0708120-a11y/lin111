@@ -414,6 +414,7 @@ html,body{height:100%;background:var(--cream);font-family:var(--font-sans);color
 .maw{display:flex;flex-direction:column;gap:8px;margin-top:12px;}
 .msel,.minp{border:1.5px solid var(--border);border-radius:10px;padding:8px 12px;font-size:13px;font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);outline:none;}
 .minp{resize:none;min-height:72px;}
+.model-selector-current{font-size:14px;color:var(--dark);margin:8px 0 10px}.model-selector-current span{color:var(--rose-deep);font-weight:600}.model-selector-status{font-size:11px;color:var(--muted);min-height:16px;margin-top:6px}
 .msel:focus,.minp:focus{border-color:var(--rose);}
 .msave{background:var(--rose);color:white;border:none;border-radius:10px;padding:10px;font-size:13px;font-weight:600;cursor:pointer;}
 .cms{flex:1;overflow-y:auto;padding:16px 16px 8px;-webkit-overflow-scrolling:touch;position:relative;transition:opacity .15s ease;}
@@ -945,6 +946,15 @@ html,body{height:100%;background:var(--cream);font-family:var(--font-sans);color
         <span id="save-check" style="display: none; position: absolute; top: -12px; right: -12px; font-size: 24px; color: #5CB85C;">✔</span>
       </button>
     </div>
+  </div>
+</div>
+
+  <!-- 模型设置 -->
+  <div class="card model-selector-card" style="max-width: 60%; margin-left: auto; margin-right: auto;">
+    <div class="cl">模型切换</div>
+    <div class="model-selector-current">当前模型：<span id="current-model-label">DeepSeek V4 Flash</span></div>
+    <select id="main-model-select" class="msel" onchange="updateMainModel()" aria-label="选择聊天模型"></select>
+    <div id="main-model-status" class="model-selector-status" aria-live="polite"></div>
   </div>
 </div>
 
@@ -2292,6 +2302,60 @@ async function updateChatLimit() {
   }
 }
 
+
+
+async function loadMainModelConfig() {
+  try {
+    const response = await fetch(AU + '/model-config');
+    const data = await response.json();
+    const select = document.getElementById('main-model-select');
+    const label = document.getElementById('current-model-label');
+    if (!select || !label || !data.current) return;
+    select.innerHTML = (data.models || []).map(item =>
+      '<option value="' + item.model + '">' + modelDisplayName(item.model) + '</option>'
+    ).join('');
+    select.value = data.current.model;
+    label.textContent = modelDisplayName(data.current.model);
+  } catch (err) {
+    console.error('Failed to load main model config:', err);
+  }
+}
+
+function modelDisplayName(model) {
+  const labels = {
+    'gpt-5.6-terra': 'GPT-5.6 Terra',
+    'gpt-5.6-luna': 'GPT-5.6 Luna',
+    'gpt-5.4-mini': 'GPT-5.4 Mini',
+    'claude-sonnet-5': 'Claude Sonnet 5',
+    'claude-haiku-4-5': 'Claude Haiku 4.5',
+    'deepseek-v4-flash': 'DeepSeek V4 Flash'
+  };
+  return labels[model] || model;
+}
+
+async function updateMainModel() {
+  const select = document.getElementById('main-model-select');
+  const label = document.getElementById('current-model-label');
+  const status = document.getElementById('main-model-status');
+  const item = select && select.options[select.selectedIndex];
+  if (!select || !item) return;
+  try {
+    const response = await fetch(AU + '/model-config', {
+      method: 'PATCH',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({model: select.value})
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || '模型设置失败');
+    label.textContent = modelDisplayName(data.current.model);
+    status.textContent = '已保存：' + modelDisplayName(data.current.model);
+    setTimeout(() => { status.textContent = ''; }, 1800);
+  } catch (err) {
+    status.textContent = '保存失败';
+    console.error('Failed to update main model:', err);
+    loadMainModelConfig();
+  }
+}
 
 
 // ========== 在一起日子 ==========

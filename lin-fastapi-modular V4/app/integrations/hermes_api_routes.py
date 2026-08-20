@@ -21,7 +21,7 @@ class HermesTaskPayload(BaseModel):
 
 
 def _client() -> HermesAPIClient:
-    return HermesAPIClient()
+    return HermesAPIClient(config=HermesAPIConfig.from_env())
 
 
 @router.get("/status")

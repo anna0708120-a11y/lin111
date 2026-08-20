@@ -32,7 +32,7 @@ class HermesAPIConfig:
     def from_env(cls) -> "HermesAPIConfig":
         return cls(
             base_url=(os.getenv("HERMES_API_URL") or os.getenv("HERMES_AGENT_URL") or "").strip(),
-            api_key=(os.getenv("HERMES_API_KEY") or os.getenv("HERMES_AGENT_API_KEY") or os.getenv("API_SERVER_KEY") or "").strip(),
+            api_key=(os.getenv("HERMES_API_KEY") or os.getenv("HERMES_AGENT_API_KEY") or "").strip(),
             model=(os.getenv("HERMES_MODEL") or os.getenv("HERMES_AGENT_MODEL") or "").strip(),
             connect_timeout=float(os.getenv("HERMES_API_CONNECT_TIMEOUT", "5")),
             read_timeout=float(os.getenv("HERMES_API_READ_TIMEOUT", "120")),

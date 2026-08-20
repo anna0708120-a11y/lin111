@@ -77,6 +77,23 @@ def test_client_uses_official_responses_endpoint_and_configured_model():
     assert result["tool_calls"] == [{"name": "web_search", "status": "completed"}]
 
 
+def test_config_uses_hermes_url_and_key_without_api_server_key_fallback(monkeypatch):
+    monkeypatch.setenv("HERMES_API_URL", "https://hermes.example/v1")
+    monkeypatch.setenv("HERMES_API_KEY", "hermes-key")
+    monkeypatch.setenv("API_SERVER_KEY", "lin-server-key")
+    monkeypatch.setenv("HERMES_MODEL", "gemma4:31b")
+
+    config = HermesAPIConfig.from_env()
+
+    assert config.normalized_base_url() == "https://hermes.example"
+    assert config.api_key == "hermes-key"
+    assert HermesAPIClient(config)._headers()["Authorization"] == "Bearer hermes-key"
+
+    monkeypatch.delenv("HERMES_API_KEY")
+    with pytest.raises(HermesAPIError, match="HERMES_API_KEY"):
+        HermesAPIClient(HermesAPIConfig.from_env())._headers()
+
+
 def test_list_models_uses_official_models_endpoint():
     session = FakeSession(FakeResponse({"object": "list", "data": [{"id": "configured-model"}]}))
     config = HermesAPIConfig("https://hermes.example", "api-key", "configured-model")

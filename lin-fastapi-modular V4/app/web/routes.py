@@ -25,7 +25,6 @@ from app.life.phase7 import get_audit, get_candidate, run_life_runtime_tick
 from app.life.mcp_registry import registry as life_capability_registry
 from app.integration.lin_context import build_lin_context, verify_lin_context_token
 from app.integration.phase_b import receive_hermes_event, verify_hermes_callback_token
-from app.integration.hermes_api import HermesAPIError, list_models, run_task
 from app.llm.main_router import get_main_model_config, list_main_models
 from app.state import state
 from app.web.pwa import MANIFEST_JSON, SERVICE_WORKER_JS
@@ -197,27 +196,6 @@ def lin_context_endpoint(
         session_id=session_id,
         memory_query=memory_query,
     )
-
-
-class HermesTaskInput(BaseModel):
-    prompt: str = Field(min_length=1, max_length=12000)
-    model: Optional[str] = Field(default=None, max_length=200)
-
-
-@router.get("/api/hermes/models")
-def hermes_models_endpoint():
-    try:
-        return list_models()
-    except HermesAPIError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
-
-
-@router.post("/api/hermes/task")
-def hermes_task_endpoint(payload: HermesTaskInput):
-    try:
-        return run_task(payload.prompt, model=payload.model)
-    except HermesAPIError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 @router.post("/internal/lin-events/v1")

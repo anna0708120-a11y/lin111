@@ -25,6 +25,8 @@ def test_phase3_keeps_text_segments_and_independent_activity_history():
 
 def test_phase3_restores_history_details_and_filters_memory():
     assert "event.type === 'memory'" in ACTIVITY
+    assert "['failed', 'unknown'].includes(status)" in ACTIVITY
+    assert "['success', 'failed', 'skipped', 'not_executed', 'unknown'].includes(status)" in ACTIVITY
     assert "a.events = (item.events || []).map" in ACTIVITY
     assert "a._renderPhase(e)" in ACTIVITY
     assert "classList.toggle('expanded')" in ACTIVITY

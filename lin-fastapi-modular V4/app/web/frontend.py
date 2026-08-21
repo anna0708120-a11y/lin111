@@ -1700,7 +1700,7 @@ async function confirmImageSend() {
         // 修復：與 send() 保持一致，不要調用 smsg()
         // 直接將消息添加到內存緩存並保存到資料庫
         const activityTrace = activityTurn ? activityTurn.finish() : null;
-        if(contentBuffer){
+        if(contentBuffer || activityTrace){
           const entry = { 
             r: 'lin', 
             t: contentBuffer, 
@@ -1756,6 +1756,10 @@ async function confirmImageSend() {
               if (data.message) {
                 addMsg('lin', data.message);
               }
+            }
+
+            else if (currentEvent === 'tool_step_update') {
+              if (activityTurn && data.event) activityTurn.handleTimelineEvent(data.event);
             }
 
             else if (currentEvent === 'agent_event') {
@@ -1852,7 +1856,7 @@ async function send(){
         // 修復：不要調用 smsg()，因為消息已經在串流過程中顯示
         // 直接將消息添加到內存緩存並保存到資料庫
         const activityTrace = activityTurn ? activityTurn.finish() : null;
-        if(contentBuffer){
+        if(contentBuffer || activityTrace){
           const entry = { 
             r: 'lin', 
             t: contentBuffer, 
@@ -1907,6 +1911,10 @@ async function send(){
               if(data.message){
                 addMsg('lin', data.message);
               }
+            }
+
+            else if(currentEvent === 'tool_step_update'){
+              if (activityTurn && data.event) activityTurn.handleTimelineEvent(data.event);
             }
 
             else if(currentEvent === 'agent_event'){

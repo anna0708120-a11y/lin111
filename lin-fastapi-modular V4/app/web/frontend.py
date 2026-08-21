@@ -947,7 +947,6 @@ html,body{height:100%;background:var(--cream);font-family:var(--font-sans);color
       </button>
     </div>
   </div>
-</div>
 
   <!-- 模型设置 -->
   <div class="card model-selector-card" style="max-width: 60%; margin-left: auto; margin-right: auto;">

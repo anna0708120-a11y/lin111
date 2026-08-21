@@ -149,7 +149,7 @@
 
   window.AgentActivity = {
     create(container) { return new Turn(container); },
-    mountHistory(container, snapshot) { (snapshot?.activities || []).forEach(item => { const a = new Activity(container); (item.events || []).forEach(e => a._renderPhase(e)); a.complete(); }); return container; },
+    mountHistory(container, snapshot) { (snapshot?.activities || []).forEach(item => { const a = new Activity(container); a.events = (item.events || []).map(e => ({ ...e })); a.events.forEach(e => { if (e.type === 'tool') a.byTool.set(String(e.id), e); a._renderPhase(e); }); a.complete(); }); return container; },
     unwrap,
   };
 })();

@@ -54,7 +54,7 @@ class ChatView {
         ? '.agent-panel-slot:not([data-message-id])'
         : '.agent-panel-slot[data-message-id="' + CSS.escape(messageId) + '"]';
       const slot = this.cmEl.querySelector(selector);
-      if (slot && window.AgentPanel) window.AgentPanel.mountHistory(slot, trace);
+      if (slot && window.AgentActivity) window.AgentActivity.mountHistory(slot, trace);
     });
     this.scrollToBottom();
   }

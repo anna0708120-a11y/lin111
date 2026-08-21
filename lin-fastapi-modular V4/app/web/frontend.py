@@ -150,24 +150,7 @@ html,body{height:100%;background:var(--cream);font-family:var(--font-sans);color
 .think-box{font-size:12px;line-height:1.65;color:var(--muted);background:var(--blush);border-radius:12px;padding:10px 12px;margin-bottom:6px;max-width:78%;white-space:pre-line;}
 .mstar{font-size:9px;letter-spacing:1px;}
 /* Phase 3: Tool UI（假数据渲染，未接真实工具）—— 开放枚举状态映射 */
-.tool-card{font-size:12px;line-height:1.5;border-radius:12px;padding:8px 12px;margin-bottom:6px;max-width:78%;background:var(--blush);border:1px solid var(--border);}
-.tool-card-head{display:flex;align-items:center;gap:6px;font-weight:600;color:var(--muted);}
-.tool-card-icon{font-size:13px;}
-.tool-card-name{flex:1;}
-.tool-card-status{font-size:10px;letter-spacing:.5px;text-transform:uppercase;padding:2px 6px;border-radius:8px;}
-.tool-card-message{margin-top:6px;color:var(--muted);white-space:pre-line;font-size:11px;}
-.tool-card-details{margin-top:4px;color:var(--muted);font-size:10px;line-height:1.6;font-family:ui-monospace,monospace;}
-.tool-card-details li{list-style:none;padding-left:12px;position:relative;}
-.tool-card-details li:before{content:'✓';position:absolute;left:0;color:var(--rose);}
-/* 状态色彩映射（开放枚举，兼容未来 waiting/cancelled/paused/streaming/custom） */
-.tool-card.running .tool-card-status,.tool-card.waiting .tool-card-status,.tool-card.streaming .tool-card-status{background:var(--border);color:var(--muted);}
-.tool-card.success .tool-card-status{background:var(--rose);color:#fff;}
-.tool-card.error .tool-card-status,.tool-card.cancelled .tool-card-status{background:#e08a8a;color:#fff;}
-.tool-card.paused .tool-card-status{background:#d4b896;color:#fff;}
-.tool-card.custom .tool-card-status{background:var(--blush);color:var(--muted);border:1px dashed var(--border);}
-/* 动画：running/waiting/streaming 状态下图标旋转 */
-.tool-card.running .tool-card-icon,.tool-card.waiting .tool-card-icon,.tool-card.streaming .tool-card-icon{animation:tool-spin 1s linear infinite;display:inline-block;}
-@keyframes tool-spin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
+/* Agent Activity lives in static/agent_activity.css and is loaded only for this chat shell. */
 .tab-bar{display:flex;background:var(--white);border-top:1px solid var(--border);position:fixed;bottom:0;left:0;right:0;padding-bottom:calc(var(--safe-bottom) * 0.8);z-index:200;height:56px;}
 .tb{flex:1;padding:10px 4px 8px;display:flex;flex-direction:column;align-items:center;gap:2px;border:none;background:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:9px;color:var(--muted);text-transform:uppercase;}
 .tb.active{color:var(--rose-deep);}
@@ -966,11 +949,12 @@ html,body{height:100%;background:var(--cream);font-family:var(--font-sans);color
   <button class="tb" id="tb-mine" onclick="stab('mine')"><span class="ti">🌙</span>Mine</button>
 </div>
 
+<link rel="stylesheet" href="/static/agent_activity.css">
 <script src="/static/js/session_manager.js"></script>
 <script src="/static/js/sidebar.js"></script>
 <script src="/static/js/chat_view.js"></script>
+<script src="/static/js/agent_activity.js"></script>
 <script src="/static/js/life_view.js"></script>
-<script src="/static/js/dev_panel.js"></script>
 <script>
 const AU = window.location.origin;
 
@@ -1495,7 +1479,7 @@ function renderOnly(history){
       time: display,
       think: m.thinking || m.think,
       message_id: m.message_id,
-      trace: m.trace
+      trace: m.trace || chatMemoryCache.find(local => local.r === 'lin' && local.t === (m.content != null ? m.content : m.t))?.trace
     };
   });
   
@@ -1703,8 +1687,7 @@ async function confirmImageSend() {
     
     let reasoningBuffer = '';
     let contentBuffer = '';
-    let currentMsgDiv = null;
-    const currentDeveloper = window.DeveloperConsole ? window.DeveloperConsole.createCompact(document.getElementById('cm')) : null;
+    const activityTurn = window.AgentActivity ? window.AgentActivity.create(document.getElementById('cm')) : null;
     publishDevEvent('api_start', {model: 'watch', input: 'image'});
     let currentEvent = null;
     let sseBuffer = '';
@@ -1716,6 +1699,7 @@ async function confirmImageSend() {
         console.log('[DEBUG] Image stream done. contentBuffer:', contentBuffer, 'reasoningBuffer:', reasoningBuffer);
         // 修復：與 send() 保持一致，不要調用 smsg()
         // 直接將消息添加到內存緩存並保存到資料庫
+        const activityTrace = activityTurn ? activityTurn.finish() : null;
         if(contentBuffer){
           const entry = { 
             r: 'lin', 
@@ -1724,6 +1708,7 @@ async function confirmImageSend() {
             iso: new Date().toISOString() 
           };
           if(reasoningBuffer) entry.think = reasoningBuffer;
+          if(activityTrace) entry.trace = activityTrace;
           
           chatMemoryCache.push(entry);
           if(chatMemoryCache.length > 200) chatMemoryCache = chatMemoryCache.slice(-200);
@@ -1732,8 +1717,6 @@ async function confirmImageSend() {
           syncChat().catch(e => console.error('[DEBUG] Failed to sync image chat:', e));
         }
         publishDevEvent('done', {});
-        if (currentDeveloper) currentDeveloper.complete();
-        window.DeveloperConsole.refreshState();
         scrollDown();
         pendingImageDataUrl = null;
         return;
@@ -1757,38 +1740,14 @@ async function confirmImageSend() {
             const data = JSON.parse(line.slice(6));
             
             if (currentEvent === 'reasoning' && data.content !== undefined) {
-              const developerEvent = publishDevEvent('reasoning', data);
-              if (currentDeveloper) currentDeveloper.ingest(developerEvent);
               reasoningBuffer += data.content;
+              if (activityTurn) activityTurn.thinking(data.content);
               scrollDown();
             }
             
-            else if (currentEvent === 'content' && data.delta !== undefined) {
-              const developerEvent = publishDevEvent('content', data);
-              if (currentDeveloper) currentDeveloper.ingest(developerEvent);
+            else if ((currentEvent === 'content' || currentEvent === 'text_delta') && data.delta !== undefined) {
               contentBuffer += data.delta;
-              
-              if (!currentMsgDiv) {
-                const msgDiv = document.createElement('div');
-                msgDiv.className = 'msg lin';
-                
-                const rowDiv = document.createElement('div');
-                rowDiv.className = 'msg-row';
-                rowDiv.innerHTML = avatarHtml('lin');
-                
-                const bubDiv = document.createElement('div');
-                bubDiv.className = 'bub';
-                bubDiv.textContent = contentBuffer;
-                
-                rowDiv.appendChild(bubDiv);
-                msgDiv.appendChild(rowDiv);
-                document.getElementById('cm').appendChild(msgDiv);
-                console.log('[DEBUG] Content msgDiv appended to #cm');
-                
-                currentMsgDiv = bubDiv;
-              } else {
-                currentMsgDiv.textContent = contentBuffer;
-              }
+              if (activityTurn) activityTurn.appendText(data.delta);
               scrollDown();
             }
             
@@ -1800,8 +1759,7 @@ async function confirmImageSend() {
             }
 
             else if (currentEvent === 'agent_event') {
-              const developerEvent = publishDevEvent('agent_event', data);
-              if (currentDeveloper) currentDeveloper.ingest(developerEvent);
+              if (activityTurn) activityTurn.handleEvent(data);
             }
             
           } catch(e) {
@@ -1851,8 +1809,7 @@ async function send(){
     
     let reasoningBuffer = '';
     let contentBuffer = '';
-    let currentMsgDiv = null;
-    const currentDeveloper = window.DeveloperConsole ? window.DeveloperConsole.createCompact(document.getElementById('cm')) : null;
+    const activityTurn = window.AgentActivity ? window.AgentActivity.create(document.getElementById('cm')) : null;
     let currentEvent = null;
     let sseBuffer = '';
     
@@ -1864,6 +1821,7 @@ async function send(){
         console.log('[DEBUG] Stream done. contentBuffer:', contentBuffer, 'reasoningBuffer:', reasoningBuffer);
         // 修復：不要調用 smsg()，因為消息已經在串流過程中顯示
         // 直接將消息添加到內存緩存並保存到資料庫
+        const activityTrace = activityTurn ? activityTurn.finish() : null;
         if(contentBuffer){
           const entry = { 
             r: 'lin', 
@@ -1872,6 +1830,7 @@ async function send(){
             iso: new Date().toISOString() 
           };
           if(reasoningBuffer) entry.think = reasoningBuffer;
+          if(activityTrace) entry.trace = activityTrace;
           
           chatMemoryCache.push(entry);
           if(chatMemoryCache.length > 200) chatMemoryCache = chatMemoryCache.slice(-200);
@@ -1880,8 +1839,6 @@ async function send(){
           syncChat().catch(e => console.error('[DEBUG] Failed to sync chat:', e));
         }
         publishDevEvent('done', {});
-        if (currentDeveloper) currentDeveloper.complete();
-        window.DeveloperConsole.refreshState();
         scrollDown();
         return;
       }
@@ -1904,32 +1861,14 @@ async function send(){
             const data = JSON.parse(line.slice(6));
             
             if (currentEvent === 'reasoning' && data.content !== undefined) {
-              const developerEvent = publishDevEvent('reasoning', data);
-              if (currentDeveloper) currentDeveloper.ingest(developerEvent);
               reasoningBuffer += data.content;
+              if (activityTurn) activityTurn.thinking(data.content);
               scrollDown();
             }
             
-            else if (currentEvent === 'content' && data.delta !== undefined) {
-              const developerEvent = publishDevEvent('content', data);
-              if (currentDeveloper) currentDeveloper.ingest(developerEvent);
+            else if ((currentEvent === 'content' || currentEvent === 'text_delta') && data.delta !== undefined) {
               contentBuffer += data.delta;
-              if (!currentMsgDiv) {
-                const msgDiv = document.createElement('div');
-                msgDiv.className = 'msg lin';
-                const rowDiv = document.createElement('div');
-                rowDiv.className = 'msg-row';
-                rowDiv.innerHTML = avatarHtml('lin');
-                const bubDiv = document.createElement('div');
-                bubDiv.className = 'bub';
-                bubDiv.textContent = contentBuffer;
-                rowDiv.appendChild(bubDiv);
-                msgDiv.appendChild(rowDiv);
-                document.getElementById('cm').appendChild(msgDiv);
-                currentMsgDiv = bubDiv;
-              } else {
-                currentMsgDiv.textContent = contentBuffer;
-              }
+              if (activityTurn) activityTurn.appendText(data.delta);
               scrollDown();
             }
             
@@ -1941,8 +1880,7 @@ async function send(){
             }
 
             else if(currentEvent === 'agent_event'){
-              const developerEvent = publishDevEvent('agent_event', data);
-              if (currentDeveloper) currentDeveloper.ingest(developerEvent);
+              if (activityTurn) activityTurn.handleEvent(data);
             }
             
           }catch(e){

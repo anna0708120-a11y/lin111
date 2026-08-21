@@ -1825,6 +1825,8 @@ async function send(){
   inp.value='';
   addMsg('anna',txt);
   typing(true);
+  let reasoningBuffer = '';
+  let contentBuffer = '';
   
   try{
     const currentSessionId = sessionManager.currentSessionId;
@@ -1841,8 +1843,6 @@ async function send(){
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     
-    let reasoningBuffer = '';
-    let contentBuffer = '';
     const activityTurn = window.AgentActivity ? window.AgentActivity.create(document.getElementById('cm')) : null;
     let currentEvent = null;
     let sseBuffer = '';

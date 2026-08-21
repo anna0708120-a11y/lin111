@@ -1688,7 +1688,7 @@ async function confirmImageSend() {
     let reasoningBuffer = '';
     let contentBuffer = '';
     const activityTurn = window.AgentActivity ? window.AgentActivity.create(document.getElementById('cm')) : null;
-    publishDevEvent('api_start', {model: 'watch', input: 'image'});
+    safePublishDevEvent('api_start', {model: 'watch', input: 'image'});
     let currentEvent = null;
     let sseBuffer = '';
     
@@ -1716,7 +1716,7 @@ async function confirmImageSend() {
           // 異步保存到後端，不阻塞 UI
           syncChat().catch(e => console.error('[DEBUG] Failed to sync image chat:', e));
         }
-        publishDevEvent('done', {});
+        safePublishDevEvent('done', {});
         scrollDown();
         pendingImageDataUrl = null;
         return;
@@ -1782,6 +1782,36 @@ async function confirmImageSend() {
   }
 }
 
+function safePublishDevEvent(type, payload) {
+  if (typeof window.publishDevEvent !== 'function') return;
+  try {
+    window.publishDevEvent(type, payload);
+  } catch (e) {
+    console.debug('[Agent Activity] Dev event skipped:', e);
+  }
+}
+
+function createHttpError(response, context) {
+  const error = new Error(`${context} failed with HTTP ${response.status}`);
+  error.kind = 'http';
+  error.status = response.status;
+  return error;
+}
+
+function describeSendError(error) {
+  if (error && error.kind === 'http') return `请求失败（HTTP ${error.status}）`;
+  if (error instanceof TypeError && /fetch|network|load/i.test(error.message || '')) return '网络连接失败';
+  return '前端处理回复时发生错误';
+}
+
+async function readSseStream(reader, decoder, processChunk) {
+  while (true) {
+    const result = await reader.read();
+    await processChunk(result);
+    if (result.done) return;
+  }
+}
+
 async function send(){
   if (pendingImageDataUrl) return confirmImageSend();
 
@@ -1801,8 +1831,8 @@ async function send(){
       body: JSON.stringify({activity: txt, session_id: currentSessionId})
     });
     
-    if(!response.ok) throw new Error('Network error');
-    publishDevEvent('api_start', {model: 'watch'});
+    if(!response.ok) throw createHttpError(response, 'Watch request');
+    safePublishDevEvent('api_start', {model: 'watch'});
     
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
@@ -1838,7 +1868,7 @@ async function send(){
           // 異步保存到後端，不阻塞 UI
           syncChat().catch(e => console.error('[DEBUG] Failed to sync chat:', e));
         }
-        publishDevEvent('done', {});
+        safePublishDevEvent('done', {});
         scrollDown();
         return;
       }
@@ -1889,15 +1919,15 @@ async function send(){
         }
       }
       
-      reader.read().then(processChunk);
+      return processChunk;
     }
     
-    reader.read().then(processChunk);
+    await readSseStream(reader, decoder, processChunk);
     
   }catch(e){
     typing(false);
-    addMsg('lin', '網絡錯誤');
-    console.error('Send error:', e);
+    console.error('[send] Failed:', e);
+    if (!contentBuffer) addMsg('lin', describeSendError(e));
   }
 }
 document.getElementById('ci').addEventListener('keypress',e=>{if(e.key==='Enter')send();});

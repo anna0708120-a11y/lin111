@@ -23,6 +23,13 @@ def test_hermes_tool_is_enabled_only_with_complete_runtime_credentials(monkeypat
     assert bridge.config.base_url == "https://runtime.example"
 
 
+def test_brain_forwards_hermes_tool_kwargs_to_the_main_model_stream():
+    assert "def model_stream(*, tools=None, tool_choice=None, tool_result=None):" in BRAIN
+    assert "tools=tools," in BRAIN
+    assert "tool_choice=tool_choice," in BRAIN
+    assert "tool_result=tool_result," in BRAIN
+
+
 def test_brain_stream_maps_real_agent_events_to_existing_sse_contract():
     assert "stream_with_hermes_agent" in BRAIN
     assert "configured_hermes_bridge" in BRAIN

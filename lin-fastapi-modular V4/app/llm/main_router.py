@@ -85,7 +85,7 @@ def chat(system_prompt, *, temperature=0.95, max_tokens=None, top_p=0.95, thinki
         return None, None
 
 
-def stream_chat(system_prompt, *, temperature=0.95, max_tokens=None, top_p=0.95, thinking=True, provider=None, model=None):
+def stream_chat(system_prompt, *, temperature=0.95, max_tokens=None, top_p=0.95, thinking=True, provider=None, model=None, tools=None, tool_choice=None, tool_result=None):
     try:
         yield from get_main_provider(provider=provider, model=model).stream_chat(
             system_prompt,
@@ -93,6 +93,9 @@ def stream_chat(system_prompt, *, temperature=0.95, max_tokens=None, top_p=0.95,
             max_tokens=max_tokens,
             top_p=top_p,
             thinking=thinking,
+            tools=tools,
+            tool_choice=tool_choice,
+            tool_result=tool_result,
         )
     except Exception as exc:
         print(f"[llm.router] stream routing failed: {exc}")

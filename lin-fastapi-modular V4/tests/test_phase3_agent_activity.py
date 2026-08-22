@@ -21,6 +21,8 @@ def test_phase3_keeps_text_segments_and_independent_activity_history():
     assert "this.history = []" in ACTIVITY
     assert "this.history.push(this.activity.snapshot())" in ACTIVITY
     assert "this.activity?.byTool?.has(id)" in ACTIVITY
+    assert "this.byAgent = new Map()" in ACTIVITY
+    assert "this.byAgent.get(agentId)" in ACTIVITY
 
 
 def test_phase3_restores_history_details_and_filters_memory():

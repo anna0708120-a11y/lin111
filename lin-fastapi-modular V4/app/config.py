@@ -78,9 +78,9 @@ MODEL_CATALOG = {
 }
 
 MAIN_PROVIDERS = {
-    "gpt": {"capabilities": {"chat": True, "streaming": True, "reasoning": True, "structured_output": True, "tool_calling": False}},
-    "claude": {"capabilities": {"chat": True, "streaming": True, "reasoning": True, "structured_output": True, "tool_calling": False}},
-    "deepseek": {"capabilities": {"chat": True, "streaming": True, "reasoning": True, "structured_output": True, "tool_calling": False}},
+    "gpt": {"capabilities": {"chat": True, "streaming": True, "reasoning": True, "structured_output": True, "tool_calling": True}},
+    "claude": {"capabilities": {"chat": True, "streaming": True, "reasoning": True, "structured_output": True, "tool_calling": True}},
+    "deepseek": {"capabilities": {"chat": True, "streaming": True, "reasoning": True, "structured_output": True, "tool_calling": True}},
 }
 
 # 旧 DeepSeek client 的兼容配置；主聊天已由 main_router 负责。

@@ -19,10 +19,10 @@ class OpenAICompatibleProvider(LLMProvider):
             streaming=True,
             reasoning=name in {"gpt", "claude", "deepseek"},
             structured_output=True,
-            tool_calling=False,
+            tool_calling=True,
         )
 
-    def _payload(self, system_prompt, *, temperature, max_tokens, top_p, thinking, stream=False):
+    def _payload(self, system_prompt, *, temperature, max_tokens, top_p, thinking, stream=False, tools=None, tool_choice=None, tool_result=None):
         payload = {
             "model": self.model,
             "messages": [
@@ -33,6 +33,11 @@ class OpenAICompatibleProvider(LLMProvider):
             "max_tokens": max_tokens,
             "top_p": top_p,
         }
+        if tools:
+            payload["tools"] = tools
+            payload["tool_choice"] = tool_choice or "auto"
+        if tool_result:
+            payload["messages"].extend(tool_result)
         if stream:
             payload["stream"] = True
         if thinking and self.capabilities.reasoning and self.name != "deepseek":
@@ -73,11 +78,12 @@ class OpenAICompatibleProvider(LLMProvider):
             print(f"[llm.{self.name}] chat failed: {exc}")
             return None, None
 
-    def stream_chat(self, system_prompt, *, temperature=0.95, max_tokens=None, top_p=0.95, thinking=True):
+    def stream_chat(self, system_prompt, *, temperature=0.95, max_tokens=None, top_p=0.95, thinking=True, tools=None, tool_choice=None, tool_result=None):
         if not self.api_key:
             yield ("error", f"{self.name} main API key is not configured")
             return
         reasoning_buffer = []
+        tool_calls = {}
         try:
             response = requests.post(
                 self._url(),
@@ -89,6 +95,9 @@ class OpenAICompatibleProvider(LLMProvider):
                     top_p=top_p,
                     thinking=thinking,
                     stream=True,
+                    tools=tools,
+                    tool_choice=tool_choice,
+                    tool_result=tool_result,
                 ),
                 timeout=self.timeout,
                 stream=True,
@@ -111,6 +120,17 @@ class OpenAICompatibleProvider(LLMProvider):
                 if not choices:
                     continue
                 delta = choices[0].get("delta") or {}
+                tool_deltas = delta.get("tool_calls") or []
+                for tool_delta in tool_deltas:
+                    index = int(tool_delta.get("index", 0))
+                    current = tool_calls.setdefault(index, {"id": "", "name": "", "arguments": ""})
+                    if tool_delta.get("id"):
+                        current["id"] = tool_delta["id"]
+                    function = tool_delta.get("function") or {}
+                    if function.get("name"):
+                        current["name"] = function["name"]
+                    if function.get("arguments"):
+                        current["arguments"] += function["arguments"]
                 reasoning_chunk = delta.get("reasoning_content") or delta.get("reasoning")
                 content_chunk = delta.get("content")
                 if reasoning_chunk is not None:
@@ -120,6 +140,9 @@ class OpenAICompatibleProvider(LLMProvider):
                     yield ("content", content_chunk)
                 if choices[0].get("finish_reason"):
                     break
+            for call in tool_calls.values():
+                if call["id"] and call["name"] and call["arguments"]:
+                    yield ("tool_call", call)
             yield ("raw_reasoning", "".join(reasoning_buffer))
             yield ("done", {})
         except Exception as exc:

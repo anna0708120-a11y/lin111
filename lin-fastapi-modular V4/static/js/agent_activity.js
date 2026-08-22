@@ -40,6 +40,7 @@
       this.parent = parent;
       this.events = [];
       this.byTool = new Map();
+      this.byAgent = new Map();
       this.root = document.createElement('div');
       this.root.className = 'lin-agent-activity';
       this.root.innerHTML = '<div class="lin-agent-live"><span class="lin-agent-mark">✦</span><span class="lin-agent-current">Agent 工作中</span><span class="lin-agent-spinner" aria-hidden="true"></span></div><div class="lin-agent-trail"></div>';
@@ -71,8 +72,12 @@
         phase = { id: 'thinking-' + (this.events.length + 1), type: 'thinking', status: 'complete', name: 'Thinking', detail: event.text || event.content || detailFor(event) };
         this.events.push(phase);
       } else if (type === 'agent.start' || type === 'agent.progress' || type === 'agent.complete' || type === 'agent.failed') {
-        phase = { id: event.id || 'agent-' + (this.events.length + 1), type: 'agent', status: type === 'agent.failed' ? 'error' : type === 'agent.complete' ? 'complete' : 'running', name: event.summary || 'Agent', detail: detailFor(event) };
-        this.events.push(phase);
+        const agentId = String(event.run_id || event.id || 'agent-' + (this.events.length + 1));
+        phase = this.byAgent.get(agentId);
+        if (!phase) { phase = { id: agentId, type: 'agent', status: 'running', name: event.summary || 'Agent', detail: detailFor(event) }; this.byAgent.set(agentId, phase); this.events.push(phase); }
+        phase.status = type === 'agent.failed' ? 'error' : type === 'agent.complete' ? 'complete' : type === 'agent.progress' ? 'progress' : 'running';
+        phase.name = event.summary || phase.name;
+        phase.detail = detailFor(event) || phase.detail;
       } else {
         return false;
       }
@@ -149,7 +154,7 @@
 
   window.AgentActivity = {
     create(container) { return new Turn(container); },
-    mountHistory(container, snapshot) { (snapshot?.activities || []).forEach(item => { const a = new Activity(container); a.events = (item.events || []).map(e => ({ ...e })); a.events.forEach(e => { if (e.type === 'tool') a.byTool.set(String(e.id), e); a._renderPhase(e); }); a.complete(); }); return container; },
+    mountHistory(container, snapshot) { (snapshot?.activities || []).forEach(item => { const a = new Activity(container); a.events = (item.events || []).map(e => ({ ...e })); a.events.forEach(e => { if (e.type === 'tool') a.byTool.set(String(e.id), e); if (e.type === 'agent') a.byAgent.set(String(e.id), e); a._renderPhase(e); }); a.complete(); }); return container; },
     unwrap,
   };
 })();

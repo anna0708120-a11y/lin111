@@ -282,6 +282,7 @@ def _generate_reply_stream_impl(context, app_name=None, use_cache=True, session_
     from app.memory_rules import parse_memory_decision, parse_memory_decision_traced, parse_mood_event, strip_hidden_blocks
     from app import mood_engine
     from app.agent.trace_collector import TraceCollector
+    from app.agent.hermes_stream import configured_hermes_bridge, stream_with_hermes_agent
 
     collector = TraceCollector()
     target_session = session_id or state.current_session_id
@@ -374,11 +375,20 @@ def _generate_reply_stream_impl(context, app_name=None, use_cache=True, session_
     
     print("[TRACE-H] before main model stream")
     try:
-        generator = stream_main_model(
-            system_prompt,
-            max_tokens=config.MAIN_LLM_MAX_TOKENS,
-            provider=selected_model["provider"],
-            model=selected_model["model"],
+        def model_stream(**tool_kwargs):
+            return stream_main_model(
+                system_prompt,
+                max_tokens=config.MAIN_LLM_MAX_TOKENS,
+                provider=selected_model["provider"],
+                model=selected_model["model"],
+                **tool_kwargs,
+            )
+
+        hermes_bridge = configured_hermes_bridge()
+        generator = (
+            stream_with_hermes_agent(model_stream, hermes_bridge)
+            if hermes_bridge is not None
+            else model_stream()
         )
         print("[TRACE-I] after main model stream")
         for event_type, data in generator:
@@ -388,6 +398,8 @@ def _generate_reply_stream_impl(context, app_name=None, use_cache=True, session_
             elif event_type == "content":
                 full_content += data
                 yield f"event: text_delta\ndata: {json.dumps({'delta': data}, ensure_ascii=False)}\n\n"
+            elif event_type == "agent_event":
+                yield f"event: agent_event\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
             elif event_type == "raw_reasoning":
                 raw_reasoning = data
             elif event_type == "error":

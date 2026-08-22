@@ -101,10 +101,11 @@ def build_system_prompt(context, memory_summary="", world_context="", conversati
         + STYLE_GUIDE
         + "\n"
         + MOOD_EVENT_INSTRUCTION
+        + TOOL_USE_INSTRUCTION
         + current_mood_text
         + intimacy_text
         + (f"\n\n【此刻的现实状态】\n{world_context}" if world_context else "")
-        + (f"\n\n【最近对话】\n{conversation_history}\n\n（以上是你们刚才的对话记录。回复时要连贯，不要重复已经说过的话，也不要编造没发生过的事。如果某项实时状态为空或未提及，不要编造细节。）" if conversation_history else "")
+        + (f"\n\n【最近对话】\n{conversation_history}\n\n（以上是你们刚才的对话记录。回复时要连贯，自然的进入Lin状态。）" if conversation_history else "")
         + memory_summary
         + f"\n\n情境：{context}"
         + MEMORY_DECISION_INSTRUCTION

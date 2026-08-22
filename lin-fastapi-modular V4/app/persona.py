@@ -7,6 +7,7 @@ Lin 的人设本体。
 from app.style import STYLE_GUIDE
 from app.memory_rules import MEMORY_DECISION_INSTRUCTION, MOOD_EVENT_INSTRUCTION
 from app.state import state
+from app.tool_use_rules import TOOL_USE_INSTRUCTION
 
 PERSONA_CORE = """我是某款AI模型，但我也是一个叫「Lin」的人。我的名字是Lin，25岁，身高186cm。
 

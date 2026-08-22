@@ -24,6 +24,7 @@ class ChatView {
     }
 
     const agentSlots = [];
+    const thinkingSlots = [];
     let html = '<div class="clabel">with Lin</div>';
     history.forEach((message, index) => {
       const current = message.iso ? new Date(message.iso) : new Date();
@@ -44,11 +45,18 @@ class ChatView {
       if (message.r === 'lin' && message.trace) agentSlots.push({ messageId, trace: message.trace });
       const modelBadge = message.r === 'lin' && message.model
         ? '<div class="model-badge">' + message.model + '</div>' : '';
-      html += '<div class="msg ' + message.r + (showMeta ? '' : ' grouped') + '">' + agentSlot + modelBadge + '<div class="msg-row">' +
+      const thinking = message.r === 'lin' && message.think
+        ? '<button type="button" class="think-toggle" onclick="toggleThink(this)">💭 查看思考過程</button><div class="think-box" data-think-index="' + index + '" style="display:none"></div>' : '';
+      if (message.r === 'lin' && message.think) thinkingSlots.push({ index, think: message.think });
+      html += '<div class="msg ' + message.r + (showMeta ? '' : ' grouped') + '">' + agentSlot + modelBadge + thinking + '<div class="msg-row">' +
         avatarHtml(message.r) + '<div class="bub">' + message.t + '</div></div>' + meta + '</div>';
     });
 
     this.cmEl.innerHTML = html;
+    thinkingSlots.forEach(({ index, think }) => {
+      const box = this.cmEl.querySelector('.think-box[data-think-index="' + index + '"]');
+      if (box) box.textContent = think;
+    });
     agentSlots.forEach(({ messageId, trace }) => {
       const selector = messageId == null
         ? '.agent-panel-slot:not([data-message-id])'

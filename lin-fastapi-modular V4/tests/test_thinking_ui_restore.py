@@ -20,6 +20,7 @@ def test_live_thinking_is_an_independent_message_level_region():
     assert "toggleThink(toggle)" in ACTIVITY
     assert "style.display = 'none'" in ACTIVITY
     assert "insertBefore(toggle" in ACTIVITY
+    assert "insertBefore(box" in ACTIVITY
 
 
 def test_thinking_and_agent_activity_remain_separate_paths():

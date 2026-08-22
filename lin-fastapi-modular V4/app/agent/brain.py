@@ -375,13 +375,15 @@ def _generate_reply_stream_impl(context, app_name=None, use_cache=True, session_
     
     print("[TRACE-H] before main model stream")
     try:
-        def model_stream(**tool_kwargs):
+        def model_stream(*, tools=None, tool_choice=None, tool_result=None):
             return stream_main_model(
                 system_prompt,
                 max_tokens=config.MAIN_LLM_MAX_TOKENS,
                 provider=selected_model["provider"],
                 model=selected_model["model"],
-                **tool_kwargs,
+                tools=tools,
+                tool_choice=tool_choice,
+                tool_result=tool_result,
             )
 
         hermes_bridge = configured_hermes_bridge()

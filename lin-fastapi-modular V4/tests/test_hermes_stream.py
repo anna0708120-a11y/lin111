@@ -1,6 +1,7 @@
 import json
 
 from app.agent.hermes_stream import stream_with_hermes_agent
+from app.integrations.hermes_tool_call import HERMES_AGENT_TOOL
 
 
 class FakeBridge:
@@ -39,6 +40,9 @@ def test_stream_runs_one_real_hermes_round_then_resumes_model_text():
         "raw_reasoning", "content", "raw_reasoning", "done",
     ]
     assert "tools" in calls[0]
+    assert calls[0]["tools"] == [HERMES_AGENT_TOOL]
+    assert calls[0]["tools"][0]["function"]["name"] == "run_hermes_agent"
+    assert calls[0]["tool_choice"] == "auto"
     assert calls[1]["tools"] is None
     assert [message["role"] for message in calls[1]["tool_result"]] == ["assistant", "tool"]
     assert calls[1]["tool_result"][0]["content"] == "Before "

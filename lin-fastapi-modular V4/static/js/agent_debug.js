@@ -16,11 +16,11 @@
   function status(value) {
     if (value === 'success' || value === 'passed') return 'success';
     if (value === 'failed' || value === 'error') return 'error';
-    if (value === 'skipped' || value === 'not_executed') return 'skipped';
+    if (value === 'skipped' || value === 'not_executed') return value;
     if (value === 'running' || value === 'pending') return 'running';
     return 'unknown';
   }
-  function mark(value) { return value === 'success' ? '✓' : value === 'error' ? '✕' : value === 'skipped' ? '—' : value === 'running' ? '…' : '?'; }
+  function mark(value) { return value === 'success' ? '✓' : value === 'error' ? '✕' : value === 'running' ? '…' : '—'; }
   function raw(type, data) { return 'event: ' + type + '\ndata: ' + JSON.stringify(data, null, 2); }
   function set(map, key, value, detail) { map.set(key, { status: status(value), detail: detail || '' }); render(); }
   function addRaw(type, data) { state.rawEvents.unshift(raw(type, data)); state.rawEvents = state.rawEvents.slice(0, 30); render(); }

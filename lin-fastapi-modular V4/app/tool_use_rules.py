@@ -1,5 +1,3 @@
-from app.tool_use_rules import TOOL_USE_INSTRUCTION
-
 """
 Hermes 工具使用规则。
 

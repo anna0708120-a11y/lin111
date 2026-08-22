@@ -16,6 +16,10 @@ def test_history_restores_existing_thinking_toggle_and_box():
 def test_live_thinking_is_an_independent_message_level_region():
     assert "closest('.msg')" in ACTIVITY
     assert "lin-agent-thinking" in ACTIVITY
+    assert "think-toggle" in ACTIVITY
+    assert "toggleThink(toggle)" in ACTIVITY
+    assert "style.display = 'none'" in ACTIVITY
+    assert "insertBefore(toggle" in ACTIVITY
     assert "insertBefore(box" in ACTIVITY
 
 

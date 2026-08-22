@@ -938,6 +938,7 @@ html,body{height:100%;background:var(--cream);font-family:var(--font-sans);color
     <select id="main-model-select" class="msel" onchange="updateMainModel()" aria-label="选择聊天模型"></select>
     <div id="main-model-status" class="model-selector-status" aria-live="polite"></div>
   </div>
+  <div class="card agent-debug-card" id="agent-debug-panel"></div>
 </div>
 
 <div class="tab-bar">
@@ -950,12 +951,19 @@ html,body{height:100%;background:var(--cream);font-family:var(--font-sans);color
 </div>
 
 <link rel="stylesheet" href="/static/agent_activity.css">
+<link rel="stylesheet" href="/static/agent_debug.css">
 <script src="/static/js/session_manager.js"></script>
 <script src="/static/js/sidebar.js"></script>
 <script src="/static/js/chat_view.js"></script>
 <script src="/static/js/agent_activity.js"></script>
+<script src="/static/js/agent_debug.js"></script>
 <script src="/static/js/life_view.js"></script>
 <script>
+function initAgentDebug(){
+  const panel=document.getElementById('agent-debug-panel');
+  if(panel&&window.LinAgentDebug&&!panel.dataset.ready){panel.dataset.ready='1';window.LinAgentDebug.mount(panel);}
+}
+
 const AU = window.location.origin;
 
 // 当前 Session 的聊天记录内存缓存（取代 localStorage 的 lin_chat_v1）。
@@ -1350,7 +1358,7 @@ function stab(tab){
     setTimeout(()=>{const c=document.getElementById('cm');c.scrollTop=c.scrollHeight;},50);
     if(!sessionManager.currentSessionId && sessionManager.sessions.length === 0){sidebar.handleNewChat();}
   }
-  else{pg.style.display='block';pg.classList.add('active');if(tab==='memory')rmem();if(tab==='monitor')loadMood();if(tab==='life')initLifeView();if(tab==='workgroup')initWorkgroup();if(tab==='mine'){loadPeriod();loadChatConfig();loadTogetherDays();}}
+  else{pg.style.display='block';pg.classList.add('active');if(tab==='memory')rmem();if(tab==='monitor')loadMood();if(tab==='life')initLifeView();if(tab==='workgroup')initWorkgroup();if(tab==='mine'){initAgentDebug();loadPeriod();loadChatConfig();loadTogetherDays();}}
 }
 // 页面加载时如果是Mine tab,立即展开
 if(document.getElementById('pg-mine')?.classList.contains('active')){loadPeriod();loadChatConfig();}
@@ -1688,6 +1696,7 @@ async function confirmImageSend() {
     let reasoningBuffer = '';
     let contentBuffer = '';
     const activityTurn = window.AgentActivity ? window.AgentActivity.create(document.getElementById('cm')) : null;
+    if (window.LinAgentDebug) { window.LinAgentDebug.recordCore('api_start', 'running'); }
     safePublishDevEvent('api_start', {model: 'watch', input: 'image'});
     let currentEvent = null;
     let sseBuffer = '';
@@ -1738,6 +1747,7 @@ async function confirmImageSend() {
         if (line.startsWith('data:')) {
           try {
             const data = JSON.parse(line.slice(6));
+            if (window.LinAgentDebug) window.LinAgentDebug.recordSse(currentEvent, data);
             
             if (currentEvent === 'reasoning' && data.content !== undefined) {
               reasoningBuffer += data.content;
@@ -1759,7 +1769,9 @@ async function confirmImageSend() {
             }
 
             else if (currentEvent === 'tool_step_update') {
-              if (activityTurn && data.event) activityTurn.handleTimelineEvent(data.event);
+              const isMemory = data.event && data.event.type === 'memory';
+              const accepted = !!(activityTurn && data.event && activityTurn.handleTimelineEvent(data.event));
+              if (window.LinAgentDebug && !isMemory) { window.LinAgentDebug.recordAgentIngest(accepted, accepted ? '' : 'Invalid tool event'); window.LinAgentDebug.rendered(accepted); }
             }
 
             else if (currentEvent === 'agent_event') {
@@ -1767,6 +1779,7 @@ async function confirmImageSend() {
             }
             
           } catch(e) {
+            if (window.LinAgentDebug) { window.LinAgentDebug.addError('SSE parsed failed: ' + e.message, { event: currentEvent, raw: line }); }
             console.error('Parse SSE error:', e, line);
           }
         }
@@ -1838,6 +1851,7 @@ async function send(){
     });
     
     if(!response.ok) throw createHttpError(response, 'Watch request');
+    if (window.LinAgentDebug) { window.LinAgentDebug.recordCore('api_start', 'running'); }
     safePublishDevEvent('api_start', {model: 'watch'});
     
     const reader = response.body.getReader();
@@ -1893,6 +1907,7 @@ async function send(){
         if(line.startsWith('data:')){
           try{
             const data = JSON.parse(line.slice(6));
+            if (window.LinAgentDebug) window.LinAgentDebug.recordSse(currentEvent, data);
             
             if (currentEvent === 'reasoning' && data.content !== undefined) {
               reasoningBuffer += data.content;
@@ -1914,7 +1929,9 @@ async function send(){
             }
 
             else if(currentEvent === 'tool_step_update'){
-              if (activityTurn && data.event) activityTurn.handleTimelineEvent(data.event);
+              const isMemory = data.event && data.event.type === 'memory';
+              const accepted = !!(activityTurn && data.event && activityTurn.handleTimelineEvent(data.event));
+              if (window.LinAgentDebug && !isMemory) { window.LinAgentDebug.recordAgentIngest(accepted, accepted ? '' : 'Invalid tool event'); window.LinAgentDebug.rendered(accepted); }
             }
 
             else if(currentEvent === 'agent_event'){
@@ -1922,6 +1939,7 @@ async function send(){
             }
             
           }catch(e){
+            if (window.LinAgentDebug) { window.LinAgentDebug.addError('SSE parsed failed: ' + e.message, { event: currentEvent, raw: line }); }
             console.error('Parse SSE error:', e, line);
           }
         }
@@ -2459,6 +2477,7 @@ async function initChatExperience() {
     chatView.updateHeader('新对话');
   }
   openDeepLinkedView();
+  initAgentDebug();
 }
 
 document.addEventListener('DOMContentLoaded', initChatExperience);
